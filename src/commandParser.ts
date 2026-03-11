@@ -1,0 +1,151 @@
+import type { ApprovalPolicy, SandboxMode } from './types.js';
+
+import { parseBooleanWord, tokenizeCommand } from './utils.js';
+
+export interface BindCommandOptions {
+  model?: string | undefined;
+  profile?: string | undefined;
+  sandboxMode?: SandboxMode | undefined;
+  approvalPolicy?: ApprovalPolicy | undefined;
+  search?: boolean | undefined;
+  skipGitRepoCheck?: boolean | undefined;
+  addDirs: string[];
+  extraConfig: string[];
+}
+
+export type ParsedCommand =
+  | { kind: 'help' }
+  | { kind: 'bind'; projectName: string; workspacePath: string; options: BindCommandOptions }
+  | { kind: 'unbind' }
+  | { kind: 'projects' }
+  | { kind: 'status' }
+  | { kind: 'cancel' }
+  | { kind: 'reset' }
+  | { kind: 'queue' };
+
+function readValue(tokens: string[], flag: string): string {
+  const value = tokens.shift();
+
+  if (!value) {
+    throw new Error(`参数 ${flag} 缺少值。`);
+  }
+
+  return value;
+}
+
+function parseSandboxMode(value: string): SandboxMode {
+  if (value === 'read-only' || value === 'workspace-write' || value === 'danger-full-access') {
+    return value;
+  }
+
+  throw new Error(`不支持的 sandbox 模式：${value}`);
+}
+
+function parseApprovalPolicy(value: string): ApprovalPolicy {
+  if (value === 'untrusted' || value === 'on-failure' || value === 'on-request' || value === 'never') {
+    return value;
+  }
+
+  throw new Error(`不支持的 approval 模式：${value}`);
+}
+
+export function isCommandMessage(content: string, prefix: string): boolean {
+  return content.trimStart().startsWith(prefix);
+}
+
+export function parseCommand(content: string, prefix: string): ParsedCommand {
+  const body = content.trimStart().slice(prefix.length).trim();
+
+  if (!body) {
+    return { kind: 'help' };
+  }
+
+  const tokens = tokenizeCommand(body);
+  const command = tokens.shift()?.toLowerCase();
+
+  switch (command) {
+    case 'help':
+      return { kind: 'help' };
+    case 'unbind':
+      return { kind: 'unbind' };
+    case 'projects':
+      return { kind: 'projects' };
+    case 'status':
+      return { kind: 'status' };
+    case 'cancel':
+      return { kind: 'cancel' };
+    case 'reset':
+      return { kind: 'reset' };
+    case 'queue':
+      return { kind: 'queue' };
+    case 'bind': {
+      const projectName = tokens.shift();
+      const workspacePath = tokens.shift();
+
+      if (!projectName || !workspacePath) {
+        throw new Error('用法：!bind <project-name> <workspace-path> [--model ...] [--sandbox ...] [--approval ...]');
+      }
+
+      const options: BindCommandOptions = {
+        addDirs: [],
+        extraConfig: [],
+      };
+
+      while (tokens.length > 0) {
+        const flag = tokens.shift();
+
+        switch (flag) {
+          case '--model':
+            options.model = readValue(tokens, flag);
+            break;
+          case '--profile':
+            options.profile = readValue(tokens, flag);
+            break;
+          case '--sandbox':
+            options.sandboxMode = parseSandboxMode(readValue(tokens, flag));
+            break;
+          case '--approval':
+            options.approvalPolicy = parseApprovalPolicy(readValue(tokens, flag));
+            break;
+          case '--search': {
+            const parsed = parseBooleanWord(readValue(tokens, flag));
+
+            if (parsed === undefined) {
+              throw new Error('--search 只接受 on/off、true/false、yes/no。');
+            }
+
+            options.search = parsed;
+            break;
+          }
+          case '--skip-git-check': {
+            const parsed = parseBooleanWord(readValue(tokens, flag));
+
+            if (parsed === undefined) {
+              throw new Error('--skip-git-check 只接受 on/off、true/false、yes/no。');
+            }
+
+            options.skipGitRepoCheck = parsed;
+            break;
+          }
+          case '--add-dir':
+            options.addDirs.push(readValue(tokens, flag));
+            break;
+          case '--config':
+            options.extraConfig.push(readValue(tokens, flag));
+            break;
+          default:
+            throw new Error(`未知参数：${flag}`);
+        }
+      }
+
+      return {
+        kind: 'bind',
+        projectName,
+        workspacePath,
+        options,
+      };
+    }
+    default:
+      throw new Error(`未知命令：${command}`);
+  }
+}

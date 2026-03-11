@@ -1,0 +1,29 @@
+{
+  "name": "codex-discord-bridge",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Discord backend bridge for Codex CLI with per-channel project mapping, attachments, thread sessions, web admin, and live progress updates",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test --test-concurrency=1 $(find test -name '*.test.ts' | sort)",
+    "test:coverage": "node --import tsx --test --test-concurrency=1 --experimental-test-coverage --test-coverage-lines=85 --test-coverage-functions=85 $(find test -name '*.test.ts' | sort)",
+    "smoke:local": "node --import tsx scripts/smoke-local.ts",
+    "smoke:discord": "node --import tsx scripts/smoke-discord.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.19.3",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}
