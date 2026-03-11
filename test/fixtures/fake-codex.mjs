@@ -1,0 +1,148 @@
+#!/usr/bin/env node
+import fs from 'node:fs/promises';
+import path from 'node:path';
+
+function parseArgs(argv) {
+  const images = [];
+  const addDirs = [];
+  const configs = [];
+  let cwd = process.cwd();
+  let mode = 'exec';
+  let resumeThreadId;
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+
+    if (arg === '-i') {
+      images.push(argv[index + 1]);
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--add-dir') {
+      addDirs.push(argv[index + 1]);
+      index += 1;
+      continue;
+    }
+
+    if (arg === '-c') {
+      configs.push(argv[index + 1]);
+      index += 1;
+      continue;
+    }
+
+    if (arg === '-C') {
+      cwd = argv[index + 1];
+      index += 1;
+      continue;
+    }
+
+    if (arg === 'exec' && argv[index + 1] === 'resume') {
+      mode = 'resume';
+      resumeThreadId = argv[index + 4];
+      break;
+    }
+
+    if (arg === 'exec') {
+      mode = 'exec';
+    }
+  }
+
+  return { images, addDirs, configs, cwd, mode, resumeThreadId };
+}
+
+function event(payload) {
+  process.stdout.write(`${JSON.stringify(payload)}\n`);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function readStdin() {
+  const chunks = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString('utf8').trim();
+}
+
+const args = parseArgs(process.argv.slice(2));
+const prompt = await readStdin();
+const scenario = (() => {
+  if (prompt.includes('[cancel]')) return 'cancel';
+  if (prompt.includes('[slow]')) return 'slow';
+  if (prompt.includes('[fail]')) return 'fail';
+  if (prompt.includes('[invalid-json]')) return 'invalid-json';
+  if (prompt.includes('[command]')) return 'command';
+  if (prompt.includes('[attachments]')) return 'attachments';
+  return 'simple';
+})();
+
+const logDir = process.env.FAKE_CODEX_LOG_DIR;
+if (logDir) {
+  await fs.mkdir(logDir, { recursive: true });
+  const file = path.join(logDir, `${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
+  await fs.writeFile(file, JSON.stringify({ args, prompt, cwd: process.cwd() }, null, 2));
+}
+
+const threadId = args.mode === 'resume' ? args.resumeThreadId : `thread-${Math.random().toString(16).slice(2, 10)}`;
+if (args.mode !== 'resume') {
+  event({ type: 'thread.started', thread_id: threadId });
+}
+
+event({ type: 'turn.started' });
+
+if (scenario === 'cancel') {
+  process.on('SIGTERM', () => {
+    console.error('fake codex cancelled');
+    process.exit(143);
+  });
+  process.on('SIGINT', () => {
+    console.error('fake codex interrupted');
+    process.exit(130);
+  });
+  event({ type: 'item.started', item: { id: 'cmd_1', type: 'command_execution', command: '/bin/echo waiting' } });
+  await sleep(15_000);
+}
+
+if (scenario === 'slow') {
+  await sleep(700);
+}
+
+if (scenario === 'command' || scenario === 'attachments') {
+  event({ type: 'item.started', item: { id: 'cmd_1', type: 'command_execution', command: '/bin/zsh -lc "ls -la"' } });
+  const output = scenario === 'attachments'
+    ? [`images=${args.images.length}`, `addDirs=${args.addDirs.join(',') || 'none'}`].join('\n')
+    : 'file-a\nfile-b\n';
+  event({
+    type: 'item.completed',
+    item: {
+      id: 'cmd_1',
+      type: 'command_execution',
+      command: '/bin/zsh -lc "ls -la"',
+      aggregated_output: output,
+      exit_code: 0,
+      status: 'completed',
+    },
+  });
+}
+
+if (scenario === 'invalid-json') {
+  process.stdout.write('not-json\n');
+  process.exit(0);
+}
+
+if (scenario === 'fail') {
+  event({ type: 'item.completed', item: { id: 'msg_1', type: 'agent_message', text: 'I tried but failed.' } });
+  console.error('intentional fake failure');
+  process.exit(2);
+}
+
+const finalText = scenario === 'attachments'
+  ? `attachments ok; resumed=${args.mode === 'resume'}; images=${args.images.length}; dirs=${args.addDirs.length}`
+  : `ok: ${prompt} | resumed=${args.mode === 'resume'} | thread=${threadId}`;
+
+event({ type: 'item.completed', item: { id: 'msg_1', type: 'agent_message', text: finalText } });
+event({ type: 'turn.completed', usage: { input_tokens: 1, cached_input_tokens: 0, output_tokens: 1 } });
+process.exit(0);
