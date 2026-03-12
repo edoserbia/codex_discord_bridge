@@ -668,6 +668,19 @@ maybe_export_proxy() {
   fi
 }
 
+sanitize_codex_desktop_env() {
+  local key
+  while IFS= read -r key; do
+    case "${key}" in
+      CODEX_TUNNING_*|CODEX_HOME|CODEX_CONFIG_HOME)
+        ;;
+      CODEX_CI|CODEX_SHELL|CODEX_THREAD_ID|CODEX_INTERNAL_*)
+        unset "${key}" || true
+        ;;
+    esac
+  done < <(env | cut -d= -f1 | grep '^CODEX_' || true)
+}
+
 resolve_service_user() {
   if [[ -n "${CODEX_TUNNING_ORIGINAL_USER:-}" ]]; then
     printf '%s' "${CODEX_TUNNING_ORIGINAL_USER}"
@@ -1132,6 +1145,7 @@ run_service_run() {
   migrate_project_token_to_secret_env
   validate_required_env
   maybe_export_proxy
+  sanitize_codex_desktop_env
 
   if [[ ! -f "${ROOT_DIR}/dist/index.js" ]]; then
     print_error 'dist/index.js 不存在，请先执行 ./scripts/macos-bridge.sh setup'

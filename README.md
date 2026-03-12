@@ -101,6 +101,22 @@ npm run macos:install-service -- --mode daemon
 npm run macos:uninstall-service -- --mode daemon
 ```
 
+## 服务模式切换
+
+如果你当前装的是登录启动，但希望改成真正开机启动：
+
+```bash
+./scripts/uninstall-service.sh --mode agent
+sudo ./scripts/install-service.sh --mode daemon
+```
+
+如果你当前装的是开机启动，但想改回登录启动：
+
+```bash
+sudo ./scripts/uninstall-service.sh --mode daemon
+./scripts/install-service.sh --mode agent
+```
+
 ## Discord Setup
 
 完整步骤见 `docs/MACOS-deploy.md`。至少需要完成：
@@ -255,6 +271,51 @@ npm run smoke:discord
 - 建议为 Web 面板配置 `WEB_AUTH_TOKEN`
 - `data/`、`logs/`、`.run/` 已在 `.gitignore` 中忽略，避免把运行态数据误提交
 - 若你不希望 Discord 中的 Codex 默认拥有写权限，可将 `DEFAULT_CODEX_SANDBOX` 改回 `workspace-write` 或 `read-only`
+
+## 故障排查
+
+### Discord 里明明绑定了高权限，但仍提示只读
+
+如果你在 Discord 中已经绑定了：
+
+```text
+!bind tmp "/path/to/project" --sandbox danger-full-access --approval never --search on
+```
+
+但 Codex 仍然回你：
+
+- `Operation not permitted`
+- `当前会话仍然是只读`
+- `python3 -m venv .venv` 无法创建目录
+
+优先按这个顺序处理：
+
+1. 重启本地桥接服务
+
+```bash
+./scripts/macos-bridge.sh restart
+```
+
+2. 在 Discord 当前频道发送：
+
+```text
+!reset
+```
+
+3. 如有必要，重新绑定一次：
+
+```text
+!bind tmp "/path/to/project" --sandbox danger-full-access --approval never --search on
+```
+
+4. 再让它做一次最小写入验证，例如创建一个临时文件
+
+原因通常有两类：
+
+- 旧的 Codex 会话在线程恢复时还保留了之前的低权限上下文
+- 旧版本服务进程继承了桌面版 Codex 的内部环境变量，导致 Discord 子进程错误落入只读上下文
+
+当前版本已经对第二类问题做了隔离修复；升级后务必至少执行一次 `restart`，必要时再执行 `!reset`。
 
 ## License
 

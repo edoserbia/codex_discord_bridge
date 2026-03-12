@@ -43,6 +43,13 @@ cd /path/to/codex-discord-bridge
 ./scripts/install-service.sh --mode daemon
 ```
 
+如果你后面要从登录启动切到真正开机启动：
+
+```bash
+./scripts/uninstall-service.sh --mode agent
+sudo ./scripts/install-service.sh --mode daemon
+```
+
 ## 3. 确认服务已启动
 
 ```bash
@@ -128,6 +135,28 @@ cd /path/to/codex-discord-bridge
 - Discord Developer Portal 已启用 **Message Content Intent**
 - Bot 已被邀请进入目标服务器和频道
 - 如果已安装 launchd 服务，再执行 `./scripts/macos-bridge.sh service-status`
+
+### 已绑定 `danger-full-access`，但还是不能写文件
+
+依次执行：
+
+```bash
+./scripts/macos-bridge.sh restart
+```
+
+然后在 Discord 当前频道发送：
+
+```text
+!reset
+```
+
+如果仍不行，再重新执行一次：
+
+```text
+!bind tmp "/path/to/project" --sandbox danger-full-access --approval never --search on
+```
+
+这通常是旧会话或旧服务进程还保留了只读上下文；升级到当前版本后，重启服务即可清掉这类环境污染。
 
 ### 网络需要代理
 

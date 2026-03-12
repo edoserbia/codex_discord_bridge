@@ -146,6 +146,87 @@ test('runner orders global and exec arguments for real Codex CLI compatibility',
   }
 });
 
+test('runner strips nested codex desktop env vars before spawning child codex', async () => {
+  const rootDir = await makeTempDir('codex-runner-env-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-codex-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+
+  const previous = {
+    CODEX_CI: process.env.CODEX_CI,
+    CODEX_SHELL: process.env.CODEX_SHELL,
+    CODEX_THREAD_ID: process.env.CODEX_THREAD_ID,
+    CODEX_INTERNAL_ORIGINATOR_OVERRIDE: process.env.CODEX_INTERNAL_ORIGINATOR_OVERRIDE,
+  };
+
+  process.env.CODEX_CI = '1';
+  process.env.CODEX_SHELL = '1';
+  process.env.CODEX_THREAD_ID = 'desktop-thread';
+  process.env.CODEX_INTERNAL_ORIGINATOR_OVERRIDE = 'Codex Desktop';
+
+  const runner = new CodexRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+
+  try {
+    const result = await runner.start(binding, { prompt: 'hello env', imagePaths: [], extraAddDirs: [] }, undefined).done;
+    assert.equal(result.success, true);
+
+    const logFiles = await readdir(logDir);
+    assert.ok(logFiles.length > 0);
+    const payload = JSON.parse(await readFile(path.join(logDir, logFiles.sort().at(-1)!), 'utf8')) as {
+      env: Record<string, string | undefined>;
+    };
+
+    assert.equal(payload.env.PWD, workspace);
+    assert.equal(payload.env.CODEX_CI, undefined);
+    assert.equal(payload.env.CODEX_SHELL, undefined);
+    assert.equal(payload.env.CODEX_THREAD_ID, undefined);
+    assert.equal(payload.env.CODEX_INTERNAL_ORIGINATOR_OVERRIDE, undefined);
+  } finally {
+    delete process.env.FAKE_CODEX_LOG_DIR;
+
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+
+    await cleanupDir(rootDir);
+  }
+});
+
+test('runner uses dangerous bypass for resume when binding requests danger-full-access', async () => {
+  const rootDir = await makeTempDir('codex-runner-resume-danger-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-codex-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+
+  const runner = new CodexRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+  binding.codex.sandboxMode = 'danger-full-access';
+
+  try {
+    const result = await runner.start(binding, { prompt: 'hello resume danger', imagePaths: [], extraAddDirs: [] }, 'thread-danger', undefined).done;
+    assert.equal(result.success, true);
+
+    const logFiles = await readdir(logDir);
+    assert.ok(logFiles.length > 0);
+    const payload = JSON.parse(await readFile(path.join(logDir, logFiles.sort().at(-1)!), 'utf8')) as {
+      argv: string[];
+    };
+
+    const resumeIndex = payload.argv.indexOf('resume');
+    assert.ok(resumeIndex >= 0);
+    assert.ok(payload.argv.includes('--dangerously-bypass-approvals-and-sandbox'));
+    assert.ok(payload.argv.indexOf('--dangerously-bypass-approvals-and-sandbox') > resumeIndex);
+  } finally {
+    delete process.env.FAKE_CODEX_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
 test('runner propagates stderr and failures', async () => {
   const rootDir = await makeTempDir('codex-runner-fail-');
   const workspace = await createWorkspace(rootDir);
