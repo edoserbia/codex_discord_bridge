@@ -54,12 +54,18 @@ function hasBindingExecutionChanged(previous: ChannelBinding | undefined, next: 
     || JSON.stringify(previous.codex) !== JSON.stringify(next.codex);
 }
 
-function buildGuidancePrompt(prompt: string): string {
+function buildGuidancePrompt(rootPrompt: string, guidancePrompt: string): string {
   return [
-    '系统提示：这是同一 Discord 会话中的最新实时引导。',
-    '请立刻根据下面的新引导调整当前工作，优先执行最新要求，继续沿用已获得的上下文，不要从头重复已完成步骤。',
+    '系统提示：这是同一 Discord 会话中的一次中途引导。',
+    '请先处理下面的最新引导，再继续完成原始任务。',
+    '如果最新引导明确要求停止、替换或放弃原始任务，以最新引导为准；否则不要丢掉原始任务。',
+    '继续沿用当前会话里已经获得的上下文，不要从头重复已经完成的步骤。',
     '',
-    prompt,
+    '【原始任务】',
+    rootPrompt,
+    '',
+    '【最新引导】',
+    guidancePrompt,
   ].join('\n');
 }
 
@@ -481,12 +487,25 @@ export class DiscordCodexBridge {
     const taskId = randomUUID();
     const downloaded = await downloadAttachments(this.config.dataDir, resolved.conversationId, taskId, extractMessageAttachments(message));
     const basePrompt = buildPromptWithAttachments(prompt, downloaded.attachments, downloaded.attachmentDir);
-    const effectivePrompt = mode === 'guidance' ? buildGuidancePrompt(basePrompt) : basePrompt;
+    const activeTask = runtime.activeRun?.task;
+    const rootPrompt = mode === 'guidance'
+      ? activeTask?.rootPrompt ?? activeTask?.prompt ?? prompt
+      : prompt;
+    const rootEffectivePrompt = mode === 'guidance'
+      ? activeTask?.rootEffectivePrompt ?? activeTask?.effectivePrompt ?? basePrompt
+      : basePrompt;
+    const guidancePrompt = mode === 'guidance' ? prompt : undefined;
+    const effectivePrompt = mode === 'guidance'
+      ? buildGuidancePrompt(rootEffectivePrompt, basePrompt)
+      : basePrompt;
 
     const task: PromptTask = {
       id: taskId,
       prompt,
       effectivePrompt,
+      rootPrompt,
+      rootEffectivePrompt,
+      guidancePrompt,
       requestedBy: message.author.username,
       requestedById: message.author.id,
       messageId: message.id,
@@ -505,12 +524,12 @@ export class DiscordCodexBridge {
 
         runtime.queue.splice(runtime.queue.length - 1, 1);
         runtime.queue.unshift(task);
-        runtime.activeRun.latestActivity = `收到 ${message.author.username} 的追加引导`;
+        runtime.activeRun.latestActivity = `收到 ${message.author.username} 的中途引导，准备继续原任务`;
         runtime.activeRun.cancellationReason = 'guidance';
         this.pushRunTimeline(runtime, `🧭 收到新的引导：${truncate(prompt, 120)}`);
 
         await message.react('🧭').catch(() => undefined);
-        await message.reply('已将你的新消息作为引导项插入当前工作，正在中断当前步骤并按最新引导续跑。');
+        await message.reply('已将你的新消息作为引导项插入当前工作，正在中断当前步骤，先处理中途引导，再继续原任务。');
 
         const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
         await this.refreshStatusPanel(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
@@ -712,14 +731,14 @@ export class DiscordCodexBridge {
         runtime.activeRun.latestActivity = result.success
           ? '本轮执行完成'
           : cancellationReason === 'guidance'
-            ? '已按新的引导继续'
+            ? '已按新的引导继续原任务'
             : '本轮执行失败';
         this.pushRunTimeline(
           runtime,
           result.success
             ? '🎉 本轮执行完成'
             : cancellationReason === 'guidance'
-              ? '🧭 当前步骤已被新的引导打断，准备继续'
+              ? '🧭 当前步骤已被中途引导打断，准备继续原任务'
               : '🛑 本轮执行失败',
         );
       }

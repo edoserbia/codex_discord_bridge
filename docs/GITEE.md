@@ -50,7 +50,7 @@ REMOTE_NAME=gitee
 
 ```bash
 git add .
-git commit -m "feat: initialize codex discord bridge"
+git commit -m "初始化：建立 Codex Discord Bridge 项目"
 git push -u gitee main
 ```
 
@@ -58,7 +58,7 @@ git push -u gitee main
 
 ```bash
 git add .
-git commit -m "docs: update deployment guide"
+git commit -m "文档：更新部署说明"
 git push
 ```
 

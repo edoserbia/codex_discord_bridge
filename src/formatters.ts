@@ -1,4 +1,4 @@
-import type { ChannelBinding, ChannelRuntime, CodexRunResult, ConversationSessionState, DashboardBinding, PlanItem } from './types.js';
+import type { ChannelBinding, ChannelRuntime, CodexRunResult, ConversationSessionState, DashboardBinding, PlanItem, PromptTask } from './types.js';
 
 import { sanitizeInlineCode, shortId, tailLines, truncate } from './utils.js';
 
@@ -49,6 +49,24 @@ function appendTimelineLines(lines: string[], entries: string[], maxItems = 5): 
   }
 }
 
+function formatTaskSummary(task: PromptTask, maxLength = 90): string {
+  if (task.guidancePrompt) {
+    return `引导：${truncate(task.guidancePrompt, Math.max(24, Math.floor(maxLength / 2)))} · 原任务：${truncate(task.rootPrompt, Math.max(24, Math.floor(maxLength / 2)))}`;
+  }
+
+  return truncate(task.prompt, maxLength);
+}
+
+function appendTaskContextLines(lines: string[], task: PromptTask, normalLabel: string, maxLength: number): void {
+  if (task.guidancePrompt) {
+    lines.push(`当前引导：${truncate(task.guidancePrompt, maxLength)}`);
+    lines.push(`原任务：${truncate(task.rootPrompt, maxLength)}`);
+    return;
+  }
+
+  lines.push(`${normalLabel}：${truncate(task.prompt, maxLength)}`);
+}
+
 export function formatHelp(prefix: string): string {
   return [
     '🤖 **Codex Discord Bridge 帮助**',
@@ -64,7 +82,7 @@ export function formatHelp(prefix: string): string {
     '',
     '绑定成功后，主频道和其下 Discord 线程里的普通消息都会直接作为 Codex prompt 发送。',
     '现在会在频道里持续更新实时进度、命令执行和计划状态。',
-    '如果当前任务正在运行，可用 `!guide <内容>` 把新的引导即时插入当前工作，bridge 会中断当前步骤并按同一会话续跑。',
+    '如果当前任务正在运行，可用 `!guide <内容>` 插入中途引导，bridge 会中断当前步骤，先处理引导，再按同一会话继续原任务。',
     '图片附件会自动透传到 `codex -i`，普通文件会下载到本地附件目录供 Codex 读取。',
     '',
     '示例：',
@@ -88,7 +106,7 @@ export function formatQueue(runtime: ChannelRuntime): string {
   const lines = ['🧵 **当前会话队列**', ''];
 
   if (runtime.activeRun) {
-    lines.push(`- 正在执行：${runtime.activeRun.task.requestedBy} · ${truncate(runtime.activeRun.task.prompt, 90)}`);
+    lines.push(`- 正在执行：${runtime.activeRun.task.requestedBy} · ${formatTaskSummary(runtime.activeRun.task, 90)}`);
   } else {
     lines.push('- 当前没有正在执行的任务');
   }
@@ -96,7 +114,7 @@ export function formatQueue(runtime: ChannelRuntime): string {
   if (runtime.queue.length === 0) {
     lines.push('- 等待队列为空');
   } else {
-    lines.push(...runtime.queue.map((item, index) => `- #${index + 1} ${item.requestedBy} · ${truncate(item.prompt, 90)}`));
+    lines.push(...runtime.queue.map((item, index) => `- #${index + 1} ${item.requestedBy} · ${formatTaskSummary(item, 90)}`));
   }
 
   return lines.join('\n');
@@ -126,7 +144,8 @@ export function formatStatus(
   }
 
   if (runtime.activeRun) {
-    lines.push(`当前请求：${runtime.activeRun.task.requestedBy}`);
+    lines.push(`请求人：${runtime.activeRun.task.requestedBy}`);
+    appendTaskContextLines(lines, runtime.activeRun.task, '当前请求', 180);
     lines.push(`活动：${truncate(runtime.activeRun.latestActivity, 180)}`);
 
     if (runtime.activeRun.task.attachments.length > 0) {
@@ -178,10 +197,11 @@ export function formatProgressMessage(binding: ChannelBinding, runtime: ChannelR
     '🛰️ **Codex 实时进度**',
     `项目：**${binding.projectName}**`,
     `请求人：${activeRun.task.requestedBy}`,
-    `请求：${truncate(activeRun.task.prompt, 120)}`,
     `状态：${formatActiveStatus(runtime)}`,
     `最新活动：${truncate(activeRun.latestActivity, 180)}`,
   ];
+
+  appendTaskContextLines(lines, activeRun.task, '请求', 120);
 
   appendPlanLines(lines, activeRun.planItems, 8);
 
