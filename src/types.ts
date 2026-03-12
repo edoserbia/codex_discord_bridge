@@ -73,6 +73,7 @@ export interface PlanItem {
 }
 
 export type RunStatus = 'idle' | 'queued' | 'starting' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type CancellationReason = 'user_cancel' | 'guidance' | 'binding_reset' | 'unbind';
 
 export interface ActiveRunState {
   task: PromptTask;
@@ -89,6 +90,7 @@ export interface ActiveRunState {
   usedResume: boolean;
   progressMessageId?: string | undefined;
   codexThreadId?: string | undefined;
+  cancellationReason?: CancellationReason | undefined;
   exitCode?: number | null | undefined;
   signal?: NodeJS.Signals | null | undefined;
 }

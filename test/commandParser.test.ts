@@ -25,6 +25,14 @@ test('parse help on empty command', () => {
   assert.deepEqual(parseCommand('!', '!'), { kind: 'help' });
 });
 
+test('parse guide command with free text', () => {
+  const parsed = parseCommand('!guide 请暂停当前步骤，先检查 README 和 package.json', '!');
+  assert.deepEqual(parsed, {
+    kind: 'guide',
+    prompt: '请暂停当前步骤，先检查 README 和 package.json',
+  });
+});
+
 test('reject unknown flag', () => {
   assert.throws(() => parseCommand('!bind api /tmp --unknown nope', '!'), /未知参数/);
 });

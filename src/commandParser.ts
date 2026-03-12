@@ -16,6 +16,7 @@ export interface BindCommandOptions {
 export type ParsedCommand =
   | { kind: 'help' }
   | { kind: 'bind'; projectName: string; workspacePath: string; options: BindCommandOptions }
+  | { kind: 'guide'; prompt: string }
   | { kind: 'unbind' }
   | { kind: 'projects' }
   | { kind: 'status' }
@@ -58,6 +59,15 @@ export function parseCommand(content: string, prefix: string): ParsedCommand {
 
   if (!body) {
     return { kind: 'help' };
+  }
+
+  const lowerBody = body.toLowerCase();
+  if (lowerBody === 'guide') {
+    throw new Error('用法：!guide <追加引导内容>');
+  }
+
+  if (lowerBody.startsWith('guide ')) {
+    return { kind: 'guide', prompt: body.slice('guide'.length).trim() };
   }
 
   const tokens = tokenizeCommand(body);
