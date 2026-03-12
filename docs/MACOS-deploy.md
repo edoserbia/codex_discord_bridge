@@ -113,6 +113,20 @@ OPENCLAW_DISCORD_PROXY
 
 并在启动时自动注入 `HTTP_PROXY` / `HTTPS_PROXY`。
 
+如果你在代理环境下启动时看到：
+
+```text
+Error: unable to get local issuer certificate
+```
+
+当前脚本会在检测到 `OPENCLAW_DISCORD_PROXY` 时自动为 Node 注入 `--use-system-ca`；如果系统存在 `/etc/ssl/cert.pem`，也会把它作为额外 CA bundle 注入。这通常足够让服务信任 macOS 已信任的代理根证书。
+
+如果你使用的是 `daemon` 模式，且证书只存在于登录用户上下文，仍可能需要把代理根证书导出成 PEM，并在 `.env` 中额外设置：
+
+```text
+OPENCLAW_DISCORD_CA_CERT=/path/to/proxy-ca.pem
+```
+
 ### 6. OpenClaw 配置（可选）
 
 如果你的机器上已存在：

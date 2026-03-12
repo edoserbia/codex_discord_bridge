@@ -605,6 +605,7 @@ prompt_interactive_configuration() {
   prompt_env_value 'WEB_PORT' 'Web 面板端口' '3769' 1 0 0
   prompt_env_value 'WEB_AUTH_TOKEN' 'Web 面板鉴权 Token（回车保留当前/自动生成值）' "$(read_env_value 'WEB_AUTH_TOKEN' || true)" 0 1 0
   prompt_env_value 'OPENCLAW_DISCORD_PROXY' 'Discord / 附件下载代理（可选，例如 http://127.0.0.1:7890）' "$(read_env_value 'OPENCLAW_DISCORD_PROXY' || true)" 0 0 1
+  prompt_env_value 'OPENCLAW_DISCORD_CA_CERT' '代理 CA 证书文件（可选；daemon 模式下如遇 TLS 报错可填，例如 ~/.codex-tunning/clash-ca.pem）' "$(read_env_value 'OPENCLAW_DISCORD_CA_CERT' || true)" 0 0 1
 
   print_info "配置已写入：${ENV_FILE}"
   print_info "Discord Token 已单独写入：${SECRET_ENV_FILE}"
@@ -666,6 +667,67 @@ maybe_export_proxy() {
     export https_proxy="${proxy}"
     print_info "已注入 HTTPS proxy: ${proxy}"
   fi
+}
+
+expand_home_path() {
+  local value="${1:-}"
+  case "${value}" in
+    '~')
+      printf '%s' "${HOME}"
+      ;;
+    '~/'*)
+      printf '%s/%s' "${HOME}" "${value#~/}"
+      ;;
+    *)
+      printf '%s' "${value}"
+      ;;
+  esac
+}
+
+node_options_has_flag() {
+  local flag="$1"
+  case " ${NODE_OPTIONS:-} " in
+    *" ${flag} "*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+append_node_option_flag() {
+  local flag="$1"
+  if node_options_has_flag "${flag}"; then
+    return 0
+  fi
+
+  export NODE_OPTIONS="${NODE_OPTIONS:+${NODE_OPTIONS} }${flag}"
+}
+
+maybe_configure_node_tls() {
+  local proxy raw_ca_cert ca_cert
+  proxy="$(read_env_value 'OPENCLAW_DISCORD_PROXY' || true)"
+  raw_ca_cert="$(read_env_value 'OPENCLAW_DISCORD_CA_CERT' || true)"
+
+  if [[ -n "${proxy}" || -n "${raw_ca_cert}" ]]; then
+    append_node_option_flag '--use-system-ca'
+    print_info '已为 Node 启用系统证书信任（--use-system-ca）'
+  fi
+
+  if [[ -n "${raw_ca_cert}" ]]; then
+    ca_cert="$(expand_home_path "${raw_ca_cert}")"
+  elif [[ -n "${NODE_EXTRA_CA_CERTS:-}" ]]; then
+    ca_cert="${NODE_EXTRA_CA_CERTS}"
+  elif [[ -f '/etc/ssl/cert.pem' ]]; then
+    ca_cert='/etc/ssl/cert.pem'
+  else
+    return 0
+  fi
+
+  if [[ ! -f "${ca_cert}" ]]; then
+    print_warn "额外 CA 证书文件不存在：${ca_cert}"
+    return 0
+  fi
+
+  export NODE_EXTRA_CA_CERTS="${ca_cert}"
+  print_info "已注入 NODE_EXTRA_CA_CERTS: ${ca_cert}"
 }
 
 sanitize_codex_desktop_env() {
@@ -1080,6 +1142,27 @@ run_doctor() {
     print_warn "${TOKEN_ENV_KEY} 未配置"
   fi
 
+  local proxy raw_ca_cert ca_cert
+  proxy="$(read_env_value 'OPENCLAW_DISCORD_PROXY' || true)"
+  raw_ca_cert="$(read_env_value 'OPENCLAW_DISCORD_CA_CERT' || true)"
+  if [[ -n "${proxy}" ]]; then
+    print_info "已配置 Discord 代理：${proxy}"
+    print_info '检测到代理时，start / service-run 会自动为 Node 注入 --use-system-ca'
+    if [[ -f '/etc/ssl/cert.pem' ]]; then
+      print_info '检测到 /etc/ssl/cert.pem，start / service-run 会把它作为额外 CA bundle 注入'
+    fi
+  fi
+  if [[ -n "${raw_ca_cert}" ]]; then
+    ca_cert="$(expand_home_path "${raw_ca_cert}")"
+    if [[ -f "${ca_cert}" ]]; then
+      print_info "已配置额外 CA 证书：${ca_cert}"
+    else
+      print_warn "已配置 OPENCLAW_DISCORD_CA_CERT，但文件不存在：${ca_cert}"
+    fi
+  elif [[ -n "${proxy}" ]]; then
+    print_info '如代理仍报 unable to get local issuer certificate，可额外设置 OPENCLAW_DISCORD_CA_CERT=/path/to/proxy-ca.pem'
+  fi
+
   if [[ -f "$(daemon_plist_path)" ]]; then
     print_info "已安装 $(service_mode_label daemon)：$(daemon_plist_path)"
   elif [[ -f "$(agent_plist_path)" ]]; then
@@ -1145,6 +1228,7 @@ run_service_run() {
   migrate_project_token_to_secret_env
   validate_required_env
   maybe_export_proxy
+  maybe_configure_node_tls
   sanitize_codex_desktop_env
 
   if [[ ! -f "${ROOT_DIR}/dist/index.js" ]]; then
@@ -1180,6 +1264,7 @@ run_start_manual() {
   migrate_project_token_to_secret_env
   validate_required_env
   maybe_export_proxy
+  maybe_configure_node_tls
 
   if is_running; then
     print_warn "服务已在运行，PID=$(cat "${PID_FILE}")"

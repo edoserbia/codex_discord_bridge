@@ -59,6 +59,8 @@ cd /path/to/codex-discord-bridge
 
 其中 Discord Bot Token 会单独保存到 `~/.codex-tunning/secrets.env`，不会写入项目 `.env`。
 
+如果配置了 `OPENCLAW_DISCORD_PROXY`，启动脚本会自动为 Node 注入 `--use-system-ca`；如果系统存在 `/etc/ssl/cert.pem`，也会一并作为额外 CA bundle 注入，处理代理环境下常见的证书链问题。
+
 部署结束后，脚本会继续询问是否安装为 macOS 自启动服务：
 
 - `daemon`：开机启动，适合长期在线
@@ -239,9 +241,18 @@ http://127.0.0.1:3769/?token=<YOUR_WEB_AUTH_TOKEN>
 | `WEB_PORT` | Web 面板端口，默认 `3769` |
 | `WEB_AUTH_TOKEN` | Web 面板鉴权 token |
 | `OPENCLAW_DISCORD_PROXY` | Discord / 附件下载所用代理，例如 `http://127.0.0.1:7890` |
+| `OPENCLAW_DISCORD_CA_CERT` | 代理 CA 证书 PEM 文件；当 `daemon` 模式下代理导致 TLS 报错时可显式指定 |
 | `OPENCLAW_CONFIG_PATH` | OpenClaw 配置路径，默认 `~/.openclaw/openclaw.json` |
 
 完整示例见 `.env.example`。
+
+如果设置了 `OPENCLAW_DISCORD_PROXY`，启动脚本会自动为 Node 注入 `--use-system-ca`，并在系统存在 `/etc/ssl/cert.pem` 时把它作为额外 CA bundle 注入，以兼容 macOS 上已信任的本地代理根证书。
+
+如果仍然出现 `unable to get local issuer certificate`，通常是 `LaunchDaemon` 拿不到登录会话里的证书链。此时请把代理根证书导出为 PEM，并设置：
+
+```text
+OPENCLAW_DISCORD_CA_CERT=/path/to/proxy-ca.pem
+```
 
 ## 文档
 
