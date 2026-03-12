@@ -1,142 +1,170 @@
 # Codex Discord Bridge
 
-把本机 `codex` CLI 挂到 Discord 文本频道上，让你可以在手机上通过 Discord 像用 Codex 客户端一样控制本地 Codex。
+把本机 `codex` CLI 挂到 Discord 文本频道和线程上，让你可以在手机上像使用 Codex 客户端一样控制本地 Codex，并实时看到过程反馈、计划状态和最终结果。
 
-## 当前能力
+> 本项目采用 **PolyForm Noncommercial 1.0.0** 许可发布：允许个人和其他非商业用途免费使用、修改和再分发，但**不允许商业使用**。这属于 **source-available**，不是 OSI 定义的开源许可证。详见根目录 `LICENSE`。
 
-- 一个 Discord 主频道绑定一个项目目录
-- 主频道下的 Discord 线程自动继承该项目，但拥有独立的 Codex 会话上下文
-- 频道普通消息直接驱动 `codex exec --json`
-- 实时显示步骤、命令执行、命令输出预览、stderr 尾部、队列状态
-- 在频道里持续更新一条“实时进度”消息，展示分析摘要、计划清单和过程时间线
-- 图片附件自动透传给 `codex -i`
-- 普通文件附件自动下载到本地附件目录，并通过 prompt 告知 Codex 读取
-- Web 管理面板，可查看绑定、会话、状态，并创建/解绑绑定
-- 状态、绑定、会话持久化到 `data/state.json`
-- 自动化测试、本地 smoke、真实 Discord smoke
-- 提供一套面向 macOS 的一键部署/启停管理脚本
+## Features
 
-## 推荐映射方式
+- **项目映射**：一个 Discord 主频道绑定一个本地项目目录
+- **线程会话**：主频道下每个 Discord 线程自动继承项目绑定，但拥有独立 Codex 会话上下文
+- **实时反馈**：持续更新“Codex 实时进度”消息，展示 reasoning 摘要、计划清单、过程时间线、当前命令、输出预览和 stderr 预览
+- **附件支持**：图片附件自动透传给 `codex -i`，普通文件附件自动下载到本地并提示 Codex 读取
+- **Web 管理面板**：查看绑定、会话、运行状态，并在浏览器里管理频道绑定
+- **持久化状态**：绑定关系和会话状态保存到 `data/state.json`
+- **macOS 一键部署**：提供 `scripts/macos-bridge.sh` 进行部署、启停、查看日志和打开 Web 面板
+- **测试覆盖**：包含类型检查、单测、本地 smoke 和真实 Discord smoke
 
-推荐你这样组织：
+## Session Model
 
-- **一个 Discord 文字频道 = 一个项目目录**
-- **一个 Discord 线程 = 这个项目里的一个独立 Codex 会话**
+推荐按下面的方式组织：
 
-例如：
+- **一个 Discord 主频道 = 一个项目目录**
+- **一个 Discord 线程 = 该项目里的一个独立 Codex 会话**
 
-- `#proj-api` → `/Users/mac/work/api`
-- `#proj-app` → `/Users/mac/work/app`
-- `#proj-api` 下线程 `修登录` → `/Users/mac/work/api` 里的独立会话
-- `#proj-api` 下线程 `写文档` → `/Users/mac/work/api` 里的另一条会话
+示例：
 
-## macOS 一键部署
+- `#proj-api` → `/path/to/workspaces/api`
+- `#proj-app` → `/path/to/workspaces/app`
+- `#proj-api` 下线程 `修登录` → `/path/to/workspaces/api` 中的一条独立 Codex 会话
+- `#proj-api` 下线程 `写文档` → `/path/to/workspaces/api` 中的另一条独立 Codex 会话
 
-这是你当前最推荐的部署方式。
+这样你可以在 Discord 里把“项目维度”和“任务维度”自然分层：主频道管项目，线程管具体任务。
+
+## Requirements
+
+- macOS
+- Node.js `>= 20.11`
+- 已安装并登录的 `codex` CLI
+- 一个可用的 Discord Bot
+- Bot 已加入目标 Discord 服务器
+- Bot 已启用 **Message Content Intent**
+
+## Quick Start
 
 ```bash
-cd /Users/mac/work/su/codex_tunning
+cd /path/to/codex-discord-bridge
 ./scripts/macos-bridge.sh deploy
 ```
 
-常用命令：
+脚本会交互式提示你填写或确认：
+
+- `CODEX_TUNNING_DISCORD_BOT_TOKEN`
+- `ALLOWED_WORKSPACE_ROOTS`
+- `DISCORD_ADMIN_USER_IDS`
+- `WEB_PORT`
+- `WEB_AUTH_TOKEN`
+- `OPENCLAW_DISCORD_PROXY`（可选）
+
+其中 Discord Bot Token 会被单独保存到：
+
+- `~/.codex-tunning/secrets.env`
+
+不会写入项目 `.env`，避免和其他 Discord Bot 或项目配置混用。
+
+完成后可用以下命令管理服务：
 
 ```bash
-./scripts/macos-bridge.sh doctor
-./scripts/macos-bridge.sh configure
-./scripts/macos-bridge.sh setup
 ./scripts/macos-bridge.sh start
 ./scripts/macos-bridge.sh stop
 ./scripts/macos-bridge.sh restart
 ./scripts/macos-bridge.sh status
 ./scripts/macos-bridge.sh logs
 ./scripts/macos-bridge.sh open
-./scripts/macos-bridge.sh deploy
 ```
 
-对应的 npm 快捷命令也已经配好：
+也提供了对应的 npm 快捷命令：
 
 ```bash
-npm run macos:doctor
-npm run macos:configure
-npm run macos:setup
+npm run macos:deploy
 npm run macos:start
 npm run macos:stop
 npm run macos:restart
 npm run macos:status
 npm run macos:logs
 npm run macos:open
-npm run macos:deploy
 ```
 
-首次执行 `./scripts/macos-bridge.sh deploy` / `setup` 时，脚本会先在终端里提示你填写或确认关键配置，其中 Discord Bot Token 会以 `CODEX_TUNNING_DISCORD_BOT_TOKEN` 的名字单独保存到 `/Users/mac/.codex-tunning/secrets.env`，不会写进项目 `.env`。
+## Discord Setup
 
-如果你保留了 `WEB_AUTH_TOKEN`，`./scripts/macos-bridge.sh open` 会自动带上一次性登录参数，浏览器打开后会写入本地 Cookie。
+完整步骤见 `docs/MACOS-deploy.md`。最少需要完成以下操作：
 
-详细说明请直接看：
+1. 在 Discord Developer Portal 创建一个 Application
+2. 为该 Application 添加 Bot
+3. 复制 Bot Token
+4. 在 Bot 页面启用 **Message Content Intent**
+5. 使用 OAuth2 URL Generator 邀请 Bot 进入你的服务器
+6. 确保 Bot 至少拥有以下权限：
+   - `View Channels`
+   - `Read Message History`
+   - `Send Messages`
+   - `Send Messages in Threads`
+   - `Attach Files`
+   - `Embed Links`
 
-- `docs/MACOS-deploy.md`
-- `docs/QUICKSTART.md`
-- `docs/DEPLOYMENT.md`
+## How To Use
 
-## 前置条件
-
-1. 本机已安装并登录 `codex`
-2. Node.js >= 20.11
-3. 你有一个 Discord Bot Token
-4. 你在目标 Discord 服务器里有邀请 Bot 的权限（通常需要 `Manage Server`）
-5. Bot 在目标服务器和频道里具备查看/发消息/线程发言权限
-6. 需要在 Discord Developer Portal 里为 Bot 开启 `MESSAGE CONTENT INTENT`
-
-## Discord 使用方式
-
-### 0. 先完成 Discord Bot 创建与授权
-
-详细申请/授权流程请直接看 `docs/MACOS-deploy.md` 里的“这些信息怎么获得”和“把 Bot 授权进你的 Discord 服务器”。
-
-### 1. 绑定主频道到项目
+### 1. 在主频道绑定项目
 
 在一个普通文本频道中发送：
 
 ```text
-!bind api "/Users/mac/work/api" --sandbox workspace-write --approval never --search off
+!bind api "/path/to/workspaces/api" --sandbox workspace-write --approval never --search off
 ```
+
+注意：
+
+- `!bind` 必须在**普通文本频道**中执行
+- 线程会自动继承主频道绑定，所以不需要在线程里重复绑定
 
 ### 2. 直接发消息给 Codex
 
-绑定完成后，该主频道里的任何普通消息都会直接当作 prompt 发给 Codex。
+绑定完成后，该主频道里的普通消息会直接作为 prompt 发给 Codex。
 
-你现在会看到两类反馈：
+你会同时看到两类反馈：
 
-- 一条持续编辑的“实时进度”消息：显示分析摘要、计划状态、命令执行和输出预览
-- 一条最终结果回复：Codex 本轮给出的最终答复
+- 一条持续更新的“Codex 实时进度”消息
+- 一条本轮最终结果回复
 
-### 3. 在 Discord 线程中继续
+### 3. 在线程里继续任务
 
-在已绑定主频道下创建线程并发送消息，该线程会：
+在已绑定主频道下创建线程并发送消息后：
 
-- 继承主频道绑定的项目目录
-- 获得自己的独立 Codex session
-- 有自己的排队和状态面板
+- 线程继承主频道的项目目录
+- 线程拥有自己的独立 Codex session
+- 线程有自己的排队、状态面板和实时进度消息
 
-### 4. 附件支持
+### 4. 发送附件
 
-- 图片附件：自动走 `codex -i`
-- 代码、文档、文本等普通附件：先下载到 `data/attachments/<conversation>/<task>/`，再把本地路径告诉 Codex
+- **图片附件**：自动走 `codex -i`
+- **普通文件附件**：保存到 `data/attachments/<conversation>/<task>/`，并把本地路径告诉 Codex
 
-### 5. 控制命令
+### 5. 使用控制命令
 
 ```text
+!help
 !status
 !queue
 !cancel
 !reset
 !unbind
 !projects
-!help
 ```
 
-## Web 管理面板
+## Real-Time Progress
+
+当 Codex 运行时，机器人会在频道中维护一条持续编辑的进度消息，包含：
+
+- reasoning / 分析摘要
+- todo / 计划项及完成状态
+- 过程时间线
+- 当前命令
+- 最新输出预览
+- 最新 stderr 预览
+
+这意味着你在手机上也能看到类似客户端里的“中间过程”，而不只是最终答案。
+
+## Web Admin
 
 默认地址：
 
@@ -144,47 +172,69 @@ npm run macos:deploy
 http://127.0.0.1:3769
 ```
 
-主要接口：
+如果设置了 `WEB_AUTH_TOKEN`，可以通过：
 
-- `GET /api/dashboard`
-- `POST /api/bindings`
-- `DELETE /api/bindings/:channelId`
-- `POST /api/conversations/:conversationId/reset`
+```text
+http://127.0.0.1:3769/?token=<YOUR_WEB_AUTH_TOKEN>
+```
 
-## 测试
+在浏览器里一次性写入登录 Cookie。
+
+## Configuration
+
+最常用的环境变量如下：
+
+| 变量 | 说明 |
+| --- | --- |
+| `CODEX_TUNNING_DISCORD_BOT_TOKEN` | Discord Bot Token；建议仅保存在 `~/.codex-tunning/secrets.env` |
+| `ALLOWED_WORKSPACE_ROOTS` | 允许绑定的项目根目录，多个目录用逗号分隔 |
+| `DISCORD_ADMIN_USER_IDS` | 允许执行管理命令的 Discord 用户 ID，多个 ID 用逗号分隔 |
+| `DEFAULT_CODEX_SANDBOX` | 默认 sandbox 模式 |
+| `DEFAULT_CODEX_APPROVAL` | 默认 approval 策略 |
+| `DEFAULT_CODEX_SEARCH` | 默认是否开启搜索 |
+| `WEB_PORT` | Web 面板端口，默认 `3769` |
+| `WEB_AUTH_TOKEN` | Web 面板鉴权 token |
+| `OPENCLAW_DISCORD_PROXY` | Discord / 附件下载所用代理，例如 `http://127.0.0.1:7890` |
+| `OPENCLAW_CONFIG_PATH` | OpenClaw 配置路径，默认 `~/.openclaw/openclaw.json` |
+
+完整示例见 `.env.example`。
+
+## Docs
+
+- `docs/QUICKSTART.md`：5 分钟快速上手
+- `docs/MACOS-deploy.md`：macOS 一键部署、Discord 授权与使用全流程
+- `docs/DEPLOYMENT.md`：运维、升级、日志和运行目录说明
+- `docs/GITEE.md`：本地 Git / Gitee 私有仓库初始化与推送
+
+## Development
 
 ```bash
+npm install
+npm run check
 npm test
-npm run test:coverage
+npm run build
 npm run smoke:local
 npm run smoke:discord
 ```
 
-## Git / Gitee
+## Security & Privacy
 
-本仓库附带脚本：
+- Discord Bot Token 默认单独保存在 `~/.codex-tunning/secrets.env`
+- 项目 `.env` 不再保存 Discord Token
+- 运行态日志、PID、状态和附件都在本地机器上
+- 建议把 `ALLOWED_WORKSPACE_ROOTS` 收紧到你真正需要暴露给 Discord 的目录
+- 建议为 Web 面板配置 `WEB_AUTH_TOKEN`
+- `data/`、`logs/`、`.run/` 已在 `.gitignore` 中忽略，避免把运行态数据误提交
 
-- `scripts/init-git.sh`
-- `scripts/create-gitee-repo.sh`
+## License
 
-当前远端：
+本项目采用 **PolyForm Noncommercial 1.0.0**：
 
-- [edoserbia/codex-discord-bridge](https://gitee.com/edoserbia/codex-discord-bridge)
+- 允许个人和其他非商业用途免费使用、修改和再分发
+- 不允许商业使用
+- 商业授权请联系版权持有人另行协商
 
-## 关键文档
+详见：
 
-- `docs/MACOS-deploy.md`
-- `docs/QUICKSTART.md`
-- `docs/DEPLOYMENT.md`
-- `docs/GITEE.md`
-
-## 当前已验证
-
-我已经在当前机器上跑过：
-
-- `npm run check`
-- `npm test`
-- `npm run test:coverage`
-- `npm run smoke:local`
-- `npm run smoke:discord`
-- `npm run build`
+- `LICENSE`
+- `NOTICE`

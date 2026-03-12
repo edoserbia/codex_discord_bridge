@@ -10,7 +10,7 @@ LOG_DIR="${ROOT_DIR}/logs"
 PID_FILE="${RUN_DIR}/codex-discord-bridge.pid"
 LOG_FILE="${LOG_DIR}/codex-discord-bridge.log"
 OPENCLAW_CONFIG_PATH="${OPENCLAW_CONFIG_PATH:-${HOME}/.openclaw/openclaw.json}"
-DEFAULT_ALLOWED_ROOTS="/Users/${USER}/work,/Users/${USER}/projects"
+DEFAULT_ALLOWED_ROOTS="/work,/projects"
 SECRET_DIR="${HOME}/.codex-tunning"
 SECRET_ENV_FILE="${CODEX_TUNNING_SECRETS_FILE:-${SECRET_DIR}/secrets.env}"
 TOKEN_ENV_KEY='CODEX_TUNNING_DISCORD_BOT_TOKEN'
@@ -517,7 +517,7 @@ prompt_interactive_configuration() {
   fi
 
   prompt_secret_value "${TOKEN_ENV_KEY}" 'Discord Bot Token（将保存为 CODEX_TUNNING_DISCORD_BOT_TOKEN）' "${openclaw_token}" 1
-  prompt_env_value 'ALLOWED_WORKSPACE_ROOTS' '允许绑定的项目根目录（逗号分隔，例如 /Users/mac/work,/Users/mac/projects）' "${DEFAULT_ALLOWED_ROOTS}" 0 0 0
+  prompt_env_value 'ALLOWED_WORKSPACE_ROOTS' '允许绑定的项目根目录（逗号分隔，例如 /path/to/workspaces,/path/to/projects）' "${DEFAULT_ALLOWED_ROOTS}" 0 0 0
   prompt_env_value 'DISCORD_ADMIN_USER_IDS' '你的 Discord 用户 ID（可选，多个用逗号；启用 Developer Mode 后可复制）' '' 0 0 1
   prompt_env_value 'WEB_PORT' 'Web 面板端口' '3769' 1 0 0
   prompt_env_value 'WEB_AUTH_TOKEN' 'Web 面板鉴权 Token（回车保留当前/自动生成值）' "$(read_env_value 'WEB_AUTH_TOKEN' || true)" 0 1 0

@@ -1,13 +1,27 @@
 # Quickstart
 
-## 最快方式
+这份文档面向“先跑起来再说”的场景，默认你已经具备：
+
+- 一台 macOS 机器
+- 已安装并登录的 `codex` CLI
+- Node.js `>= 20.11`
+- 一个已经创建好的 Discord Bot
+
+如果你还没有创建 Discord Bot，请先看 `docs/MACOS-deploy.md`。
+
+## 1. 进入项目目录
 
 ```bash
-cd /Users/mac/work/su/codex_tunning
+cd /path/to/codex-discord-bridge
+```
+
+## 2. 一键部署
+
+```bash
 ./scripts/macos-bridge.sh deploy
 ```
 
-首次执行时，脚本会在终端依次提示你确认或填写：
+脚本会提示你填写或确认：
 
 - `CODEX_TUNNING_DISCORD_BOT_TOKEN`
 - `ALLOWED_WORKSPACE_ROOTS`
@@ -18,141 +32,100 @@ cd /Users/mac/work/su/codex_tunning
 
 其中：
 
-- `CODEX_TUNNING_DISCORD_BOT_TOKEN` 不会写进项目 `.env`
-- 它会被单独保存到 `/Users/mac/.codex-tunning/secrets.env`
-- 这样你本机同时跑多个 Discord Bot 项目时，不容易把 Token 混掉
+- Discord Bot Token 会单独写入 `~/.codex-tunning/secrets.env`
+- 不会写入项目 `.env`
+- 如果本机存在 `~/.openclaw/openclaw.json`，脚本会优先尝试自动导入其中可识别的 Discord Token / 代理
 
-部署完成后常用：
+## 3. 确认服务已启动
 
 ```bash
 ./scripts/macos-bridge.sh status
+```
+
+查看日志：
+
+```bash
 ./scripts/macos-bridge.sh logs
-./scripts/macos-bridge.sh open
-./scripts/macos-bridge.sh stop
 ```
 
-## 如果你想先单独填写配置
-
-```bash
-./scripts/macos-bridge.sh configure
-```
-
-## 如果你想分步执行
-
-### 1. 环境检查
-
-```bash
-./scripts/macos-bridge.sh doctor
-```
-
-### 2. 初始化并构建
-
-```bash
-./scripts/macos-bridge.sh setup
-```
-
-### 3. 后台启动
-
-```bash
-./scripts/macos-bridge.sh start
-```
-
-### 4. 打开 Web 面板
+打开 Web 面板：
 
 ```bash
 ./scripts/macos-bridge.sh open
 ```
 
-如果你保留了 `WEB_AUTH_TOKEN`，这个命令会自动带上一次性登录参数，浏览器打开后会写入本地 Cookie。
+## 4. 在 Discord 主频道绑定项目
 
-默认是：
-
-```text
-http://127.0.0.1:3769
-```
-
-## 第一次部署后要确认
-
-打开项目配置：
-
-```bash
-open /Users/mac/work/su/codex_tunning/.env
-```
-
-重点看：
-
-```env
-ALLOWED_WORKSPACE_ROOTS=
-DISCORD_ADMIN_USER_IDS=
-WEB_PORT=3769
-WEB_AUTH_TOKEN=
-OPENCLAW_DISCORD_PROXY=
-```
-
-打开独立密钥文件：
-
-```bash
-open /Users/mac/.codex-tunning/secrets.env
-```
-
-里面应该有：
-
-```env
-CODEX_TUNNING_DISCORD_BOT_TOKEN=...
-```
-
-浏览器手动访问时，也可以先打开：
+在一个普通文本频道发送：
 
 ```text
-http://127.0.0.1:3769/?token=<你的 WEB_AUTH_TOKEN>
+!bind api "/path/to/workspaces/api" --sandbox workspace-write --approval never --search off
 ```
 
-脚本 `./scripts/macos-bridge.sh open` 已经自动帮你处理这一点。
+绑定成功后：
 
-## 这些值怎么拿
+- 该主频道的普通消息会直接驱动 Codex
+- 该主频道下创建的线程会自动继承同一个项目目录
+- 每个线程会拥有独立 Codex 会话
 
-这些值的获取方式和 Discord Application / Bot 授权流程，已经完整写在：
+## 5. 直接开始对话
 
-- `MACOS-deploy.md`
-
-## 绑定项目到 Discord
-
-在目标频道发送：
+发送普通消息，例如：
 
 ```text
-!bind api "/Users/mac/work/api" --sandbox workspace-write --approval never
+帮我检查一下这个项目的 README，并列出缺失的部署说明
 ```
 
-## 推荐使用方式
+你将看到：
 
-- 一个频道绑定一个项目目录
-- 一个线程对应一个独立 Codex 会话
-- 在频道主会话里做全局沟通
-- 在线程里做具体任务推进
+- 一条持续更新的“Codex 实时进度”消息
+- 一条最终结果消息
 
-## 常用命令
+## 6. 常用控制命令
 
 ```text
+!help
 !status
 !queue
 !cancel
 !reset
 !unbind
 !projects
-!help
 ```
 
-## 测试
+## 7. 附件与图片
+
+- 图片附件会自动透传给 `codex -i`
+- 普通文件会下载到 `data/attachments/...` 后再提示 Codex 读取
+
+## 8. 常见问题
+
+### `!bind` 在线程里无效
+
+`!bind` 只能在普通文本频道执行；线程会自动继承主频道绑定。
+
+### Bot 显示离线
+
+依次检查：
 
 ```bash
-npm test
-npm run smoke:local
-npm run smoke:discord
+./scripts/macos-bridge.sh status
+./scripts/macos-bridge.sh start
+./scripts/macos-bridge.sh logs
 ```
 
-## 详细说明
+同时确认：
 
-请继续看：
+- `CODEX_TUNNING_DISCORD_BOT_TOKEN` 正确
+- Discord Developer Portal 已启用 **Message Content Intent**
+- Bot 已被邀请进入目标服务器和频道
 
-- `MACOS-deploy.md`
-- `DEPLOYMENT.md`
+### 网络需要代理
+
+在交互配置里填写：
+
+```text
+OPENCLAW_DISCORD_PROXY=http://127.0.0.1:7890
+```
+
+脚本会在启动时自动注入 `HTTP_PROXY` / `HTTPS_PROXY`。
