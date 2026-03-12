@@ -234,6 +234,221 @@ cd /path/to/codex-discord-bridge
 http://127.0.0.1:7890
 ```
 
+## 八、在一台新 Mac 上，从 Gitee 拉下来之后怎么完整部署
+
+这部分就是“换一台全新的 macOS 机器”时，最推荐照着走的一条龙流程。
+
+### 1. 先准备这台 Mac
+
+至少确保这台机器已经具备：
+
+- `git`
+- Node.js `>= 20.11`
+- 已安装并登录的 `codex` CLI
+- 能正常访问 Discord；如果不能，请提前准备好代理 `http://127.0.0.1:7890`
+
+可以先执行：
+
+```bash
+git --version
+node -v
+npm -v
+codex --version
+```
+
+### 2. 从 Gitee 拉代码
+
+如果你已经给这台 Mac 配好了 Gitee SSH Key，推荐直接用 SSH：
+
+```bash
+git clone git@gitee.com:<你的 Gitee 用户名>/<你的仓库名>.git
+cd <你的仓库目录名>
+```
+
+如果你还没有配 SSH Key，也可以先用 HTTPS：
+
+```bash
+git clone https://gitee.com/<你的 Gitee 用户名>/<你的仓库名>.git
+cd <你的仓库目录名>
+```
+
+如果这是一个私有仓库：
+
+- 使用 SSH 时，要先把这台 Mac 的公钥加到 Gitee 账号
+- 使用 HTTPS 时，拉取时需要输入 Gitee 账号凭据
+
+### 3. 直接执行一键部署
+
+进入仓库目录后，直接运行：
+
+```bash
+./scripts/macos-bridge.sh deploy
+```
+
+这个命令会自动：
+
+1. 检查 `node`、`npm`、`codex`
+2. 创建或更新项目 `.env`
+3. 交互式询问关键配置
+4. 把 Discord Bot Token 单独写入 `~/.codex-tunning/secrets.env`
+5. 安装依赖
+6. 执行类型检查
+7. 执行构建
+8. 询问你是否安装为 macOS 自启动服务
+
+### 4. 部署过程中你需要准备并填写的信息
+
+部署脚本会提示你输入或确认这些值：
+
+- `CODEX_TUNNING_DISCORD_BOT_TOKEN`
+- `ALLOWED_WORKSPACE_ROOTS`
+- `DISCORD_ADMIN_USER_IDS`
+- `WEB_PORT`
+- `WEB_AUTH_TOKEN`
+- `OPENCLAW_DISCORD_PROXY`（可选）
+
+建议这样理解：
+
+- `CODEX_TUNNING_DISCORD_BOT_TOKEN`：Discord Developer Portal 里复制出来的 Bot Token
+- `ALLOWED_WORKSPACE_ROOTS`：这台新 Mac 上允许被 Discord 控制的项目根目录
+- `DISCORD_ADMIN_USER_IDS`：你的 Discord 用户 ID，可选但建议填写
+- `WEB_PORT`：本地管理面板端口，默认 `3769`
+- `WEB_AUTH_TOKEN`：本机 Web 管理面板鉴权 token，建议保留
+- `OPENCLAW_DISCORD_PROXY`：如果这台新机器访问 Discord 不稳定，就填 `http://127.0.0.1:7890`
+
+### 5. 选择是否安装成自启动服务
+
+部署脚本跑完后，会继续问你要不要安装成 `launchd` 服务。
+
+通常建议：
+
+- 这台机器是长期在线的桥接机：选 `daemon`
+- 这台机器只是你日常登录使用的个人电脑：选 `agent`
+
+如果你想手动安装：
+
+```bash
+./scripts/install-service.sh --mode daemon
+```
+
+或者：
+
+```bash
+./scripts/install-service.sh --mode agent
+```
+
+### 6. 确认服务已经真的跑起来
+
+部署完成后，执行：
+
+```bash
+./scripts/macos-bridge.sh status
+./scripts/macos-bridge.sh service-status
+./scripts/macos-bridge.sh logs
+```
+
+正常情况下，你应该能在日志里看到：
+
+```text
+Discord bot connected as <bot-name>#<discriminator>
+```
+
+如果你配置了 Web 面板，也可以打开：
+
+```bash
+./scripts/macos-bridge.sh open
+```
+
+### 7. 第一次在 Discord 里验证
+
+先到你的 Discord 服务器里，找一个普通文本频道发送：
+
+```text
+!bind demo "/这台新 Mac 上的某个项目目录" --sandbox danger-full-access --approval never --search off
+```
+
+绑定成功后，再发一条普通消息，例如：
+
+```text
+请告诉我当前项目目录有哪些文件
+```
+
+如果机器人开始回复实时进度，并且最终返回结果，说明这台新 Mac 上的整套链路已经打通。
+
+### 8. 新 Mac 上推荐的日常管理命令
+
+以后你主要会用到这些：
+
+```bash
+./scripts/macos-bridge.sh restart
+./scripts/macos-bridge.sh status
+./scripts/macos-bridge.sh service-status
+./scripts/macos-bridge.sh logs
+./scripts/macos-bridge.sh configure
+```
+
+如果你从 Gitee 拉了新版本，推荐更新流程：
+
+```bash
+git pull
+npm install
+npm run check
+npm test
+npm run build
+./scripts/macos-bridge.sh restart
+```
+
+### 9. 新 Mac 常见问题
+
+#### 拉仓库失败
+
+优先检查：
+
+- 这台 Mac 是否已经配置 Gitee SSH Key
+- 私有仓库是否有访问权限
+- 是否需要改用 HTTPS 克隆
+
+#### Discord 连不上
+
+优先检查：
+
+- `CODEX_TUNNING_DISCORD_BOT_TOKEN` 是否正确
+- Discord Developer Portal 是否启用了 `MESSAGE CONTENT INTENT`
+- 这台新机器是否需要代理
+
+如果需要代理，请重新执行：
+
+```bash
+./scripts/macos-bridge.sh configure
+./scripts/macos-bridge.sh restart
+```
+
+然后把 `OPENCLAW_DISCORD_PROXY` 配成：
+
+```text
+http://127.0.0.1:7890
+```
+
+#### 绑定成功但写文件仍提示只读
+
+先执行：
+
+```bash
+./scripts/macos-bridge.sh restart
+```
+
+然后在 Discord 目标频道发送：
+
+```text
+!reset
+```
+
+必要时重新绑定：
+
+```text
+!bind demo "/这台新 Mac 上的项目目录" --sandbox danger-full-access --approval never --search on
+```
+
 ## 九、开机启动 / 登录启动怎么选
 
 部署结束后，脚本会继续询问是否安装自启动服务，并让你选择模式：
