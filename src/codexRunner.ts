@@ -31,8 +31,10 @@ export class CodexRunner {
   start(binding: ChannelBinding, input: CodexRunInput, existingThreadId: string | undefined, hooks: CodexRunHooks = {}): RunningCodexJob {
     const usedResume = Boolean(existingThreadId);
     const args = this.buildArgs(binding, input, usedResume, existingThreadId);
+    const env = buildCodexChildEnv(binding.workspacePath);
     const child = spawn(this.config.codexCommand, args, {
       cwd: binding.workspacePath,
+      env,
       stdio: ['pipe', 'pipe', 'pipe'],
       detached: process.platform !== 'win32',
     });
@@ -235,6 +237,10 @@ export class CodexRunner {
         resumeArgs.push('-i', imagePath);
       }
 
+      if (binding.codex.sandboxMode === 'danger-full-access') {
+        resumeArgs.push('--dangerously-bypass-approvals-and-sandbox');
+      }
+
       if (binding.codex.skipGitRepoCheck) {
         resumeArgs.push('--skip-git-repo-check');
       }
@@ -273,6 +279,35 @@ export class CodexRunner {
     execArgs.push('-');
     return [...globalArgs, ...execArgs];
   }
+}
+
+function buildCodexChildEnv(workspacePath: string): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    PWD: workspacePath,
+  };
+
+  const blockedExactKeys = new Set([
+    'CODEX_CI',
+    'CODEX_SHELL',
+    'CODEX_THREAD_ID',
+  ]);
+
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('CODEX_TUNNING_')) {
+      continue;
+    }
+
+    if (key === 'CODEX_HOME' || key === 'CODEX_CONFIG_HOME') {
+      continue;
+    }
+
+    if (blockedExactKeys.has(key) || key.startsWith('CODEX_INTERNAL_')) {
+      delete env[key];
+    }
+  }
+
+  return env;
 }
 
 function parsePlanItems(rawItems: unknown): PlanItem[] {

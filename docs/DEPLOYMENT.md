@@ -73,6 +73,13 @@ cd /path/to/codex-discord-bridge
 ./scripts/install-service.sh --mode agent
 ```
 
+模式切换示例：
+
+```bash
+./scripts/uninstall-service.sh --mode agent
+sudo ./scripts/install-service.sh --mode daemon
+```
+
 查看服务状态：
 
 ```bash
@@ -184,6 +191,39 @@ cat ~/.codex-tunning/secrets.env
 - Bot Token 未失效
 - 已启用 **Message Content Intent**
 - Bot 已加入目标服务器
+
+## Discord 仍提示只读时
+
+如果你已经绑定了 `danger-full-access`，但 Discord 里执行写文件仍然出现：
+
+- `Operation not permitted`
+- `touch ... permission denied`
+- `python3 -m venv .venv` 失败
+
+请执行：
+
+```bash
+./scripts/macos-bridge.sh restart
+```
+
+然后在 Discord 目标频道发送：
+
+```text
+!reset
+```
+
+必要时再重新绑定一次：
+
+```text
+!bind tmp "/path/to/project" --sandbox danger-full-access --approval never --search on
+```
+
+这通常说明：
+
+- 当前 Discord 会话还复用了旧的低权限 Codex thread
+- 或者旧版本服务进程继承了桌面版 Codex 的内部环境变量，导致子进程错误进入只读上下文
+
+当前版本已经在 bridge 侧清理了这类环境变量，但旧进程必须重启后才会生效。
 
 ## 会话与状态
 

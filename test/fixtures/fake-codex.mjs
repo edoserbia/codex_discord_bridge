@@ -106,7 +106,20 @@ const logDir = process.env.FAKE_CODEX_LOG_DIR;
 if (logDir) {
   await fs.mkdir(logDir, { recursive: true });
   const file = path.join(logDir, `${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
-  await fs.writeFile(file, JSON.stringify({ argv: process.argv.slice(2), args, prompt, cwd: process.cwd() }, null, 2));
+  await fs.writeFile(file, JSON.stringify({
+    argv: process.argv.slice(2),
+    args,
+    prompt,
+    cwd: process.cwd(),
+    env: {
+      PWD: process.env.PWD,
+      CODEX_CI: process.env.CODEX_CI,
+      CODEX_SHELL: process.env.CODEX_SHELL,
+      CODEX_THREAD_ID: process.env.CODEX_THREAD_ID,
+      CODEX_INTERNAL_ORIGINATOR_OVERRIDE: process.env.CODEX_INTERNAL_ORIGINATOR_OVERRIDE,
+      CODEX_TUNNING_SECRETS_FILE: process.env.CODEX_TUNNING_SECRETS_FILE,
+    },
+  }, null, 2));
 }
 
 const threadId = args.mode === 'resume' ? args.resumeThreadId : `thread-${Math.random().toString(16).slice(2, 10)}`;

@@ -281,6 +281,13 @@ http://127.0.0.1:7890
 ./scripts/uninstall-service.sh --mode agent
 ```
 
+### 从登录启动切换到开机启动
+
+```bash
+./scripts/uninstall-service.sh --mode agent
+sudo ./scripts/install-service.sh --mode daemon
+```
+
 ## 十、部署后的文件在哪
 
 默认情况下：
@@ -366,6 +373,43 @@ Bridge 会中断当前步骤，并在**同一会话**中按新的引导继续。
 
 - `workspace-write`
 - `read-only`
+
+## 十四、如果 Discord 里仍然显示只读怎么办
+
+如果你已经绑定了高权限：
+
+```text
+!bind tmp "/path/to/project" --sandbox danger-full-access --approval never --search on
+```
+
+但它仍回你：
+
+- `Operation not permitted`
+- `touch ...` 失败
+- `python3 -m venv .venv` 失败
+
+按下面顺序处理：
+
+1. 在本机重启 bridge
+
+```bash
+./scripts/macos-bridge.sh restart
+```
+
+2. 在 Discord 当前频道发送
+
+```text
+!reset
+```
+
+3. 如有必要，再重新发送一次高权限 `!bind`
+
+根因通常是：
+
+- 旧 Codex 会话还没被刷新
+- 或者旧版本 bridge 进程继承了桌面版 Codex 的内部环境变量，导致子进程错误进入只读上下文
+
+当前版本已经修复第二类问题，但旧进程必须重启后才会生效。
 
 如果 Discord 客户端里仍显示离线，重点检查：
 
