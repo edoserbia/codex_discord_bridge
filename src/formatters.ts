@@ -68,7 +68,7 @@ export function formatHelp(prefix: string): string {
     '图片附件会自动透传到 `codex -i`，普通文件会下载到本地附件目录供 Codex 读取。',
     '',
     '示例：',
-    `\`${prefix}bind api "/path/to/workspaces/api" --sandbox workspace-write --approval never --search off\``,
+    `\`${prefix}bind api "/path/to/workspaces/api" --sandbox danger-full-access --approval never --search off\``,
   ].join('\n');
 }
 

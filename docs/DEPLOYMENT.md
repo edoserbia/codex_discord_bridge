@@ -1,6 +1,6 @@
 # Deployment & Operations
 
-这份文档面向日常运维：启动、停止、查看状态、升级、日志排查，以及运行目录说明。
+这份文档面向日常运维：部署、升级、launchd 自启动、日志排查和运行目录说明。
 
 ## 目录约定
 
@@ -18,6 +18,10 @@
 - PID 文件：`/path/to/codex-discord-bridge/.run/codex-discord-bridge.pid`
 - 状态文件：`/path/to/codex-discord-bridge/data/state.json`
 - Web 面板：`http://127.0.0.1:3769`
+- LaunchAgent plist：`~/Library/LaunchAgents/<label>.plist`
+- LaunchDaemon plist：`/Library/LaunchDaemons/<label>.plist`
+
+服务标签会根据仓库路径自动生成，所以同一台 Mac 上可以安装多个不同仓库实例，不会互相冲突。
 
 ## 首次部署
 
@@ -26,21 +30,12 @@ cd /path/to/codex-discord-bridge
 ./scripts/macos-bridge.sh deploy
 ```
 
-`deploy` 等价于：
+`deploy` 会执行：
 
 1. `doctor`
 2. `setup`
-3. `start`
-
-其中 `setup` 会：
-
-- 检查 Node.js / npm / codex
-- 创建 `.env`（若不存在）
-- 交互式填写配置
-- 把 Discord Token 单独写入 `~/.codex-tunning/secrets.env`
-- 安装依赖
-- 运行类型检查
-- 执行构建
+3. 交互式询问是否安装 launchd 自启动服务
+4. 若未安装 launchd，则直接 `start`
 
 ## 日常管理命令
 
@@ -52,9 +47,56 @@ cd /path/to/codex-discord-bridge
 ./scripts/macos-bridge.sh stop
 ./scripts/macos-bridge.sh restart
 ./scripts/macos-bridge.sh status
+./scripts/macos-bridge.sh service-status
 ./scripts/macos-bridge.sh logs
 ./scripts/macos-bridge.sh open
+./scripts/macos-bridge.sh install-service --mode daemon
+./scripts/macos-bridge.sh uninstall-service --mode daemon
 ```
+
+## launchd 自启动
+
+### `LaunchDaemon` 和 `LaunchAgent` 的区别
+
+- `daemon`：开机启动，适合你希望机器启动后就保持在线
+- `agent`：登录后启动，不需要 `sudo`，适合个人桌面环境
+
+安装开机启动服务：
+
+```bash
+./scripts/install-service.sh --mode daemon
+```
+
+安装登录后启动服务：
+
+```bash
+./scripts/install-service.sh --mode agent
+```
+
+查看服务状态：
+
+```bash
+./scripts/macos-bridge.sh service-status
+```
+
+卸载服务：
+
+```bash
+./scripts/uninstall-service.sh --mode daemon
+./scripts/uninstall-service.sh --mode agent
+```
+
+### 自动恢复
+
+安装为 launchd 服务后，plist 会带：
+
+- `RunAtLoad=true`
+- `KeepAlive=true`
+
+这意味着：
+
+- 机器启动或用户登录后会自动拉起
+- 进程异常退出后 launchd 会自动重启
 
 ## 升级流程
 
@@ -69,7 +111,7 @@ npm run build
 ./scripts/macos-bridge.sh restart
 ```
 
-如果只是文档或前端管理页面有改动，也建议至少运行：
+如果只是文档或 Web 面板改动，也建议至少运行：
 
 ```bash
 npm run check
@@ -101,7 +143,7 @@ http://127.0.0.1:3769/?token=<YOUR_WEB_AUTH_TOKEN>
 OPENCLAW_DISCORD_PROXY=http://127.0.0.1:7890
 ```
 
-启动脚本会在进程启动前自动注入：
+启动脚本和 launchd 前台入口都会自动注入：
 
 - `HTTP_PROXY`
 - `HTTPS_PROXY`
@@ -112,10 +154,11 @@ OPENCLAW_DISCORD_PROXY=http://127.0.0.1:7890
 
 优先按下面顺序检查：
 
-1. 进程是否在运行
+1. 查看运行状态
 
 ```bash
 ./scripts/macos-bridge.sh status
+./scripts/macos-bridge.sh service-status
 ```
 
 2. 如果未运行，直接启动
@@ -151,8 +194,13 @@ cat ~/.codex-tunning/secrets.env
 
 如需清空本地会话状态，可以先停止服务，再删除 `data/state.json`。
 
-## 不做什么
+## 权限说明
 
-当前部署脚本**不会**自动配置开机自启或 `launchd` 服务；它只负责本机手动部署与日常管理。
+默认会把 `DEFAULT_CODEX_SANDBOX` 设为 `danger-full-access`，让 Discord 中的 Codex 可以直接读写项目文件。
 
-如果你后续需要，我可以再单独补一套 `launchd` 配置方案。
+如果你希望收紧权限，可以把 `.env` 中的值改成：
+
+- `workspace-write`
+- `read-only`
+
+同时重新 `!bind` 或发送 `!reset` 让旧会话失效。

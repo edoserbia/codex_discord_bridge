@@ -6,6 +6,7 @@
 - Discord Bot 怎么创建
 - Token、用户 ID、权限、代理怎么获得
 - 如何在 macOS 上一键部署
+- 如何安装开机启动服务
 - 如何在 Discord 里把“频道 ↔ 项目目录”绑定起来
 - 如何使用线程作为独立 Codex 会话
 - 如何查看实时进度、传图片和普通附件
@@ -19,6 +20,7 @@
 - 主频道下每个线程对应该项目里的一个独立 Codex 会话
 - 在 Discord 里发消息即可驱动本机 `codex`
 - 运行中可以实时看到 reasoning、todo/plan、时间线、当前命令和输出预览
+- 可以安装为 `launchd` 服务，实现开机启动或登录后启动
 - 可通过 Web 面板查看绑定和会话状态
 
 ## 二、前置条件
@@ -171,8 +173,11 @@ cd /path/to/codex-discord-bridge
 ./scripts/macos-bridge.sh stop
 ./scripts/macos-bridge.sh restart
 ./scripts/macos-bridge.sh status
+./scripts/macos-bridge.sh service-status
 ./scripts/macos-bridge.sh logs
 ./scripts/macos-bridge.sh open
+./scripts/macos-bridge.sh install-service --mode daemon
+./scripts/macos-bridge.sh uninstall-service --mode daemon
 ./scripts/macos-bridge.sh deploy
 ```
 
@@ -188,7 +193,8 @@ cd /path/to/codex-discord-bridge
 6. 安装依赖
 7. 运行类型检查
 8. 执行构建
-9. 后台启动服务
+9. 询问是否安装为 `launchd` 服务
+10. 若未安装 `launchd`，则后台启动服务
 
 ## 七、部署时你会被问到什么
 
@@ -228,7 +234,54 @@ cd /path/to/codex-discord-bridge
 http://127.0.0.1:7890
 ```
 
-## 八、部署后的文件在哪
+## 九、开机启动 / 登录启动怎么选
+
+部署结束后，脚本会继续询问是否安装自启动服务，并让你选择模式：
+
+### 方案 A：`daemon` 开机启动
+
+特点：
+
+- 机器开机后就自动拉起
+- 适合把这台 Mac 当作长期在线的桥接主机
+- 首次安装需要 `sudo`
+
+安装命令：
+
+```bash
+./scripts/install-service.sh --mode daemon
+```
+
+### 方案 B：`agent` 登录后启动
+
+特点：
+
+- 只有登录用户会话建立后才启动
+- 不需要 `sudo`
+- 更适合个人日常桌面环境
+
+安装命令：
+
+```bash
+./scripts/install-service.sh --mode agent
+```
+
+### 查看和卸载服务
+
+查看：
+
+```bash
+./scripts/macos-bridge.sh service-status
+```
+
+卸载：
+
+```bash
+./scripts/uninstall-service.sh --mode daemon
+./scripts/uninstall-service.sh --mode agent
+```
+
+## 十、部署后的文件在哪
 
 默认情况下：
 
@@ -238,13 +291,16 @@ http://127.0.0.1:7890
 - PID 文件：`/path/to/codex-discord-bridge/.run/codex-discord-bridge.pid`
 - 运行状态：`/path/to/codex-discord-bridge/data/state.json`
 - Web 面板：`http://127.0.0.1:3769`
+- LaunchAgent：`~/Library/LaunchAgents/<label>.plist`
+- LaunchDaemon：`/Library/LaunchDaemons/<label>.plist`
 
-## 九、怎么确认 Bot 已经上线
+## 十一、怎么确认 Bot 已经上线
 
 执行：
 
 ```bash
 ./scripts/macos-bridge.sh status
+./scripts/macos-bridge.sh service-status
 ```
 
 再看日志：
@@ -258,6 +314,58 @@ http://127.0.0.1:7890
 ```text
 Discord bot connected as <bot-name>#<discriminator>
 ```
+
+## 十二、在 Discord 里怎么绑定和使用
+
+### 1. 在主频道绑定项目
+
+在普通文本频道发送：
+
+```text
+!bind api "/path/to/workspaces/api" --sandbox danger-full-access --approval never --search off
+```
+
+说明：
+
+- `!bind` 必须在主频道执行
+- 该主频道下创建的线程会自动继承此绑定
+- 默认 `.env` 已把 `DEFAULT_CODEX_SANDBOX` 设为 `danger-full-access`
+
+### 2. 线程会自动变成独立会话
+
+绑定完成后：
+
+- 主频道继续承担“项目入口”
+- 每个线程会成为该项目下的一条独立 Codex 会话
+
+### 3. 运行中插入新的引导
+
+如果 Codex 正在运行，而你希望临时改方向，直接发送：
+
+```text
+!guide 请停止当前步骤，先创建部署文档
+```
+
+Bridge 会中断当前步骤，并在**同一会话**中按新的引导继续。
+
+### 4. 图片和文件怎么传
+
+- 图片附件会自动透传给 `codex -i`
+- 普通文件会下载到本地附件目录，并提示 Codex 读取
+
+## 十三、权限和写文件说明
+
+为了让 Discord 中的 Codex 能像本地 CLI 一样写文件，当前默认策略是：
+
+- `DEFAULT_CODEX_SANDBOX=danger-full-access`
+- `DEFAULT_CODEX_APPROVAL=never`
+
+如果你已经绑定过旧频道，但之前是低权限模式，重新发送一次新的 `!bind` 即可切换到高权限会话。
+
+如果你不希望默认就是高权限，可以把 `.env` 中的 `DEFAULT_CODEX_SANDBOX` 改回：
+
+- `workspace-write`
+- `read-only`
 
 如果 Discord 客户端里仍显示离线，重点检查：
 

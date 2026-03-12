@@ -1,6 +1,6 @@
 {
   "name": "codex-discord-bridge",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Discord backend bridge for Codex CLI with per-channel project mapping, attachments, thread sessions, web admin, and live progress updates",
   "type": "module",
@@ -23,6 +23,9 @@
     "macos:stop": "./scripts/macos-bridge.sh stop",
     "macos:restart": "./scripts/macos-bridge.sh restart",
     "macos:status": "./scripts/macos-bridge.sh status",
+    "macos:service-status": "./scripts/macos-bridge.sh service-status",
+    "macos:install-service": "./scripts/macos-bridge.sh install-service",
+    "macos:uninstall-service": "./scripts/macos-bridge.sh uninstall-service",
     "macos:logs": "./scripts/macos-bridge.sh logs",
     "macos:open": "./scripts/macos-bridge.sh open",
     "macos:deploy": "./scripts/macos-bridge.sh deploy"

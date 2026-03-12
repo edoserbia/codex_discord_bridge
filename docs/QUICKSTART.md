@@ -35,6 +35,13 @@ cd /path/to/codex-discord-bridge
 - Discord Bot Token 会单独写入 `~/.codex-tunning/secrets.env`
 - 不会写入项目 `.env`
 - 如果本机存在 `~/.openclaw/openclaw.json`，脚本会优先尝试自动导入其中可识别的 Discord Token / 代理
+- 默认会把 `DEFAULT_CODEX_SANDBOX` 设为 `danger-full-access`
+
+如果你希望立即安装为自启动服务，也可以直接执行：
+
+```bash
+./scripts/install-service.sh --mode daemon
+```
 
 ## 3. 确认服务已启动
 
@@ -59,7 +66,7 @@ cd /path/to/codex-discord-bridge
 在一个普通文本频道发送：
 
 ```text
-!bind api "/path/to/workspaces/api" --sandbox workspace-write --approval never --search off
+!bind api "/path/to/workspaces/api" --sandbox danger-full-access --approval never --search off
 ```
 
 绑定成功后：
@@ -87,6 +94,7 @@ cd /path/to/codex-discord-bridge
 !help
 !status
 !queue
+!guide <追加指令>
 !cancel
 !reset
 !unbind
@@ -119,6 +127,7 @@ cd /path/to/codex-discord-bridge
 - `CODEX_TUNNING_DISCORD_BOT_TOKEN` 正确
 - Discord Developer Portal 已启用 **Message Content Intent**
 - Bot 已被邀请进入目标服务器和频道
+- 如果已安装 launchd 服务，再执行 `./scripts/macos-bridge.sh service-status`
 
 ### 网络需要代理
 
