@@ -245,7 +245,7 @@ export class DiscordCodexBridge {
 
   private async handleCommand(message: Message, command: ParsedCommand): Promise<void> {
     const resolved = this.resolveConversationForMessage(message);
-    const isThread = Boolean(this.getParentChannelId(message.channel));
+    const isThread = this.isThreadChannel(message.channel);
 
     switch (command.kind) {
       case 'help':
@@ -580,7 +580,7 @@ export class DiscordCodexBridge {
       };
     }
 
-    const parentId = this.getParentChannelId(message.channel);
+    const parentId = this.getThreadParentChannelId(message.channel);
 
     if (!parentId) {
       return undefined;
@@ -601,7 +601,21 @@ export class DiscordCodexBridge {
     };
   }
 
-  private getParentChannelId(channel: Message['channel'] | SendableChannel): string | undefined {
+  private isThreadChannel(channel: Message['channel'] | SendableChannel): boolean {
+    const candidate = channel as { isThread?: (() => boolean) | boolean };
+
+    if (typeof candidate.isThread === 'function') {
+      return candidate.isThread();
+    }
+
+    return candidate.isThread === true;
+  }
+
+  private getThreadParentChannelId(channel: Message['channel'] | SendableChannel): string | undefined {
+    if (!this.isThreadChannel(channel)) {
+      return undefined;
+    }
+
     return (channel as { parentId?: string | null }).parentId ?? undefined;
   }
 
