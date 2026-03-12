@@ -15,7 +15,17 @@
     "test:coverage": "node --import tsx --test --test-concurrency=1 --experimental-test-coverage --test-coverage-lines=85 --test-coverage-functions=85 $(find test -name '*.test.ts' | sort)",
     "smoke:local": "node --import tsx scripts/smoke-local.ts",
     "smoke:discord": "node --import tsx scripts/smoke-discord.ts",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "macos:doctor": "./scripts/macos-bridge.sh doctor",
+    "macos:configure": "./scripts/macos-bridge.sh configure",
+    "macos:setup": "./scripts/macos-bridge.sh setup",
+    "macos:start": "./scripts/macos-bridge.sh start",
+    "macos:stop": "./scripts/macos-bridge.sh stop",
+    "macos:restart": "./scripts/macos-bridge.sh restart",
+    "macos:status": "./scripts/macos-bridge.sh status",
+    "macos:logs": "./scripts/macos-bridge.sh logs",
+    "macos:open": "./scripts/macos-bridge.sh open",
+    "macos:deploy": "./scripts/macos-bridge.sh deploy"
   },
   "dependencies": {
     "discord.js": "^14.19.3",

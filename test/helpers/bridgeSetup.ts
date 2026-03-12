@@ -13,6 +13,7 @@ export async function createBridgeTestRig(options: {
   codexCommand?: string;
   webEnabled?: boolean;
   webPort?: number;
+  webAuthToken?: string;
 }): Promise<{
   config: AppConfig;
   store: JsonStateStore;
@@ -39,7 +40,7 @@ export async function createBridgeTestRig(options: {
       enabled: options.webEnabled ?? false,
       bind: '127.0.0.1',
       port: options.webPort ?? 0,
-      authToken: undefined,
+      authToken: options.webAuthToken,
     },
   };
 
