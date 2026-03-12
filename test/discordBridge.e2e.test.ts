@@ -75,6 +75,24 @@ test('bridge gives Discord threads their own Codex session under the parent bind
   await cleanupDir(rootDir);
 });
 
+test('bridge posts live progress with reasoning summary and plan updates', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-progress-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-progress', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannel, '[plan] show me live progress'));
+  await waitFor(() => findSent(rootChannel, /Codex 实时进度/));
+  await waitFor(() => findSent(rootChannel, /计划：/));
+  await waitFor(() => findSent(rootChannel, /分析摘要：/));
+
+  assert.ok(rootChannel.sent.some((message) => /Codex 实时进度/.test(message.content)));
+  assert.ok(rootChannel.sent.some((message) => /Create a short plan/.test(message.content)));
+  await cleanupDir(rootDir);
+});
+
 test('bridge downloads attachments and forwards image files to codex -i', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-attach-');
   const workspace = await createWorkspace(rootDir);

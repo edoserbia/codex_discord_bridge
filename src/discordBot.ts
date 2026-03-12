@@ -21,9 +21,9 @@ import type {
 
 import { buildPromptWithAttachments, downloadAttachments, extractMessageAttachments } from './attachments.js';
 import { isCommandMessage, parseCommand } from './commandParser.js';
-import { formatFailureReply, formatHelp, formatProjects, formatQueue, formatStatus, formatSuccessReply } from './formatters.js';
+import { formatFailureReply, formatHelp, formatProgressMessage, formatProjects, formatQueue, formatStatus, formatSuccessReply } from './formatters.js';
 import { JsonStateStore } from './store.js';
-import { cloneCodexOptions, isWithinAllowedRoots, normalizeAllowedRoots, resolveExistingDirectory, splitIntoDiscordChunks } from './utils.js';
+import { cloneCodexOptions, isWithinAllowedRoots, normalizeAllowedRoots, resolveExistingDirectory, splitIntoDiscordChunks, summarizeReasoningText, truncate } from './utils.js';
 
 type SendableChannel = {
   id: string;
@@ -156,7 +156,7 @@ export class DiscordCodexBridge {
     const channel = await this.fetchChannel(savedBinding.channelId);
 
     if (channel) {
-      await this.refreshStatusPanel(channel, savedBinding, session, runtime, false);
+      await this.refreshRuntimeViews(channel, savedBinding, session, runtime, false);
     }
 
     return savedBinding;
@@ -447,6 +447,9 @@ export class DiscordCodexBridge {
       startedAt: new Date().toISOString(),
       latestActivity: '准备启动 Codex',
       agentMessages: [],
+      reasoningSummaries: [],
+      planItems: [],
+      timeline: ['⏳ 已收到请求，准备启动 Codex'],
       stderr: [],
       usedResume: Boolean(session.codexThreadId),
       codexThreadId: session.codexThreadId,
@@ -458,7 +461,7 @@ export class DiscordCodexBridge {
     }, task.bindingChannelId);
 
     await channel.sendTyping().catch(() => undefined);
-    await this.refreshStatusPanel(channel, binding, currentSession, runtime, isThreadConversation);
+    await this.refreshRuntimeViews(channel, binding, currentSession, runtime, isThreadConversation);
 
     const job = this.runner.start(binding, {
       prompt: task.effectivePrompt,
@@ -471,8 +474,9 @@ export class DiscordCodexBridge {
         }
 
         runtime.activeRun.codexThreadId = codexThreadId;
+        this.pushRunTimeline(runtime, `🧵 Codex 会话已建立：${codexThreadId.slice(0, 8)}`);
         const nextSession = await this.store.updateSession(conversationId, { codexThreadId }, task.bindingChannelId);
-        await this.refreshStatusPanel(channel, binding, nextSession, runtime, isThreadConversation);
+        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onActivity: async (activity) => {
         if (!runtime.activeRun) {
@@ -481,8 +485,37 @@ export class DiscordCodexBridge {
 
         runtime.activeRun.status = runtime.activeRun.status === 'cancelled' ? 'cancelled' : 'running';
         runtime.activeRun.latestActivity = activity;
+        this.pushRunTimeline(runtime, `🔄 ${activity}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
-        await this.refreshStatusPanel(channel, binding, nextSession, runtime, isThreadConversation);
+        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
+      },
+      onReasoning: async (reasoning) => {
+        if (!runtime.activeRun) {
+          return;
+        }
+
+        const summary = summarizeReasoningText(reasoning, 180);
+        if (summary) {
+          runtime.activeRun.reasoningSummaries.push(summary);
+          runtime.activeRun.reasoningSummaries = runtime.activeRun.reasoningSummaries.slice(-6);
+          runtime.activeRun.latestActivity = summary;
+          this.pushRunTimeline(runtime, `🧠 ${summary}`);
+        }
+
+        const nextSession = this.store.getSession(conversationId) ?? currentSession;
+        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
+      },
+      onTodoListChanged: async (items) => {
+        if (!runtime.activeRun) {
+          return;
+        }
+
+        runtime.activeRun.planItems = items;
+        const completed = items.filter((item) => item.completed).length;
+        runtime.activeRun.latestActivity = `计划进度 ${completed}/${items.length}`;
+        this.pushRunTimeline(runtime, `📋 计划进度 ${completed}/${items.length}`);
+        const nextSession = this.store.getSession(conversationId) ?? currentSession;
+        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onAgentMessage: async (agentMessage) => {
         if (!runtime.activeRun) {
@@ -491,8 +524,9 @@ export class DiscordCodexBridge {
 
         runtime.activeRun.agentMessages.push(agentMessage);
         runtime.activeRun.latestActivity = agentMessage;
+        this.pushRunTimeline(runtime, `💬 ${truncate(agentMessage, 140)}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
-        await this.refreshStatusPanel(channel, binding, nextSession, runtime, isThreadConversation);
+        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onCommandStarted: async (command) => {
         if (!runtime.activeRun) {
@@ -502,8 +536,9 @@ export class DiscordCodexBridge {
         runtime.activeRun.status = runtime.activeRun.status === 'cancelled' ? 'cancelled' : 'running';
         runtime.activeRun.currentCommand = command;
         runtime.activeRun.latestActivity = '正在执行命令';
+        this.pushRunTimeline(runtime, `▶️ ${truncate(command, 120)}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
-        await this.refreshStatusPanel(channel, binding, nextSession, runtime, isThreadConversation);
+        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onCommandCompleted: async (command, output, exitCode) => {
         if (!runtime.activeRun) {
@@ -513,8 +548,9 @@ export class DiscordCodexBridge {
         runtime.activeRun.currentCommand = command;
         runtime.activeRun.lastCommandOutput = output;
         runtime.activeRun.latestActivity = exitCode === 0 ? '命令执行完成' : '命令执行失败';
+        this.pushRunTimeline(runtime, `${exitCode === 0 ? '✅' : '❌'} ${truncate(command, 120)} (${exitCode ?? 'null'})`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
-        await this.refreshStatusPanel(channel, binding, nextSession, runtime, isThreadConversation);
+        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onStderr: async (line) => {
         if (!runtime.activeRun) {
@@ -522,9 +558,11 @@ export class DiscordCodexBridge {
         }
 
         runtime.activeRun.stderr.push(line);
+        runtime.activeRun.stderr = runtime.activeRun.stderr.slice(-20);
         runtime.activeRun.latestActivity = line;
+        this.pushRunTimeline(runtime, `⚠️ ${truncate(line, 140)}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
-        await this.refreshStatusPanel(channel, binding, nextSession, runtime, isThreadConversation);
+        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       },
     });
 
@@ -544,9 +582,10 @@ export class DiscordCodexBridge {
             ? 'completed'
             : 'failed';
         runtime.activeRun.latestActivity = result.success ? '本轮执行完成' : '本轮执行失败';
+        this.pushRunTimeline(runtime, result.success ? '🎉 本轮执行完成' : '🛑 本轮执行失败');
       }
 
-      await this.refreshStatusPanel(channel, binding, nextSession, runtime, isThreadConversation);
+      await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       await this.replyToOriginalMessage(
         channel,
         task.messageId,
@@ -558,7 +597,7 @@ export class DiscordCodexBridge {
       this.activeJobs.delete(conversationId);
       runtime.activeRun = undefined;
       const nextSession = this.store.getSession(conversationId) ?? currentSession;
-      await this.refreshStatusPanel(channel, binding, nextSession, runtime, isThreadConversation);
+      await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
 
       if (runtime.queue.length > 0) {
         void this.processQueue(conversationId);
@@ -617,6 +656,74 @@ export class DiscordCodexBridge {
     }
 
     return (channel as { parentId?: string | null }).parentId ?? undefined;
+  }
+
+  private pushRunTimeline(runtime: ChannelRuntime, entry: string): void {
+    if (!runtime.activeRun) {
+      return;
+    }
+
+    const normalized = entry.trim();
+    if (!normalized) {
+      return;
+    }
+
+    const timeline = runtime.activeRun.timeline;
+    if (timeline.at(-1) === normalized) {
+      return;
+    }
+
+    timeline.push(normalized);
+    if (timeline.length > 12) {
+      timeline.splice(0, timeline.length - 12);
+    }
+  }
+
+  private async refreshRuntimeViews(
+    channel: SendableChannel,
+    binding: ChannelBinding,
+    session: ConversationSessionState,
+    runtime: ChannelRuntime,
+    isThreadConversation: boolean,
+  ): Promise<void> {
+    await this.refreshStatusPanel(channel, binding, session, runtime, isThreadConversation);
+    await this.refreshProgressMessage(channel, binding, runtime);
+  }
+
+  private async refreshProgressMessage(
+    channel: SendableChannel,
+    binding: ChannelBinding,
+    runtime: ChannelRuntime,
+  ): Promise<void> {
+    const activeRun = runtime.activeRun;
+
+    if (!activeRun) {
+      return;
+    }
+
+    const content = formatProgressMessage(binding, runtime, this.config.commandPrefix);
+    const progressMessageId = activeRun.progressMessageId;
+
+    if (!progressMessageId) {
+      const originalMessage = await channel.messages.fetch(activeRun.task.messageId).catch(() => null);
+      const created = originalMessage
+        ? await originalMessage.reply(content)
+        : await channel.send(content);
+      activeRun.progressMessageId = created.id;
+      return;
+    }
+
+    const existing = await channel.messages.fetch(progressMessageId).catch(() => null);
+
+    if (!existing) {
+      const created = await channel.send(content);
+      activeRun.progressMessageId = created.id;
+      return;
+    }
+
+    if (existing.content !== content) {
+      await existing.edit(content);
+    }
   }
 
   private async refreshStatusPanel(
