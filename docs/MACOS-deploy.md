@@ -34,13 +34,14 @@ cd /Users/mac/work/su/codex_tunning
 首次执行时，这条命令会自动做：
 
 1. 检查 macOS / Node / npm / codex
-2. 自动创建 `.env`
-3. 如果检测到 `/Users/mac/.openclaw/openclaw.json`，先把里面可识别的 Discord Bot Token 和代理写入 `.env`
-4. 在终端里逐项提示你确认/修改关键配置
-5. 安装依赖
-6. 跑 `npm run check`
-7. 跑 `npm run build`
-8. 后台启动服务
+2. 自动创建项目 `.env`
+3. 如果检测到 `/Users/mac/.openclaw/openclaw.json`，先读取里面可识别的 Discord Bot Token 和代理
+4. 把 Discord Bot Token 单独写入 `/Users/mac/.codex-tunning/secrets.env`
+5. 在终端里逐项提示你确认/修改关键配置
+6. 安装依赖
+7. 跑 `npm run check`
+8. 跑 `npm run build`
+9. 后台启动服务
 
 启动后你可以用：
 
@@ -100,8 +101,14 @@ cd /Users/mac/work/su/codex_tunning
 
 脚本会在终端提示你填写或确认这些项：
 
-### `DISCORD_BOT_TOKEN`
+### `CODEX_TUNNING_DISCORD_BOT_TOKEN`
 必填。你的 Discord Bot Token。
+
+注意：
+
+- 这个值**不会**写进项目 `.env`
+- 它会单独保存到 `/Users/mac/.codex-tunning/secrets.env`
+- 变量名带项目前缀，避免和其他 Discord Bot 项目混淆
 
 ### `ALLOWED_WORKSPACE_ROOTS`
 推荐填写。允许绑定项目的根目录，多个路径用逗号分隔。
@@ -132,19 +139,20 @@ http://127.0.0.1:7890
 
 ## 这些信息怎么获得
 
-### 1. `DISCORD_BOT_TOKEN` 怎么拿
+### 1. `CODEX_TUNNING_DISCORD_BOT_TOKEN` 怎么拿
 
-1. 打开 Discord Developer Portal：<https://discord.com/developers/applications>
+1. 打开 Discord Developer Portal：[Discord Developer Portal](https://discord.com/developers/applications)
 2. 点击 **New Application**，创建一个新的 Application
 3. 进入这个 Application 的 **Bot** 页面
 4. 如果页面提示创建 Bot，就先点击 **Add Bot**
 5. 在 **Token** 区域生成或重置 Token，然后复制
-6. 把这个值填进脚本提示或 `.env` 的 `DISCORD_BOT_TOKEN`
+6. 把这个值在脚本交互里直接粘贴回车即可
 
 注意：
 
 - 这个 Token 等同于 Bot 密钥，不要发给别人
 - 如果泄露，就去 Bot 页面重新生成
+- 脚本会把它单独保存到 `/Users/mac/.codex-tunning/secrets.env`
 
 ### 2. `DISCORD_ADMIN_USER_IDS` 怎么拿
 
@@ -154,7 +162,7 @@ http://127.0.0.1:7890
 4. 回到你的头像、用户名或成员列表里自己的账号，右键
 5. 选择 **Copy User ID**
 
-多个管理员可以用逗号分隔写进 `.env`。
+多个管理员可以用逗号分隔写进项目 `.env`。
 
 ### 3. `ALLOWED_WORKSPACE_ROOTS` 怎么填
 
@@ -250,14 +258,15 @@ http://127.0.0.1:7890
 
 ## 重要文件
 
-- 环境配置：`/Users/mac/work/su/codex_tunning/.env`
+- 项目配置：`/Users/mac/work/su/codex_tunning/.env`
+- 独立密钥：`/Users/mac/.codex-tunning/secrets.env`
 - 运行日志：`/Users/mac/work/su/codex_tunning/logs/codex-discord-bridge.log`
 - PID 文件：`/Users/mac/work/su/codex_tunning/.run/codex-discord-bridge.pid`
 - Web 面板：默认 `http://127.0.0.1:3769`
 
 ## 第一次部署后要检查什么
 
-打开：
+打开项目配置：
 
 ```bash
 cat /Users/mac/work/su/codex_tunning/.env
@@ -266,12 +275,23 @@ cat /Users/mac/work/su/codex_tunning/.env
 重点确认这些字段：
 
 ```env
-DISCORD_BOT_TOKEN=
 ALLOWED_WORKSPACE_ROOTS=
 DISCORD_ADMIN_USER_IDS=
 WEB_PORT=3769
 WEB_AUTH_TOKEN=
 OPENCLAW_DISCORD_PROXY=
+```
+
+打开独立密钥文件：
+
+```bash
+cat /Users/mac/.codex-tunning/secrets.env
+```
+
+重点确认：
+
+```env
+CODEX_TUNNING_DISCORD_BOT_TOKEN=...
 ```
 
 浏览器手动访问时，也可以先打开：
@@ -436,7 +456,7 @@ Authorization: Bearer <你的 WEB_AUTH_TOKEN>
 
 ## 如果后面你改了配置
 
-改完 `.env` 后，执行：
+改完项目 `.env` 或独立密钥文件后，执行：
 
 ```bash
 ./scripts/macos-bridge.sh configure

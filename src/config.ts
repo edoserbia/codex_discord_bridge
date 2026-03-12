@@ -1,8 +1,14 @@
 import 'dotenv/config';
 
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
+import { config as dotenvConfig } from 'dotenv';
+
 import type { ApprovalPolicy, BindingCodexOptions, SandboxMode } from './types.js';
+
+const DEFAULT_SECRETS_FILE = path.join(os.homedir(), '.codex-tunning', 'secrets.env');
 
 export interface WebConfig {
   enabled: boolean;
@@ -20,6 +26,16 @@ export interface AppConfig {
   adminUserIds: Set<string>;
   defaultCodex: BindingCodexOptions;
   web: WebConfig;
+}
+
+function loadExternalSecretEnv(): void {
+  const secretFile = process.env.CODEX_TUNNING_SECRETS_FILE?.trim() || DEFAULT_SECRETS_FILE;
+
+  if (!fs.existsSync(secretFile)) {
+    return;
+  }
+
+  dotenvConfig({ path: secretFile, override: false });
 }
 
 function parseList(value: string | undefined): string[] {
@@ -77,10 +93,14 @@ function parseApprovalPolicy(value: string | undefined, fallback: ApprovalPolicy
 }
 
 export function loadConfig(): AppConfig {
-  const discordToken = process.env.DISCORD_BOT_TOKEN ?? process.env.DISCORD_TOKEN;
+  loadExternalSecretEnv();
+
+  const discordToken = process.env.CODEX_TUNNING_DISCORD_BOT_TOKEN?.trim()
+    || process.env.DISCORD_BOT_TOKEN?.trim()
+    || process.env.DISCORD_TOKEN?.trim();
 
   if (!discordToken) {
-    throw new Error('缺少环境变量 DISCORD_BOT_TOKEN。');
+    throw new Error('缺少环境变量 CODEX_TUNNING_DISCORD_BOT_TOKEN。');
   }
 
   return {

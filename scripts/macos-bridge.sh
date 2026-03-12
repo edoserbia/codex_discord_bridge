@@ -11,6 +11,9 @@ PID_FILE="${RUN_DIR}/codex-discord-bridge.pid"
 LOG_FILE="${LOG_DIR}/codex-discord-bridge.log"
 OPENCLAW_CONFIG_PATH="${OPENCLAW_CONFIG_PATH:-${HOME}/.openclaw/openclaw.json}"
 DEFAULT_ALLOWED_ROOTS="/Users/${USER}/work,/Users/${USER}/projects"
+SECRET_DIR="${HOME}/.codex-tunning"
+SECRET_ENV_FILE="${CODEX_TUNNING_SECRETS_FILE:-${SECRET_DIR}/secrets.env}"
+TOKEN_ENV_KEY='CODEX_TUNNING_DISCORD_BOT_TOKEN'
 ENV_CREATED_THIS_RUN=0
 
 mkdir -p "${RUN_DIR}" "${LOG_DIR}"
@@ -49,7 +52,7 @@ Codex Discord Bridge macOS 管理脚本
 
 说明：
   doctor     检查本机环境是否满足部署条件
-  configure  交互式填写/修改 .env 配置
+  configure  交互式填写/修改 .env，并单独保存 Discord Bot Token
   setup      初始化 .env、提示填写配置、安装依赖、执行类型检查和构建
   start      后台启动服务（日志写入 logs/codex-discord-bridge.log）
   stop       停止后台服务
@@ -62,7 +65,7 @@ USAGE
 }
 
 require_macos() {
-  if [[ "$(uname -s)" != "Darwin" ]]; then
+  if [[ "$(uname -s)" != 'Darwin' ]]; then
     print_error '该脚本目前只面向 macOS。'
     exit 1
   fi
@@ -85,11 +88,6 @@ if (!ok) {
   process.exit(1);
 }
 ' >/dev/null
-}
-
-is_placeholder_value() {
-  local value="${1:-}"
-  [[ -z "${value}" || "${value}" == 'your-discord-bot-token' ]]
 }
 
 mask_value() {
@@ -125,6 +123,101 @@ is_running() {
   return 1
 }
 
+read_secret_file_value() {
+  local key="$1"
+  if [[ ! -f "${SECRET_ENV_FILE}" ]]; then
+    return 0
+  fi
+
+  SECRET_ENV_PATH="${SECRET_ENV_FILE}" SECRET_KEY="$key" node <<'NODE'
+const fs = require('fs');
+const envPath = process.env.SECRET_ENV_PATH;
+const key = process.env.SECRET_KEY;
+const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
+for (const line of lines) {
+  const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
+  if (!match || match[1] !== key) {
+    continue;
+  }
+
+  const raw = match[2].trim();
+  if (!raw) {
+    break;
+  }
+
+  if (raw.startsWith('"') && raw.endsWith('"')) {
+    try {
+      process.stdout.write(JSON.parse(raw));
+      break;
+    } catch {}
+  }
+
+  if (raw.startsWith("'") && raw.endsWith("'")) {
+    process.stdout.write(raw.slice(1, -1));
+    break;
+  }
+
+  process.stdout.write(raw);
+  break;
+}
+NODE
+}
+
+load_secret_env() {
+  local value
+  value="$(read_secret_file_value "${TOKEN_ENV_KEY}")"
+  if [[ -n "${value}" ]]; then
+    printf -v "$TOKEN_ENV_KEY" '%s' "$value"
+    export "$TOKEN_ENV_KEY"
+  fi
+}
+
+read_secret_value() {
+  local key="$1"
+  local current="${!key-}"
+  if [[ -n "${current}" ]]; then
+    printf '%s' "${current}"
+    return 0
+  fi
+
+  read_secret_file_value "$key"
+}
+
+write_secret_value() {
+  local key="$1"
+  local value="$2"
+  mkdir -p "$(dirname "${SECRET_ENV_FILE}")"
+
+  SECRET_ENV_PATH="${SECRET_ENV_FILE}" SECRET_KEY="$key" SECRET_VALUE="$value" node <<'NODE'
+const fs = require('fs');
+const envPath = process.env.SECRET_ENV_PATH;
+const key = process.env.SECRET_KEY;
+const value = process.env.SECRET_VALUE ?? '';
+const lines = fs.existsSync(envPath)
+  ? fs.readFileSync(envPath, 'utf8').split(/\r?\n/)
+  : [];
+const encoded = JSON.stringify(value);
+let replaced = false;
+for (let index = 0; index < lines.length; index += 1) {
+  const line = lines[index];
+  const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
+  if (match && match[1] === key) {
+    lines[index] = `${key}=${encoded}`;
+    replaced = true;
+    break;
+  }
+}
+if (!replaced) {
+  lines.push(`${key}=${encoded}`);
+}
+fs.writeFileSync(envPath, `${lines.join('\n').replace(/\n+$/,'')}\n`);
+NODE
+
+  chmod 600 "${SECRET_ENV_FILE}"
+  printf -v "$key" '%s' "$value"
+  export "$key"
+}
+
 get_openclaw_field() {
   local field="$1"
   if [[ ! -f "${OPENCLAW_CONFIG_PATH}" ]]; then
@@ -152,13 +245,11 @@ ensure_env_file() {
     print_info '已从 .env.example 创建 .env'
   fi
 
-  local openclaw_token openclaw_proxy web_token
-  openclaw_token="$(get_openclaw_field 'channels.discord.token')"
+  local openclaw_proxy web_token
   openclaw_proxy="$(get_openclaw_field 'channels.discord.proxy')"
   web_token="$(node -e 'console.log(require("node:crypto").randomBytes(16).toString("hex"))')"
 
   ENV_FILE_PATH="${ENV_FILE}" \
-  OPENCLAW_TOKEN="${openclaw_token}" \
   OPENCLAW_PROXY="${openclaw_proxy}" \
   DEFAULT_ALLOWED_ROOTS="${DEFAULT_ALLOWED_ROOTS}" \
   GENERATED_WEB_AUTH_TOKEN="${web_token}" \
@@ -166,8 +257,7 @@ ensure_env_file() {
 const fs = require('fs');
 const path = process.env.ENV_FILE_PATH;
 const source = fs.readFileSync(path, 'utf8');
-const lines = source.split(/\r?\n/);
-const openclawToken = process.env.OPENCLAW_TOKEN || '';
+let lines = source.split(/\r?\n/);
 const openclawProxy = process.env.OPENCLAW_PROXY || '';
 const defaults = new Map([
   ['COMMAND_PREFIX', '!'],
@@ -182,14 +272,17 @@ const defaults = new Map([
   ['WEB_PORT', '3769'],
   ['ALLOWED_WORKSPACE_ROOTS', process.env.DEFAULT_ALLOWED_ROOTS || ''],
 ]);
-if (openclawToken) {
-  defaults.set('DISCORD_BOT_TOKEN', openclawToken);
-}
 if (process.env.GENERATED_WEB_AUTH_TOKEN) {
   defaults.set('WEB_AUTH_TOKEN', process.env.GENERATED_WEB_AUTH_TOKEN);
 }
 
-const placeholderValues = new Set(['', 'your-discord-bot-token']);
+const placeholderValues = new Set(['']);
+const removeKeys = new Set(['DISCORD_BOT_TOKEN', 'DISCORD_TOKEN']);
+lines = lines.filter((line) => {
+  const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
+  return !match || !removeKeys.has(match[1]);
+});
+
 const indexByKey = new Map();
 for (let index = 0; index < lines.length; index += 1) {
   const line = lines[index];
@@ -271,6 +364,42 @@ fs.writeFileSync(envPath, `${lines.join('\n').replace(/\n+$/,'')}\n`);
 NODE
 }
 
+remove_env_keys() {
+  if [[ ! -f "${ENV_FILE}" ]]; then
+    return 0
+  fi
+
+  ENV_FILE_PATH="${ENV_FILE}" REMOVE_KEYS="$*" node <<'NODE'
+const fs = require('fs');
+const envPath = process.env.ENV_FILE_PATH;
+const removeKeys = new Set((process.env.REMOVE_KEYS || '').split(/\s+/).filter(Boolean));
+const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
+const kept = lines.filter((line) => {
+  const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
+  return !match || !removeKeys.has(match[1]);
+});
+fs.writeFileSync(envPath, `${kept.join('\n').replace(/\n+$/,'')}\n`);
+NODE
+}
+
+migrate_project_token_to_secret_env() {
+  local current_secret env_token legacy_token token_to_store
+  current_secret="$(read_secret_value "${TOKEN_ENV_KEY}")"
+  env_token="$(read_env_value 'DISCORD_BOT_TOKEN' || true)"
+  legacy_token="$(read_env_value 'DISCORD_TOKEN' || true)"
+  token_to_store="${current_secret:-${env_token:-${legacy_token:-}}}"
+
+  if [[ -n "${token_to_store}" && -z "${current_secret}" ]]; then
+    write_secret_value "${TOKEN_ENV_KEY}" "${token_to_store}"
+    print_info "已将 Discord Bot Token 独立保存到：${SECRET_ENV_FILE}"
+  fi
+
+  if [[ -n "${env_token}" || -n "${legacy_token}" ]]; then
+    remove_env_keys 'DISCORD_BOT_TOKEN' 'DISCORD_TOKEN'
+    print_info '已从项目 .env 移除内联 Discord Token，避免与其他机器人配置混淆'
+  fi
+}
+
 prompt_env_value() {
   local key="$1"
   local label="$2"
@@ -331,18 +460,63 @@ prompt_env_value() {
   done
 }
 
+prompt_secret_value() {
+  local key="$1"
+  local label="$2"
+  local fallback_value="${3:-}"
+  local required="${4:-0}"
+  local current_value prompt_label answer
+
+  current_value="$(read_secret_value "${key}")"
+  if [[ -z "${current_value}" ]]; then
+    current_value="${fallback_value}"
+  fi
+
+  while true; do
+    prompt_label="${label}"
+    if [[ -n "${current_value}" ]]; then
+      prompt_label+=" [已存在：$(mask_value "${current_value}")，回车保留]"
+    else
+      prompt_label+=" [未填写]"
+    fi
+
+    printf '%s: ' "${prompt_label}"
+    read -r -s answer || true
+    printf '\n'
+
+    if [[ -z "${answer}" ]]; then
+      answer="${current_value}"
+    fi
+
+    if [[ "${required}" == '1' ]] && [[ -z "${answer}" ]]; then
+      print_warn '此项必填，请输入。'
+      continue
+    fi
+
+    write_secret_value "${key}" "${answer}"
+    return 0
+  done
+}
+
 prompt_interactive_configuration() {
   if [[ ! -t 0 ]]; then
     print_warn '当前不是交互终端，无法进行提问式配置。'
-    print_info "请手动编辑 ${ENV_FILE}，或在本机终端执行 ./scripts/macos-bridge.sh configure"
+    print_info "请手动编辑 ${ENV_FILE}，并在本机终端执行 ./scripts/macos-bridge.sh configure"
     return 0
   fi
 
+  local openclaw_token current_token
+  openclaw_token="$(get_openclaw_field 'channels.discord.token')"
+  current_token="$(read_secret_value "${TOKEN_ENV_KEY}")"
+
   print_header '交互配置'
   print_info '直接回车即可保留当前值。'
-  print_info '如果你有 OpenClaw 配置，脚本已经先自动导入可识别的 Discord Token / 代理。'
+  print_info "Discord Bot Token 会单独写入 ${SECRET_ENV_FILE}，不会写进项目 .env。"
+  if [[ -n "${openclaw_token}" && -z "${current_token}" ]]; then
+    print_info '检测到 OpenClaw 中已有 Discord Token，可直接回车采用该值。'
+  fi
 
-  prompt_env_value 'DISCORD_BOT_TOKEN' 'Discord Bot Token（Developer Portal -> Application -> Bot -> Token）' '' 1 1 0
+  prompt_secret_value "${TOKEN_ENV_KEY}" 'Discord Bot Token（将保存为 CODEX_TUNNING_DISCORD_BOT_TOKEN）' "${openclaw_token}" 1
   prompt_env_value 'ALLOWED_WORKSPACE_ROOTS' '允许绑定的项目根目录（逗号分隔，例如 /Users/mac/work,/Users/mac/projects）' "${DEFAULT_ALLOWED_ROOTS}" 0 0 0
   prompt_env_value 'DISCORD_ADMIN_USER_IDS' '你的 Discord 用户 ID（可选，多个用逗号；启用 Developer Mode 后可复制）' '' 0 0 1
   prompt_env_value 'WEB_PORT' 'Web 面板端口' '3769' 1 0 0
@@ -350,6 +524,7 @@ prompt_interactive_configuration() {
   prompt_env_value 'OPENCLAW_DISCORD_PROXY' 'Discord / 附件下载代理（可选，例如 http://127.0.0.1:7890）' "$(read_env_value 'OPENCLAW_DISCORD_PROXY' || true)" 0 0 1
 
   print_info "配置已写入：${ENV_FILE}"
+  print_info "Discord Token 已单独写入：${SECRET_ENV_FILE}"
 }
 
 should_prompt_for_configuration() {
@@ -362,13 +537,13 @@ should_prompt_for_configuration() {
   fi
 
   local token
-  token="$(read_env_value 'DISCORD_BOT_TOKEN' || true)"
-  if is_placeholder_value "${token}"; then
+  token="$(read_secret_value "${TOKEN_ENV_KEY}")"
+  if [[ -z "${token}" ]]; then
     return 0
   fi
 
   local answer normalized
-  read -r -p '检测到已有 .env，是否现在检查/修改配置？[y/N]: ' answer || true
+  read -r -p '检测到已有配置，是否现在检查/修改配置？[y/N]: ' answer || true
   normalized="$(printf '%s' "${answer}" | tr '[:upper:]' '[:lower:]')"
   case "${normalized}" in
     y|yes)
@@ -382,9 +557,9 @@ should_prompt_for_configuration() {
 
 validate_required_env() {
   local token
-  token="$(read_env_value 'DISCORD_BOT_TOKEN' || true)"
-  if is_placeholder_value "${token}"; then
-    print_error 'DISCORD_BOT_TOKEN 仍未配置，无法继续。请运行 ./scripts/macos-bridge.sh configure 或手动编辑 .env。'
+  token="$(read_secret_value "${TOKEN_ENV_KEY}")"
+  if [[ -z "${token}" ]]; then
+    print_error "${TOKEN_ENV_KEY} 仍未配置，无法继续。请运行 ./scripts/macos-bridge.sh configure。"
     exit 1
   fi
 
@@ -431,12 +606,28 @@ run_doctor() {
   else
     print_warn '.env 不存在，执行 setup / deploy 时会自动创建并提示填写'
   fi
+
+  if [[ -f "${SECRET_ENV_FILE}" ]]; then
+    print_info "独立密钥文件已存在：${SECRET_ENV_FILE}"
+  else
+    print_warn "独立密钥文件不存在：${SECRET_ENV_FILE}"
+  fi
+
+  local token
+  token="$(read_secret_value "${TOKEN_ENV_KEY}")"
+  if [[ -n "${token}" ]]; then
+    print_info "${TOKEN_ENV_KEY} 已配置"
+  else
+    print_warn "${TOKEN_ENV_KEY} 未配置"
+  fi
 }
 
 run_configure() {
   require_macos
   require_command node
+  load_secret_env
   ensure_env_file
+  migrate_project_token_to_secret_env
   prompt_interactive_configuration
   validate_required_env
 }
@@ -444,6 +635,7 @@ run_configure() {
 run_setup() {
   run_doctor
   ensure_env_file
+  migrate_project_token_to_secret_env
 
   if should_prompt_for_configuration; then
     prompt_interactive_configuration
@@ -458,19 +650,15 @@ run_setup() {
   print_header '构建'
   (cd "${ROOT_DIR}" && npm run build)
 
-  local token admin_id web_port
-  token="$(read_env_value 'DISCORD_BOT_TOKEN' || true)"
+  local admin_id web_port
   admin_id="$(read_env_value 'DISCORD_ADMIN_USER_IDS' || true)"
   web_port="$(read_env_value 'WEB_PORT' || true)"
 
   print_header 'setup 完成'
   print_info "配置文件：${ENV_FILE}"
+  print_info "独立密钥文件：${SECRET_ENV_FILE}"
   print_info "Web 面板：http://127.0.0.1:${web_port:-3769}"
-  if ! is_placeholder_value "${token}"; then
-    print_info 'Discord Bot Token 已配置'
-  else
-    print_warn 'DISCORD_BOT_TOKEN 仍为空，请运行 ./scripts/macos-bridge.sh configure'
-  fi
+  print_info "${TOKEN_ENV_KEY} 已配置"
   if [[ -z "${admin_id}" ]]; then
     print_warn 'DISCORD_ADMIN_USER_IDS 为空；你也可以依赖 Discord 频道管理权限来执行管理员命令'
   fi
@@ -482,7 +670,9 @@ run_start() {
   require_command node
   require_command npm
   require_command codex
+  load_secret_env
   ensure_env_file
+  migrate_project_token_to_secret_env
   validate_required_env
   maybe_export_proxy
 
@@ -579,6 +769,8 @@ run_deploy() {
 }
 
 main() {
+  load_secret_env
+
   local command="${1:-help}"
   case "${command}" in
     help|-h|--help)

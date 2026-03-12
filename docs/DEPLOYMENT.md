@@ -11,6 +11,12 @@ cd /Users/mac/work/su/codex_tunning
 
 首次执行 `deploy` / `setup` 时，脚本会在终端交互式提示你确认或填写关键配置；如果你已有 `~/.openclaw/openclaw.json`，脚本也会先自动导入可识别的 Discord Token / 代理。
 
+其中 Discord Bot Token 会：
+
+- 使用独立变量名 `CODEX_TUNNING_DISCORD_BOT_TOKEN`
+- 单独保存到 `/Users/mac/.codex-tunning/secrets.env`
+- 不写进项目 `/Users/mac/work/su/codex_tunning/.env`
+
 后台运行后，你可以用：
 
 ```bash
@@ -31,25 +37,27 @@ cd /Users/mac/work/su/codex_tunning
 `./scripts/macos-bridge.sh deploy` 会自动：
 
 1. 检查 macOS / Node / npm / codex
-2. 创建 `.env`
+2. 创建项目 `.env`
 3. 尝试从 `~/.openclaw/openclaw.json` 读取 Discord Bot Token 和代理
-4. 在终端里提示你确认/修改关键配置
-5. 安装依赖
-6. 运行 `npm run check`
-7. 运行 `npm run build`
-8. 后台启动服务
-9. 写入运行日志和 PID 文件
+4. 把 Discord Token 单独写入 `/Users/mac/.codex-tunning/secrets.env`
+5. 在终端里提示你确认/修改关键配置
+6. 安装依赖
+7. 运行 `npm run check`
+8. 运行 `npm run build`
+9. 后台启动服务
+10. 写入运行日志和 PID 文件
 
 ## 运行文件位置
 
-- 环境配置：`/Users/mac/work/su/codex_tunning/.env`
+- 项目配置：`/Users/mac/work/su/codex_tunning/.env`
+- 独立密钥：`/Users/mac/.codex-tunning/secrets.env`
 - 运行日志：`/Users/mac/work/su/codex_tunning/logs/codex-discord-bridge.log`
 - PID 文件：`/Users/mac/work/su/codex_tunning/.run/codex-discord-bridge.pid`
 - Web 面板：`http://127.0.0.1:3769`
 
 ## 推荐生产配置
 
-1. `DISCORD_BOT_TOKEN` 使用专用 Bot
+1. `CODEX_TUNNING_DISCORD_BOT_TOKEN` 使用专用 Bot
 2. 限制 `ALLOWED_WORKSPACE_ROOTS`
 3. 使用 `workspace-write`
 4. 配置 `DISCORD_ADMIN_USER_IDS`
@@ -76,7 +84,7 @@ cd /Users/mac/work/su/codex_tunning
 
 完整的 Discord Application / Bot 创建、Token 获取、Message Content Intent、OAuth2 邀请和权限勾选流程，请看：
 
-- `MACOS.md`
+- `MACOS-deploy.md`
 
 ## 回归检查
 

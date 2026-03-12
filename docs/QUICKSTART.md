@@ -9,12 +9,18 @@ cd /Users/mac/work/su/codex_tunning
 
 首次执行时，脚本会在终端依次提示你确认或填写：
 
-- `DISCORD_BOT_TOKEN`
+- `CODEX_TUNNING_DISCORD_BOT_TOKEN`
 - `ALLOWED_WORKSPACE_ROOTS`
 - `DISCORD_ADMIN_USER_IDS`
 - `WEB_PORT`
 - `WEB_AUTH_TOKEN`
 - `OPENCLAW_DISCORD_PROXY`（可选）
+
+其中：
+
+- `CODEX_TUNNING_DISCORD_BOT_TOKEN` 不会写进项目 `.env`
+- 它会被单独保存到 `/Users/mac/.codex-tunning/secrets.env`
+- 这样你本机同时跑多个 Discord Bot 项目时，不容易把 Token 混掉
 
 部署完成后常用：
 
@@ -67,7 +73,7 @@ http://127.0.0.1:3769
 
 ## 第一次部署后要确认
 
-编辑：
+打开项目配置：
 
 ```bash
 open /Users/mac/work/su/codex_tunning/.env
@@ -76,11 +82,23 @@ open /Users/mac/work/su/codex_tunning/.env
 重点看：
 
 ```env
-DISCORD_BOT_TOKEN=
 ALLOWED_WORKSPACE_ROOTS=
 DISCORD_ADMIN_USER_IDS=
 WEB_PORT=3769
 WEB_AUTH_TOKEN=
+OPENCLAW_DISCORD_PROXY=
+```
+
+打开独立密钥文件：
+
+```bash
+open /Users/mac/.codex-tunning/secrets.env
+```
+
+里面应该有：
+
+```env
+CODEX_TUNNING_DISCORD_BOT_TOKEN=...
 ```
 
 浏览器手动访问时，也可以先打开：
@@ -95,7 +113,7 @@ http://127.0.0.1:3769/?token=<你的 WEB_AUTH_TOKEN>
 
 这些值的获取方式和 Discord Application / Bot 授权流程，已经完整写在：
 
-- `MACOS.md`
+- `MACOS-deploy.md`
 
 ## 绑定项目到 Discord
 
@@ -136,5 +154,5 @@ npm run smoke:discord
 
 请继续看：
 
-- `MACOS.md`
+- `MACOS-deploy.md`
 - `DEPLOYMENT.md`

@@ -68,15 +68,15 @@ npm run macos:open
 npm run macos:deploy
 ```
 
-首次执行 `./scripts/macos-bridge.sh deploy` / `setup` 时，脚本会先在终端里提示你填写或确认关键配置。
+首次执行 `./scripts/macos-bridge.sh deploy` / `setup` 时，脚本会先在终端里提示你填写或确认关键配置，其中 Discord Bot Token 会以 `CODEX_TUNNING_DISCORD_BOT_TOKEN` 的名字单独保存到 `/Users/mac/.codex-tunning/secrets.env`，不会写进项目 `.env`。
 
 如果你保留了 `WEB_AUTH_TOKEN`，`./scripts/macos-bridge.sh open` 会自动带上一次性登录参数，浏览器打开后会写入本地 Cookie。
 
 详细说明请直接看：
 
-- `MACOS.md`
-- `QUICKSTART.md`
-- `DEPLOYMENT.md`
+- `docs/MACOS-deploy.md`
+- `docs/QUICKSTART.md`
+- `docs/DEPLOYMENT.md`
 
 ## 前置条件
 
@@ -91,7 +91,7 @@ npm run macos:deploy
 
 ### 0. 先完成 Discord Bot 创建与授权
 
-详细申请/授权流程请直接看 `MACOS.md` 里的“这些信息怎么获得”和“把 Bot 授权进你的 Discord 服务器”。
+详细申请/授权流程请直接看 `docs/MACOS-deploy.md` 里的“这些信息怎么获得”和“把 Bot 授权进你的 Discord 服务器”。
 
 ### 1. 绑定主频道到项目
 
@@ -167,10 +167,10 @@ npm run smoke:discord
 
 ## 关键文档
 
-- `MACOS.md`
-- `QUICKSTART.md`
-- `DEPLOYMENT.md`
-- `GITEE.md`
+- `docs/MACOS-deploy.md`
+- `docs/QUICKSTART.md`
+- `docs/DEPLOYMENT.md`
+- `docs/GITEE.md`
 
 ## 当前已验证
 
