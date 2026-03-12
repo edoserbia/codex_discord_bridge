@@ -29,7 +29,12 @@ export class FakeChannel {
     public readonly id: string,
     public readonly guildId: string,
     public readonly parentId?: string,
+    private readonly thread = false,
   ) {}
+
+  isThread(): boolean {
+    return this.thread;
+  }
 
   async send(content: string): Promise<any> {
     const message = new FakeMessage({

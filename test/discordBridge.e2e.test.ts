@@ -41,12 +41,26 @@ test('bridge binds a root channel and reuses session on follow-up prompts', { co
   await cleanupDir(rootDir);
 });
 
+test('bridge allows binding in a regular channel under a Discord category', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-category-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const categoryChildChannel = new FakeChannel('channel-category-child', 'guild-1', 'category-1', false);
+  channels.set(categoryChildChannel.id, categoryChildChannel);
+
+  await dispatch(bridge, createUserMessage(categoryChildChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+
+  assert.equal(store.getBinding(categoryChildChannel.id)?.projectName, 'api');
+  assert.ok(!findSent(categoryChildChannel, /请在主频道执行 `!bind`/));
+  await cleanupDir(rootDir);
+});
+
 test('bridge gives Discord threads their own Codex session under the parent binding', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-thread-');
   const workspace = await createWorkspace(rootDir);
   const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
   const rootChannel = new FakeChannel('channel-root', 'guild-1');
-  const threadChannel = new FakeChannel('thread-1', 'guild-1', 'channel-root');
+  const threadChannel = new FakeChannel('thread-1', 'guild-1', 'channel-root', true);
   channels.set(rootChannel.id, rootChannel);
   channels.set(threadChannel.id, threadChannel);
 
