@@ -168,4 +168,16 @@ sudo ./scripts/install-service.sh --mode daemon
 OPENCLAW_DISCORD_PROXY=http://127.0.0.1:7890
 ```
 
-脚本会在启动时自动注入 `HTTP_PROXY` / `HTTPS_PROXY`。
+脚本会在启动时自动注入 `HTTP_PROXY` / `HTTPS_PROXY`，并自动为 Node 启用 `--use-system-ca`；如果系统存在 `/etc/ssl/cert.pem`，也会自动把它作为额外 CA bundle 注入。
+
+如果你仍然看到：
+
+```text
+Error: unable to get local issuer certificate
+```
+
+通常是 `daemon` 模式拿不到代理证书链。把代理根证书导出成 PEM 后，在 `.env` 里补一行：
+
+```text
+OPENCLAW_DISCORD_CA_CERT=/path/to/proxy-ca.pem
+```
