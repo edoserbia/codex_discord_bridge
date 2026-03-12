@@ -1,79 +1,140 @@
 # Quickstart
 
-## 1. 安装依赖
+## 最快方式
 
 ```bash
-npm install
-cp .env.example .env
+cd /Users/<user>/work/su/codex_tunning
+./scripts/macos-bridge.sh deploy
 ```
 
-## 2. 配置环境变量
+首次执行时，脚本会在终端依次提示你确认或填写：
 
-至少填写：
+- `DISCORD_BOT_TOKEN`
+- `ALLOWED_WORKSPACE_ROOTS`
+- `DISCORD_ADMIN_USER_IDS`
+- `WEB_PORT`
+- `WEB_AUTH_TOKEN`
+- `OPENCLAW_DISCORD_PROXY`（可选）
 
-```env
-DISCORD_BOT_TOKEN=你的 Discord Bot Token
-COMMAND_PREFIX=!
-DATA_DIR=./data
-CODEX_COMMAND=codex
-WEB_ENABLED=true
-WEB_BIND=127.0.0.1
-WEB_PORT=3769
-```
-
-建议补充：
-
-```env
-ALLOWED_WORKSPACE_ROOTS=/Users/<user>/work,/Users/<user>/projects
-DISCORD_ADMIN_USER_IDS=你的 Discord 用户 ID
-WEB_AUTH_TOKEN=一个随机字符串
-```
-
-## 3. 启动
+部署完成后常用：
 
 ```bash
-npm run dev
+./scripts/macos-bridge.sh status
+./scripts/macos-bridge.sh logs
+./scripts/macos-bridge.sh open
+./scripts/macos-bridge.sh stop
 ```
 
-或：
+## 如果你想先单独填写配置
 
 ```bash
-npm run build
-npm start
+./scripts/macos-bridge.sh configure
 ```
 
-## 4. 在 Discord 中绑定项目
+## 如果你想分步执行
 
-在目标主频道中发送：
+### 1. 环境检查
 
-```text
-!bind api "/Users/<user>/work/api" --sandbox workspace-write --approval never
+```bash
+./scripts/macos-bridge.sh doctor
 ```
 
-## 5. 发送普通消息
+### 2. 初始化并构建
 
-例如：
-
-```text
-请检查当前仓库里的后端 API 设计并给出改进建议。
+```bash
+./scripts/macos-bridge.sh setup
 ```
 
-## 6. 在 Discord 线程里开分支上下文
+### 3. 后台启动
 
-在同一个主频道下创建线程，再发送消息。线程会自动继承主频道绑定目录，但使用独立的 Codex 会话。
+```bash
+./scripts/macos-bridge.sh start
+```
 
-## 7. 打开 Web 面板
+### 4. 打开 Web 面板
 
-浏览器打开：
+```bash
+./scripts/macos-bridge.sh open
+```
+
+如果你保留了 `WEB_AUTH_TOKEN`，这个命令会自动带上一次性登录参数，浏览器打开后会写入本地 Cookie。
+
+默认是：
 
 ```text
 http://127.0.0.1:3769
 ```
 
-## 8. 跑测试
+## 第一次部署后要确认
+
+编辑：
+
+```bash
+open /Users/<user>/work/su/codex_tunning/.env
+```
+
+重点看：
+
+```env
+DISCORD_BOT_TOKEN=
+ALLOWED_WORKSPACE_ROOTS=
+DISCORD_ADMIN_USER_IDS=
+WEB_PORT=3769
+WEB_AUTH_TOKEN=
+```
+
+浏览器手动访问时，也可以先打开：
+
+```text
+http://127.0.0.1:3769/?token=<你的 WEB_AUTH_TOKEN>
+```
+
+脚本 `./scripts/macos-bridge.sh open` 已经自动帮你处理这一点。
+
+## 这些值怎么拿
+
+这些值的获取方式和 Discord Application / Bot 授权流程，已经完整写在：
+
+- `MACOS.md`
+
+## 绑定项目到 Discord
+
+在目标频道发送：
+
+```text
+!bind api "/Users/<user>/work/api" --sandbox workspace-write --approval never
+```
+
+## 推荐使用方式
+
+- 一个频道绑定一个项目目录
+- 一个线程对应一个独立 Codex 会话
+- 在频道主会话里做全局沟通
+- 在线程里做具体任务推进
+
+## 常用命令
+
+```text
+!status
+!queue
+!cancel
+!reset
+!unbind
+!projects
+!help
+```
+
+## 测试
 
 ```bash
 npm test
 npm run smoke:local
 npm run smoke:discord
 ```
+
+## 详细说明
+
+请继续看：
+
+- `MACOS.md`
+- `DEPLOYMENT.md`

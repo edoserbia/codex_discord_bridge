@@ -6,6 +6,8 @@ import type { BindCommandOptions } from './commandParser.js';
 import { DiscordCodexBridge } from './discordBot.js';
 import { formatDashboardHtml } from './formatters.js';
 
+const AUTH_COOKIE_NAME = 'codex_bridge_auth';
+
 export class AdminWebServer {
   private server: http.Server | undefined;
 
@@ -58,13 +60,17 @@ export class AdminWebServer {
 
   private async handleRequest(request: IncomingMessage, response: ServerResponse): Promise<void> {
     try {
+      const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
+
+      if (this.handleBrowserAuthBootstrap(url, response)) {
+        return;
+      }
+
       if (!this.isAuthorized(request)) {
         response.writeHead(401, { 'content-type': 'text/plain; charset=utf-8' });
         response.end('Unauthorized');
         return;
       }
-
-      const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
 
       if (request.method === 'GET' && url.pathname === '/') {
         response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
@@ -136,13 +142,67 @@ export class AdminWebServer {
     }
   }
 
+  private handleBrowserAuthBootstrap(url: URL, response: ServerResponse): boolean {
+    if (!this.config.web.authToken || !url.searchParams.has('token')) {
+      return false;
+    }
+
+    if (url.searchParams.get('token') !== this.config.web.authToken) {
+      response.writeHead(401, { 'content-type': 'text/plain; charset=utf-8' });
+      response.end('Unauthorized');
+      return true;
+    }
+
+    const redirectUrl = new URL(url.pathname || '/', url);
+    for (const [key, value] of url.searchParams.entries()) {
+      if (key !== 'token') {
+        redirectUrl.searchParams.append(key, value);
+      }
+    }
+
+    response.writeHead(302, {
+      location: `${redirectUrl.pathname}${redirectUrl.search}`,
+      'set-cookie': this.buildAuthCookie(this.config.web.authToken),
+    });
+    response.end();
+    return true;
+  }
+
   private isAuthorized(request: IncomingMessage): boolean {
     if (!this.config.web.authToken) {
       return true;
     }
 
     const header = request.headers.authorization;
-    return header === `Bearer ${this.config.web.authToken}`;
+    if (header === `Bearer ${this.config.web.authToken}`) {
+      return true;
+    }
+
+    const cookie = this.parseCookies(request.headers.cookie).get(AUTH_COOKIE_NAME);
+    return cookie === this.config.web.authToken;
+  }
+
+  private parseCookies(headerValue: string | undefined): Map<string, string> {
+    const cookies = new Map<string, string>();
+
+    if (!headerValue) {
+      return cookies;
+    }
+
+    for (const part of headerValue.split(';')) {
+      const [rawName, ...rawValue] = part.trim().split('=');
+      if (!rawName) {
+        continue;
+      }
+
+      cookies.set(rawName, rawValue.join('='));
+    }
+
+    return cookies;
+  }
+
+  private buildAuthCookie(token: string): string {
+    return `${AUTH_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`;
   }
 
   private async readJsonBody(request: IncomingMessage): Promise<unknown> {

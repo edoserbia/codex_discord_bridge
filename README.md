@@ -2,7 +2,7 @@
 
 把本机 `codex` CLI 挂到 Discord 文本频道上，让你可以在手机上通过 Discord 像用 Codex 客户端一样控制本地 Codex。
 
-当前版本已经支持：
+## 当前能力
 
 - 一个 Discord 主频道绑定一个项目目录
 - 主频道下的 Discord 线程自动继承该项目，但拥有独立的 Codex 会话上下文
@@ -13,66 +13,85 @@
 - Web 管理面板，可查看绑定、会话、状态，并创建/解绑绑定
 - 状态、绑定、会话持久化到 `data/state.json`
 - 自动化测试、本地 smoke、真实 Discord smoke
+- 提供一套面向 macOS 的一键部署/启停管理脚本
 
-## 目录
+## 推荐映射方式
 
-- `src/index.ts` 入口
-- `src/discordBot.ts` Discord 控制器、队列、会话、线程映射
-- `src/codexRunner.ts` Codex CLI 桥接层
-- `src/attachments.ts` Discord 附件下载与 prompt 注入
-- `src/store.ts` JSON 持久化
-- `src/webServer.ts` Web 管理面板与 API
-- `scripts/smoke-local.ts` 本地假链路 smoke
-- `scripts/smoke-discord.ts` 真实 Discord 连通与发消息 smoke
+推荐你这样组织：
+
+- **一个 Discord 文字频道 = 一个项目目录**
+- **一个 Discord 线程 = 这个项目里的一个独立 Codex 会话**
+
+例如：
+
+- `#proj-api` → `/Users/<user>/work/api`
+- `#proj-app` → `/Users/<user>/work/app`
+- `#proj-api` 下线程 `修登录` → `/Users/<user>/work/api` 里的独立会话
+- `#proj-api` 下线程 `写文档` → `/Users/<user>/work/api` 里的另一条会话
+
+## macOS 一键部署
+
+这是你当前最推荐的部署方式。
+
+```bash
+cd /Users/<user>/work/su/codex_tunning
+./scripts/macos-bridge.sh deploy
+```
+
+常用命令：
+
+```bash
+./scripts/macos-bridge.sh doctor
+./scripts/macos-bridge.sh configure
+./scripts/macos-bridge.sh setup
+./scripts/macos-bridge.sh start
+./scripts/macos-bridge.sh stop
+./scripts/macos-bridge.sh restart
+./scripts/macos-bridge.sh status
+./scripts/macos-bridge.sh logs
+./scripts/macos-bridge.sh open
+./scripts/macos-bridge.sh deploy
+```
+
+对应的 npm 快捷命令也已经配好：
+
+```bash
+npm run macos:doctor
+npm run macos:configure
+npm run macos:setup
+npm run macos:start
+npm run macos:stop
+npm run macos:restart
+npm run macos:status
+npm run macos:logs
+npm run macos:open
+npm run macos:deploy
+```
+
+首次执行 `./scripts/macos-bridge.sh deploy` / `setup` 时，脚本会先在终端里提示你填写或确认关键配置。
+
+如果你保留了 `WEB_AUTH_TOKEN`，`./scripts/macos-bridge.sh open` 会自动带上一次性登录参数，浏览器打开后会写入本地 Cookie。
+
+详细说明请直接看：
+
+- `MACOS.md`
+- `QUICKSTART.md`
+- `DEPLOYMENT.md`
 
 ## 前置条件
 
 1. 本机已安装并登录 `codex`
 2. Node.js >= 20.11
 3. 你有一个 Discord Bot Token
-4. Bot 在目标服务器中拥有读取/发消息权限
-5. 建议开启 Discord Developer Portal 里的 `MESSAGE CONTENT INTENT`
-
-## 安装
-
-```bash
-npm install
-cp .env.example .env
-```
-
-填写 `.env`：
-
-```env
-DISCORD_BOT_TOKEN=你的机器人 Token
-COMMAND_PREFIX=!
-DATA_DIR=./data
-CODEX_COMMAND=codex
-WEB_ENABLED=true
-WEB_BIND=127.0.0.1
-WEB_PORT=3769
-```
-
-## 启动
-
-开发模式：
-
-```bash
-npm run dev
-```
-
-生产模式：
-
-```bash
-npm run build
-npm start
-```
-
-启动后会同时拉起：
-
-- Discord Bridge Bot
-- Web 管理面板，默认在 `http://127.0.0.1:3769`
+4. 你在目标 Discord 服务器里有邀请 Bot 的权限（通常需要 `Manage Server`）
+5. Bot 在目标服务器和频道里具备查看/发消息/线程发言权限
+6. 需要在 Discord Developer Portal 里为 Bot 开启 `MESSAGE CONTENT INTENT`
 
 ## Discord 使用方式
+
+### 0. 先完成 Discord Bot 创建与授权
+
+详细申请/授权流程请直接看 `MACOS.md` 里的“这些信息怎么获得”和“把 Bot 授权进你的 Discord 服务器”。
 
 ### 1. 绑定主频道到项目
 
@@ -82,18 +101,7 @@ npm start
 !bind api "/Users/<user>/work/api" --sandbox workspace-write --approval never --search off
 ```
 
-常用参数：
-
-- `--model <name>`
-- `--profile <name>`
-- `--sandbox read-only|workspace-write|danger-full-access`
-- `--approval untrusted|on-request|on-failure|never`
-- `--search on|off`
-- `--skip-git-check on|off`
-- `--add-dir "/another/path"`
-- `--config key=value`
-
-### 2. 直接发送消息给 Codex
+### 2. 直接发消息给 Codex
 
 绑定完成后，该主频道里的任何普通消息都会直接当作 prompt 发给 Codex。
 
@@ -104,8 +112,6 @@ npm start
 - 继承主频道绑定的项目目录
 - 获得自己的独立 Codex session
 - 有自己的排队和状态面板
-
-这让你能在同一项目下开多个并行上下文，更像 Codex 客户端里的多会话体验。
 
 ### 4. 附件支持
 
@@ -132,13 +138,6 @@ npm start
 http://127.0.0.1:3769
 ```
 
-当前实现支持：
-
-- 查看所有绑定项目
-- 查看每个绑定下的会话与当前状态
-- 通过表单创建绑定
-- 调用 JSON API 解绑和重置会话
-
 主要接口：
 
 - `GET /api/dashboard`
@@ -146,73 +145,32 @@ http://127.0.0.1:3769
 - `DELETE /api/bindings/:channelId`
 - `POST /api/conversations/:conversationId/reset`
 
-如需简单鉴权，可配置 `WEB_AUTH_TOKEN`，然后在请求头里带：
-
-```text
-Authorization: Bearer <token>
-```
-
 ## 测试
-
-### 自动化测试
 
 ```bash
 npm test
 npm run test:coverage
-```
-
-### 本地全链路 smoke
-
-```bash
 npm run smoke:local
-```
-
-### 真实 Discord smoke
-
-默认会读取：
-
-```text
-~/.openclaw/openclaw.json
-```
-
-然后使用其中的 Discord Bot Token 和绑定频道做一轮：
-
-- 登录验证
-- 频道访问验证
-- 发送/删除 smoke 消息验证
-
-执行：
-
-```bash
 npm run smoke:discord
-```
-
-也可以自定义配置路径：
-
-```bash
-OPENCLAW_CONFIG_PATH=/path/to/openclaw.json npm run smoke:discord
 ```
 
 ## Git / Gitee
 
-本仓库附带两个脚本：
+本仓库附带脚本：
 
-- `scripts/init-git.sh`：初始化本地 Git 仓库
-- `scripts/create-gitee-repo.sh`：通过 `GITEE_TOKEN` 创建私有仓库并配置 `gitee` 远端
+- `scripts/init-git.sh`
+- `scripts/create-gitee-repo.sh`
 
-详见：
+当前远端：
 
+- [<owner-or-namespace>/codex-discord-bridge](https://gitee.com/<owner-or-namespace>/codex-discord-bridge)
+
+## 关键文档
+
+- `MACOS.md`
 - `QUICKSTART.md`
 - `DEPLOYMENT.md`
 - `GITEE.md`
-
-## 安全建议
-
-- 优先使用 `workspace-write`，谨慎使用 `danger-full-access`
-- 建议配置 `ALLOWED_WORKSPACE_ROOTS`
-- 建议配置 `DISCORD_ADMIN_USER_IDS`
-- Web 面板建议只监听 `127.0.0.1`，或配置 `WEB_AUTH_TOKEN`
-- Discord Bot 建议只加入你自己的私有服务器/私有频道
 
 ## 当前已验证
 
@@ -224,5 +182,3 @@ OPENCLAW_CONFIG_PATH=/path/to/openclaw.json npm run smoke:discord
 - `npm run smoke:local`
 - `npm run smoke:discord`
 - `npm run build`
-
-其中真实 Discord smoke 使用了你本机 `openclaw` 配置中的 Discord Bot 设置。
