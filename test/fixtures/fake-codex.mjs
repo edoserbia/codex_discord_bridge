@@ -75,6 +75,7 @@ const scenario = (() => {
   if (prompt.includes('[fail]')) return 'fail';
   if (prompt.includes('[invalid-json]')) return 'invalid-json';
   if (prompt.includes('[command]')) return 'command';
+  if (prompt.includes('[plan]')) return 'plan';
   if (prompt.includes('[attachments]')) return 'attachments';
   return 'simple';
 })();
@@ -110,6 +111,53 @@ if (scenario === 'slow') {
   await sleep(700);
 }
 
+if (scenario === 'plan') {
+  event({
+    type: 'item.completed',
+    item: {
+      id: 'reason_1',
+      type: 'reasoning',
+      text: '**Inspecting request**\n\nI will create a short plan, run one command, and then summarize the results.',
+    },
+  });
+  event({
+    type: 'item.started',
+    item: {
+      id: 'todo_1',
+      type: 'todo_list',
+      items: [
+        { text: 'Create a short plan', completed: true },
+        { text: 'Run pwd', completed: false },
+        { text: 'Summarize the result', completed: false },
+      ],
+    },
+  });
+  event({ type: 'item.started', item: { id: 'cmd_plan', type: 'command_execution', command: '/bin/zsh -lc "pwd"' } });
+  event({
+    type: 'item.completed',
+    item: {
+      id: 'cmd_plan',
+      type: 'command_execution',
+      command: '/bin/zsh -lc "pwd"',
+      aggregated_output: `${process.cwd()}\n`,
+      exit_code: 0,
+      status: 'completed',
+    },
+  });
+  event({
+    type: 'item.updated',
+    item: {
+      id: 'todo_1',
+      type: 'todo_list',
+      items: [
+        { text: 'Create a short plan', completed: true },
+        { text: 'Run pwd', completed: true },
+        { text: 'Summarize the result', completed: true },
+      ],
+    },
+  });
+}
+
 if (scenario === 'command' || scenario === 'attachments') {
   event({ type: 'item.started', item: { id: 'cmd_1', type: 'command_execution', command: '/bin/zsh -lc "ls -la"' } });
   const output = scenario === 'attachments'
@@ -141,7 +189,9 @@ if (scenario === 'fail') {
 
 const finalText = scenario === 'attachments'
   ? `attachments ok; resumed=${args.mode === 'resume'}; images=${args.images.length}; dirs=${args.addDirs.length}`
-  : `ok: ${prompt} | resumed=${args.mode === 'resume'} | thread=${threadId}`;
+  : scenario === 'plan'
+    ? `plan ok; resumed=${args.mode === 'resume'}; cwd=${process.cwd()}`
+    : `ok: ${prompt} | resumed=${args.mode === 'resume'} | thread=${threadId}`;
 
 event({ type: 'item.completed', item: { id: 'msg_1', type: 'agent_message', text: finalText } });
 event({ type: 'turn.completed', usage: { input_tokens: 1, cached_input_tokens: 0, output_tokens: 1 } });

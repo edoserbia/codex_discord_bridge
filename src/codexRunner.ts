@@ -3,13 +3,15 @@ import { spawn } from 'node:child_process';
 import readline from 'node:readline';
 
 import type { AppConfig } from './config.js';
-import type { ChannelBinding, CodexRunInput, CodexRunResult, CommandRecord } from './types.js';
+import type { ChannelBinding, CodexRunInput, CodexRunResult, CommandRecord, PlanItem } from './types.js';
 
 import { uniqueStrings } from './utils.js';
 
 export interface CodexRunHooks {
   onThreadStarted?: (threadId: string) => void | Promise<void>;
   onActivity?: (activity: string) => void | Promise<void>;
+  onReasoning?: (message: string) => void | Promise<void>;
+  onTodoListChanged?: (items: PlanItem[]) => void | Promise<void>;
   onAgentMessage?: (message: string) => void | Promise<void>;
   onCommandStarted?: (command: string) => void | Promise<void>;
   onCommandCompleted?: (command: string, output: string, exitCode: number | null) => void | Promise<void>;
@@ -37,8 +39,10 @@ export class CodexRunner {
 
     const commands: CommandRecord[] = [];
     const agentMessages: string[] = [];
+    const reasoning: string[] = [];
     const stderr: string[] = [];
     let codexThreadId = existingThreadId;
+    let planItems: PlanItem[] = [];
     let turnCompleted = false;
     let stdoutChain = Promise.resolve();
     let stderrChain = Promise.resolve();
@@ -75,27 +79,44 @@ export class CodexRunner {
           case 'turn.started':
             await hooks.onActivity?.('Codex 正在分析请求');
             break;
-          case 'item.started': {
-            const item = (event.item ?? null) as Record<string, unknown> | null;
-
-            if (item?.type === 'command_execution' && typeof item.command === 'string') {
-              await hooks.onCommandStarted?.(item.command);
-            }
-            break;
-          }
+          case 'item.started':
+          case 'item.updated':
           case 'item.completed': {
             const item = (event.item ?? null) as Record<string, unknown> | null;
 
-            if (item?.type === 'agent_message' && typeof item.text === 'string') {
+            if (!item || typeof item.type !== 'string') {
+              break;
+            }
+
+            if (item.type === 'reasoning' && event.type === 'item.completed' && typeof item.text === 'string') {
+              reasoning.push(item.text);
+              await hooks.onReasoning?.(item.text);
+            }
+
+            if (item.type === 'todo_list') {
+              const nextPlanItems = parsePlanItems(item.items);
+              if (nextPlanItems.length > 0) {
+                planItems = nextPlanItems;
+                await hooks.onTodoListChanged?.(nextPlanItems);
+              }
+            }
+
+            if (item.type === 'agent_message' && event.type === 'item.completed' && typeof item.text === 'string') {
               agentMessages.push(item.text);
               await hooks.onAgentMessage?.(item.text);
             }
 
-            if (item?.type === 'command_execution' && typeof item.command === 'string') {
-              const output = typeof item.aggregated_output === 'string' ? item.aggregated_output : '';
-              const exitCode = typeof item.exit_code === 'number' ? item.exit_code : null;
-              commands.push({ command: item.command, output, exitCode });
-              await hooks.onCommandCompleted?.(item.command, output, exitCode);
+            if (item.type === 'command_execution' && typeof item.command === 'string') {
+              if (event.type === 'item.started') {
+                await hooks.onCommandStarted?.(item.command);
+              }
+
+              if (event.type === 'item.completed') {
+                const output = typeof item.aggregated_output === 'string' ? item.aggregated_output : '';
+                const exitCode = typeof item.exit_code === 'number' ? item.exit_code : null;
+                commands.push({ command: item.command, output, exitCode });
+                await hooks.onCommandCompleted?.(item.command, output, exitCode);
+              }
             }
             break;
           }
@@ -166,6 +187,8 @@ export class CodexRunner {
         usedResume,
         turnCompleted,
         agentMessages,
+        reasoning,
+        planItems,
         stderr,
         commands,
       };
@@ -239,6 +262,26 @@ export class CodexRunner {
   }
 }
 
+function parsePlanItems(rawItems: unknown): PlanItem[] {
+  if (!Array.isArray(rawItems)) {
+    return [];
+  }
+
+  return rawItems
+    .map((item) => {
+      const candidate = item as Record<string, unknown> | null;
+      if (!candidate || typeof candidate.text !== 'string') {
+        return undefined;
+      }
+
+      return {
+        text: candidate.text,
+        completed: candidate.completed === true,
+      } satisfies PlanItem;
+    })
+    .filter((item): item is PlanItem => Boolean(item));
+}
+
 function terminateChild(child: ReturnType<typeof spawn>): void {
   if (child.killed) {
     return;
@@ -262,8 +305,4 @@ function terminateChild(child: ReturnType<typeof spawn>): void {
   }
 
   child.kill('SIGTERM');
-
-  setTimeout(() => {
-    child.kill('SIGKILL');
-  }, 5_000).unref();
 }

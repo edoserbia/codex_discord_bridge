@@ -1,4 +1,4 @@
-import type { ChannelBinding, ChannelRuntime, CodexRunResult, ConversationSessionState, DashboardBinding } from './types.js';
+import type { ChannelBinding, ChannelRuntime, CodexRunResult, ConversationSessionState, DashboardBinding, PlanItem } from './types.js';
 
 import { sanitizeInlineCode, shortId, tailLines, truncate } from './utils.js';
 
@@ -27,6 +27,28 @@ function formatActiveStatus(runtime: ChannelRuntime): string {
   return '空闲';
 }
 
+function appendPlanLines(lines: string[], planItems: PlanItem[], maxItems = 6): void {
+  if (planItems.length === 0) {
+    return;
+  }
+
+  lines.push('计划：');
+  for (const item of planItems.slice(0, maxItems)) {
+    lines.push(`- ${item.completed ? '✅' : '⬜️'} ${truncate(item.text, 120)}`);
+  }
+}
+
+function appendTimelineLines(lines: string[], entries: string[], maxItems = 5): void {
+  if (entries.length === 0) {
+    return;
+  }
+
+  lines.push('过程：');
+  for (const entry of entries.slice(-maxItems)) {
+    lines.push(`- ${truncate(entry, 150)}`);
+  }
+}
+
 export function formatHelp(prefix: string): string {
   return [
     '🤖 **Codex Discord Bridge 帮助**',
@@ -40,6 +62,7 @@ export function formatHelp(prefix: string): string {
     `- 查看所有项目：\`${prefix}projects\``,
     '',
     '绑定成功后，主频道和其下 Discord 线程里的普通消息都会直接作为 Codex prompt 发送。',
+    '现在会在频道里持续更新实时进度、命令执行和计划状态。',
     '图片附件会自动透传到 `codex -i`，普通文件会下载到本地附件目录供 Codex 读取。',
     '',
     '示例：',
@@ -107,6 +130,15 @@ export function formatStatus(
       lines.push(`附件：${runtime.activeRun.task.attachments.length} 个`);
     }
 
+    appendPlanLines(lines, runtime.activeRun.planItems, 5);
+
+    const latestReasoning = runtime.activeRun.reasoningSummaries.at(-1);
+    if (latestReasoning) {
+      lines.push(`分析：${truncate(latestReasoning, 180)}`);
+    }
+
+    appendTimelineLines(lines, runtime.activeRun.timeline, 4);
+
     if (runtime.activeRun.currentCommand) {
       lines.push(`命令：\`${truncate(sanitizeInlineCode(runtime.activeRun.currentCommand), 180)}\``);
     }
@@ -129,6 +161,57 @@ export function formatStatus(
   }
 
   lines.push(`控制：\`${prefix}status\` · \`${prefix}queue\` · \`${prefix}cancel\` · \`${prefix}reset\` · \`${prefix}unbind\``);
+  return truncate(lines.join('\n'), 1900);
+}
+
+export function formatProgressMessage(binding: ChannelBinding, runtime: ChannelRuntime, prefix: string): string {
+  const activeRun = runtime.activeRun;
+
+  if (!activeRun) {
+    return '⏳ 当前没有正在运行的任务。';
+  }
+
+  const lines = [
+    '🛰️ **Codex 实时进度**',
+    `项目：**${binding.projectName}**`,
+    `请求人：${activeRun.task.requestedBy}`,
+    `请求：${truncate(activeRun.task.prompt, 120)}`,
+    `状态：${formatActiveStatus(runtime)}`,
+    `最新活动：${truncate(activeRun.latestActivity, 180)}`,
+  ];
+
+  appendPlanLines(lines, activeRun.planItems, 8);
+
+  if (activeRun.reasoningSummaries.length > 0) {
+    lines.push('分析摘要：');
+    for (const summary of activeRun.reasoningSummaries.slice(-3)) {
+      lines.push(`- ${truncate(summary, 160)}`);
+    }
+  }
+
+  appendTimelineLines(lines, activeRun.timeline, 6);
+
+  if (activeRun.currentCommand) {
+    lines.push(`当前命令：\`${truncate(sanitizeInlineCode(activeRun.currentCommand), 180)}\``);
+  }
+
+  if (activeRun.lastCommandOutput) {
+    lines.push('最新输出预览：');
+    lines.push('```');
+    lines.push(truncate(tailLines(activeRun.lastCommandOutput, 6), 500));
+    lines.push('```');
+  }
+
+  if (activeRun.stderr.length > 0) {
+    lines.push('最新 stderr：');
+    lines.push('```');
+    lines.push(truncate(tailLines(activeRun.stderr.join('\n'), 5), 360));
+    lines.push('```');
+  }
+
+  lines.push(`控制：\`${prefix}status\` · \`${prefix}queue\` · \`${prefix}cancel\``);
+  lines.push('说明：这条消息会持续更新，最终结果仍会单独回复。');
+
   return truncate(lines.join('\n'), 1900);
 }
 

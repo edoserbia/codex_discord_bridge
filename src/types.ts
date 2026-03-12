@@ -67,6 +67,11 @@ export interface CommandRecord {
   exitCode: number | null;
 }
 
+export interface PlanItem {
+  text: string;
+  completed: boolean;
+}
+
 export type RunStatus = 'idle' | 'queued' | 'starting' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 export interface ActiveRunState {
@@ -77,8 +82,12 @@ export interface ActiveRunState {
   currentCommand?: string | undefined;
   lastCommandOutput?: string | undefined;
   agentMessages: string[];
+  reasoningSummaries: string[];
+  planItems: PlanItem[];
+  timeline: string[];
   stderr: string[];
   usedResume: boolean;
+  progressMessageId?: string | undefined;
   codexThreadId?: string | undefined;
   exitCode?: number | null | undefined;
   signal?: NodeJS.Signals | null | undefined;
@@ -104,6 +113,8 @@ export interface CodexRunResult {
   usedResume: boolean;
   turnCompleted: boolean;
   agentMessages: string[];
+  reasoning: string[];
+  planItems: PlanItem[];
   stderr: string[];
   commands: CommandRecord[];
 }

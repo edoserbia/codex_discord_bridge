@@ -190,6 +190,24 @@ export function shortId(value: string): string {
   return value.slice(0, 8);
 }
 
+export function summarizeReasoningText(value: string, maxLength = 180): string {
+  const normalized = value
+    .replace(/\r\n/g, '\n')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*/g, '')
+    .replace(/`/g, '')
+    .replace(/\[(.*?)\]\((.*?)\)/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!normalized) {
+    return '';
+  }
+
+  const firstSentence = normalized.split(/(?<=[。！？.!?])\s+/)[0] ?? normalized;
+  return truncate(firstSentence.trim() || normalized, maxLength);
+}
+
 export function uniqueStrings(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }

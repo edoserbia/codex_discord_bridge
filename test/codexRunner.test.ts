@@ -74,6 +74,26 @@ test('runner handles simple execution and thread creation', async () => {
   await cleanupDir(rootDir);
 });
 
+test('runner surfaces reasoning and todo list updates', async () => {
+  const rootDir = await makeTempDir('codex-runner-plan-');
+  const workspace = await createWorkspace(rootDir);
+  const runner = new CodexRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+  const reasoning: string[] = [];
+  const planSnapshots: Array<Array<{ text: string; completed: boolean }>> = [];
+
+  const result = await runner.start(binding, { prompt: '[plan] inspect', imagePaths: [], extraAddDirs: [] }, undefined, {
+    onReasoning: async (message) => { reasoning.push(message); },
+    onTodoListChanged: async (items) => { planSnapshots.push(items.map((item) => ({ ...item }))); },
+  }).done;
+
+  assert.equal(result.success, true);
+  assert.ok(reasoning.length >= 1);
+  assert.ok(planSnapshots.length >= 2);
+  assert.equal(planSnapshots.at(-1)?.every((item) => item.completed), true);
+  await cleanupDir(rootDir);
+});
+
 test('runner handles resume and command events', async () => {
   const rootDir = await makeTempDir('codex-runner-resume-');
   const workspace = await createWorkspace(rootDir);
