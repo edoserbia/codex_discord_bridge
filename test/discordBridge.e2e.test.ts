@@ -68,6 +68,25 @@ test('bridge resets existing Codex sessions when bind execution settings change'
   await cleanupDir(rootDir);
 });
 
+test('bridge can inject guide prompts into an active run and continue on the same session', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-guide-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-guide', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannel, '[slow] first task'));
+  await waitFor(() => (bridge as any).getDashboardData().some((entry: any) => entry.conversations.some((conversation: any) => conversation.status === 'running' || conversation.status === 'starting')));
+
+  await dispatch(bridge, createUserMessage(rootChannel, '!guide 请停止当前步骤，改为优先检查 README', { userId: 'admin-user' }));
+  await waitFor(() => findSent(rootChannel, /已将你的新消息作为引导项插入当前工作/));
+  await waitFor(() => findSent(rootChannel, /resumed=true/), 15_000);
+  await waitFor(() => findSent(rootChannel, /README/), 15_000);
+  assert.ok(!findSent(rootChannel, /已加入队列/));
+  await cleanupDir(rootDir);
+});
+
 test('bridge allows binding in a regular channel under a Discord category', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-category-');
   const workspace = await createWorkspace(rootDir);

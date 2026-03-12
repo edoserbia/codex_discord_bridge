@@ -54,6 +54,15 @@ function hasBindingExecutionChanged(previous: ChannelBinding | undefined, next: 
     || JSON.stringify(previous.codex) !== JSON.stringify(next.codex);
 }
 
+function buildGuidancePrompt(prompt: string): string {
+  return [
+    '系统提示：这是同一 Discord 会话中的最新实时引导。',
+    '请立刻根据下面的新引导调整当前工作，优先执行最新要求，继续沿用已获得的上下文，不要从头重复已完成步骤。',
+    '',
+    prompt,
+  ].join('\n');
+}
+
 export interface BindRequest {
   channelId: string;
   guildId?: string | undefined;
@@ -185,6 +194,9 @@ export class DiscordCodexBridge {
       const activeJob = this.activeJobs.get(session.conversationId);
       const runtime = this.runtimes.get(session.conversationId);
       if (runtime) {
+        if (runtime.activeRun) {
+          runtime.activeRun.cancellationReason = 'unbind';
+        }
         runtime.activeRun = undefined;
         runtime.queue = [];
       }
@@ -207,6 +219,9 @@ export class DiscordCodexBridge {
       const activeJob = this.activeJobs.get(session.conversationId);
       const runtime = this.runtimes.get(session.conversationId);
       if (runtime) {
+        if (runtime.activeRun) {
+          runtime.activeRun.cancellationReason = 'binding_reset';
+        }
         runtime.activeRun = undefined;
         runtime.queue = [];
       }
@@ -298,6 +313,9 @@ export class DiscordCodexBridge {
         return;
       case 'projects':
         await message.reply(formatProjects(this.store.listBindings(message.guildId ?? undefined)));
+        return;
+      case 'guide':
+        await this.handleGuideCommand(message, resolved, command.prompt);
         return;
       case 'bind':
         if (isThread) {
@@ -414,6 +432,7 @@ export class DiscordCodexBridge {
 
     runtime.activeRun.status = 'cancelled';
     runtime.activeRun.latestActivity = `已由 ${message.author.username} 请求取消`;
+    runtime.activeRun.cancellationReason = 'user_cancel';
     activeJob.cancel();
 
     const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
@@ -432,11 +451,37 @@ export class DiscordCodexBridge {
     await message.reply('当前会话的 Codex 上下文已重置。下一条消息会开启新会话。');
   }
 
-  private async enqueuePrompt(message: Message, resolved: ResolvedConversation, prompt: string): Promise<void> {
+  private async handleGuideCommand(
+    message: Message,
+    resolved: ResolvedConversation | undefined,
+    prompt: string,
+  ): Promise<void> {
+    if (!resolved) {
+      await message.reply('当前频道未绑定项目。先执行 `!bind`。');
+      return;
+    }
+
+    const runtime = this.getRuntime(resolved.conversationId);
+
+    if (!runtime.activeRun) {
+      await message.reply('当前没有正在运行的任务。直接发送普通消息即可，或先启动一个任务后再使用 `!guide`。');
+      return;
+    }
+
+    await this.enqueuePrompt(message, resolved, prompt, 'guidance');
+  }
+
+  private async enqueuePrompt(
+    message: Message,
+    resolved: ResolvedConversation,
+    prompt: string,
+    mode: 'normal' | 'guidance' = 'normal',
+  ): Promise<void> {
     const runtime = this.getRuntime(resolved.conversationId);
     const taskId = randomUUID();
     const downloaded = await downloadAttachments(this.config.dataDir, resolved.conversationId, taskId, extractMessageAttachments(message));
-    const effectivePrompt = buildPromptWithAttachments(prompt, downloaded.attachments, downloaded.attachmentDir);
+    const basePrompt = buildPromptWithAttachments(prompt, downloaded.attachments, downloaded.attachmentDir);
+    const effectivePrompt = mode === 'guidance' ? buildGuidancePrompt(basePrompt) : basePrompt;
 
     const task: PromptTask = {
       id: taskId,
@@ -455,6 +500,31 @@ export class DiscordCodexBridge {
     runtime.queue.push(task);
 
     if (runtime.activeRun) {
+      if (mode === 'guidance') {
+        const activeJob = this.activeJobs.get(resolved.conversationId);
+
+        runtime.queue.splice(runtime.queue.length - 1, 1);
+        runtime.queue.unshift(task);
+        runtime.activeRun.latestActivity = `收到 ${message.author.username} 的追加引导`;
+        runtime.activeRun.cancellationReason = 'guidance';
+        this.pushRunTimeline(runtime, `🧭 收到新的引导：${truncate(prompt, 120)}`);
+
+        await message.react('🧭').catch(() => undefined);
+        await message.reply('已将你的新消息作为引导项插入当前工作，正在中断当前步骤并按最新引导续跑。');
+
+        const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
+        await this.refreshStatusPanel(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
+        await this.refreshProgressMessage(resolved.channel, resolved.binding, runtime);
+
+        if (activeJob) {
+          activeJob.cancel();
+        } else {
+          runtime.activeRun = undefined;
+          void this.processQueue(resolved.conversationId);
+        }
+        return;
+      }
+
       await message.react('🕒').catch(() => undefined);
       await message.reply(`已加入队列，前面还有 ${runtime.queue.length - 1} 条请求。`);
     } else {
@@ -508,6 +578,7 @@ export class DiscordCodexBridge {
       stderr: [],
       usedResume: Boolean(session.codexThreadId),
       codexThreadId: session.codexThreadId,
+      cancellationReason: undefined,
     };
 
     const currentSession = await this.store.updateSession(conversationId, {
@@ -625,6 +696,8 @@ export class DiscordCodexBridge {
 
     try {
       const result = await job.done;
+      const cancellationReason = runtime.activeRun?.cancellationReason;
+      const suppressReply = !result.success && (cancellationReason === 'guidance' || cancellationReason === 'binding_reset' || cancellationReason === 'unbind');
       const nextSession = this.store.getSession(conversationId) ?? currentSession;
 
       if (runtime.activeRun) {
@@ -636,18 +709,31 @@ export class DiscordCodexBridge {
           : result.success
             ? 'completed'
             : 'failed';
-        runtime.activeRun.latestActivity = result.success ? '本轮执行完成' : '本轮执行失败';
-        this.pushRunTimeline(runtime, result.success ? '🎉 本轮执行完成' : '🛑 本轮执行失败');
+        runtime.activeRun.latestActivity = result.success
+          ? '本轮执行完成'
+          : cancellationReason === 'guidance'
+            ? '已按新的引导继续'
+            : '本轮执行失败';
+        this.pushRunTimeline(
+          runtime,
+          result.success
+            ? '🎉 本轮执行完成'
+            : cancellationReason === 'guidance'
+              ? '🧭 当前步骤已被新的引导打断，准备继续'
+              : '🛑 本轮执行失败',
+        );
       }
 
       await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
-      await this.replyToOriginalMessage(
-        channel,
-        task.messageId,
-        result.success
-          ? formatSuccessReply(binding, task.requestedBy, result)
-          : formatFailureReply(binding, task.requestedBy, result),
-      );
+      if (!suppressReply) {
+        await this.replyToOriginalMessage(
+          channel,
+          task.messageId,
+          result.success
+            ? formatSuccessReply(binding, task.requestedBy, result)
+            : formatFailureReply(binding, task.requestedBy, result),
+        );
+      }
     } finally {
       this.activeJobs.delete(conversationId);
       runtime.activeRun = undefined;
