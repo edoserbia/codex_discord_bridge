@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- 补充 `docs/MACOS-deploy.md`，新增“新 Mac 从 Gitee clone 到上线”的完整部署、验证与升级流程。
+
 ### Fixed
 
 - 修复 `!guide` 在复杂任务中会把原任务整体替换掉的问题；现在会先处理中途引导，再继续原任务。
