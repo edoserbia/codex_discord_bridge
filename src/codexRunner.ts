@@ -210,55 +210,68 @@ export class CodexRunner {
     usedResume: boolean,
     existingThreadId: string | undefined,
   ): string[] {
-    const rootArgs: string[] = [];
+    const globalArgs: string[] = ['-a', binding.codex.approvalPolicy];
 
     if (binding.codex.search) {
-      rootArgs.push('--search');
+      globalArgs.push('--search');
     }
-
-    if (binding.codex.model) {
-      rootArgs.push('-m', binding.codex.model);
-    }
-
-    if (binding.codex.profile) {
-      rootArgs.push('-p', binding.codex.profile);
-    }
-
-    rootArgs.push('-s', binding.codex.sandboxMode);
-    rootArgs.push('-a', binding.codex.approvalPolicy);
-    rootArgs.push('-C', binding.workspacePath);
 
     for (const addDir of uniqueStrings([...binding.codex.addDirs, ...input.extraAddDirs])) {
-      rootArgs.push('--add-dir', addDir);
-    }
-
-    for (const configEntry of binding.codex.extraConfig) {
-      rootArgs.push('-c', configEntry);
-    }
-
-    for (const imagePath of uniqueStrings(input.imagePaths)) {
-      rootArgs.push('-i', imagePath);
+      globalArgs.push('--add-dir', addDir);
     }
 
     if (usedResume && existingThreadId) {
-      const resumeArgs = ['exec', 'resume', '--json'];
+      const resumeArgs = ['exec', 'resume'];
+
+      if (binding.codex.model) {
+        resumeArgs.push('-m', binding.codex.model);
+      }
+
+      for (const configEntry of binding.codex.extraConfig) {
+        resumeArgs.push('-c', configEntry);
+      }
+
+      for (const imagePath of uniqueStrings(input.imagePaths)) {
+        resumeArgs.push('-i', imagePath);
+      }
 
       if (binding.codex.skipGitRepoCheck) {
         resumeArgs.push('--skip-git-repo-check');
       }
 
+      resumeArgs.push('--json');
       resumeArgs.push(existingThreadId, '-');
-      return [...rootArgs, ...resumeArgs];
+      return [...globalArgs, ...resumeArgs];
     }
 
-    const execArgs = ['exec', '--json', '--color', 'never'];
+    const execArgs = ['exec'];
+
+    if (binding.codex.model) {
+      execArgs.push('-m', binding.codex.model);
+    }
+
+    if (binding.codex.profile) {
+      execArgs.push('-p', binding.codex.profile);
+    }
+
+    execArgs.push('-s', binding.codex.sandboxMode);
+    execArgs.push('-C', binding.workspacePath);
+
+    for (const configEntry of binding.codex.extraConfig) {
+      execArgs.push('-c', configEntry);
+    }
+
+    for (const imagePath of uniqueStrings(input.imagePaths)) {
+      execArgs.push('-i', imagePath);
+    }
 
     if (binding.codex.skipGitRepoCheck) {
       execArgs.push('--skip-git-repo-check');
     }
 
+    execArgs.push('--json', '--color', 'never');
     execArgs.push('-');
-    return [...rootArgs, ...execArgs];
+    return [...globalArgs, ...execArgs];
   }
 }
 

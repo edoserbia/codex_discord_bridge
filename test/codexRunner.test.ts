@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import { readdir, readFile } from 'node:fs/promises';
 
 import type { AppConfig } from '../src/config.js';
 import type { ChannelBinding } from '../src/types.js';
@@ -111,6 +112,38 @@ test('runner handles resume and command events', async () => {
   assert.equal(result.commands.length, 1);
   assert.equal(startedCommands.length, 1);
   await cleanupDir(rootDir);
+});
+
+test('runner orders global and exec arguments for real Codex CLI compatibility', async () => {
+  const rootDir = await makeTempDir('codex-runner-argv-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-codex-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+
+  const runner = new CodexRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+  binding.codex.sandboxMode = 'danger-full-access';
+  binding.codex.search = true;
+
+  try {
+    const result = await runner.start(binding, { prompt: 'hello argv', imagePaths: [], extraAddDirs: [] }, undefined).done;
+    assert.equal(result.success, true);
+
+    const logFiles = await readdir(logDir);
+    assert.ok(logFiles.length > 0);
+    const payload = JSON.parse(await readFile(path.join(logDir, logFiles.sort().at(-1)!), 'utf8')) as {
+      argv: string[];
+    };
+
+    const execIndex = payload.argv.indexOf('exec');
+    assert.ok(execIndex >= 0);
+    assert.deepEqual(payload.argv.slice(0, 3), ['-a', 'never', '--search']);
+    assert.ok(payload.argv.indexOf('-s') > execIndex);
+    assert.ok(payload.argv.indexOf('-C') > execIndex);
+  } finally {
+    delete process.env.FAKE_CODEX_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
 });
 
 test('runner propagates stderr and failures', async () => {
