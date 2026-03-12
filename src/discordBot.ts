@@ -44,6 +44,16 @@ interface ResolvedConversation {
   channel: SendableChannel;
 }
 
+function hasBindingExecutionChanged(previous: ChannelBinding | undefined, next: ChannelBinding): boolean {
+  if (!previous) {
+    return false;
+  }
+
+  return previous.projectName !== next.projectName
+    || previous.workspacePath !== next.workspacePath
+    || JSON.stringify(previous.codex) !== JSON.stringify(next.codex);
+}
+
 export interface BindRequest {
   channelId: string;
   guildId?: string | undefined;
@@ -150,7 +160,13 @@ export class DiscordCodexBridge {
       updatedAt: now,
     };
 
+    const executionChanged = hasBindingExecutionChanged(existingBinding, binding);
     const savedBinding = await this.store.upsertBinding(binding);
+
+    if (executionChanged) {
+      await this.resetBindingSessions(savedBinding.channelId);
+    }
+
     const session = await this.store.ensureSession(savedBinding.channelId, savedBinding.channelId);
     const runtime = this.getRuntime(savedBinding.channelId);
     const channel = await this.fetchChannel(savedBinding.channelId);
@@ -167,6 +183,11 @@ export class DiscordCodexBridge {
 
     for (const session of sessions) {
       const activeJob = this.activeJobs.get(session.conversationId);
+      const runtime = this.runtimes.get(session.conversationId);
+      if (runtime) {
+        runtime.activeRun = undefined;
+        runtime.queue = [];
+      }
       activeJob?.cancel();
       this.activeJobs.delete(session.conversationId);
       this.runtimes.delete(session.conversationId);
@@ -177,6 +198,30 @@ export class DiscordCodexBridge {
 
   async resetConversation(conversationId: string, bindingChannelId?: string): Promise<ConversationSessionState> {
     return this.store.updateSession(conversationId, { codexThreadId: undefined }, bindingChannelId);
+  }
+
+  private async resetBindingSessions(bindingChannelId: string): Promise<void> {
+    const sessions = this.store.listSessions(bindingChannelId);
+
+    for (const session of sessions) {
+      const activeJob = this.activeJobs.get(session.conversationId);
+      const runtime = this.runtimes.get(session.conversationId);
+      if (runtime) {
+        runtime.activeRun = undefined;
+        runtime.queue = [];
+      }
+      activeJob?.cancel();
+      this.activeJobs.delete(session.conversationId);
+      this.runtimes.delete(session.conversationId);
+
+      await this.store.updateSession(session.conversationId, {
+        codexThreadId: undefined,
+        lastRunAt: undefined,
+        lastPromptBy: undefined,
+      }, bindingChannelId);
+    }
+
+    this.runtimes.delete(bindingChannelId);
   }
 
   getDashboardData(): DashboardBinding[] {
@@ -307,6 +352,7 @@ export class DiscordCodexBridge {
     workspacePath: string,
     options: BindCommandOptions,
   ): Promise<void> {
+    const existingBinding = this.store.getBinding(message.channelId);
     const savedBinding = await this.bindChannel({
       channelId: message.channelId,
       guildId: message.guildId!,
@@ -315,8 +361,17 @@ export class DiscordCodexBridge {
       options,
     });
 
+    const executionChanged = hasBindingExecutionChanged(existingBinding, savedBinding);
+
     await message.reply(
-      [`已绑定当前频道到项目 **${savedBinding.projectName}**。`, `目录：\`${savedBinding.workspacePath}\``, '现在主频道和其下线程都可以直接控制 Codex。'].join('\n'),
+      [
+        `已绑定当前频道到项目 **${savedBinding.projectName}**。`,
+        `目录：\`${savedBinding.workspacePath}\``,
+        `执行模式：sandbox=\`${savedBinding.codex.sandboxMode}\` · approval=\`${savedBinding.codex.approvalPolicy}\` · search=${savedBinding.codex.search ? 'on' : 'off'}`,
+        executionChanged
+          ? '检测到绑定配置已变更，已重置当前频道及其线程的 Codex 会话；下一条消息会按新权限新建会话。'
+          : '现在主频道和其下线程都可以直接控制 Codex。',
+      ].join('\n'),
     );
   }
 
