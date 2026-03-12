@@ -41,6 +41,33 @@ test('bridge binds a root channel and reuses session on follow-up prompts', { co
   await cleanupDir(rootDir);
 });
 
+
+test('bridge resets existing Codex sessions when bind execution settings change', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-rebind-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-rebind', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannel, 'first prompt'));
+  await waitFor(() => findSent(rootChannel, /ok: first prompt/));
+
+  const firstSession = store.getSession(rootChannel.id);
+  assert.ok(firstSession?.codexThreadId);
+
+  await dispatch(
+    bridge,
+    createUserMessage(rootChannel, `!bind api "${workspace}" --sandbox danger-full-access --approval never --search on`, {
+      userId: 'admin-user',
+    }),
+  );
+
+  await dispatch(bridge, createUserMessage(rootChannel, '[command] after rebind'));
+  await waitFor(() => findSent(rootChannel, /resumed=false/));
+  await cleanupDir(rootDir);
+});
+
 test('bridge allows binding in a regular channel under a Discord category', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-category-');
   const workspace = await createWorkspace(rootDir);

@@ -111,6 +111,7 @@ export function formatStatus(
     '🤖 **Codex Bridge 状态面板**',
     `项目：**${binding.projectName}**`,
     `目录：\`${binding.workspacePath}\``,
+    `执行模式：sandbox=\`${binding.codex.sandboxMode}\` · approval=\`${binding.codex.approvalPolicy}\` · search=${binding.codex.search ? 'on' : 'off'}`,
     `会话类型：${isThreadConversation ? 'Discord 线程会话' : '频道主会话'}`,
     `状态：${formatActiveStatus(runtime)}`,
     `Codex 会话：${session.codexThreadId ? `\`${shortId(session.codexThreadId)}\`` : '未建立'}`,
