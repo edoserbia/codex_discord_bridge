@@ -37,14 +37,36 @@ function parseArgs(argv) {
       continue;
     }
 
-    if (arg === 'exec' && argv[index + 1] === 'resume') {
-      mode = 'resume';
-      resumeThreadId = argv[index + 4];
-      break;
-    }
-
     if (arg === 'exec') {
-      mode = 'exec';
+      if (argv[index + 1] === 'resume') {
+        mode = 'resume';
+        let promptValueSeen = false;
+
+        for (let resumeIndex = index + 2; resumeIndex < argv.length; resumeIndex += 1) {
+          const resumeArg = argv[resumeIndex];
+
+          if (resumeArg === '-m' || resumeArg === '-c' || resumeArg === '-i') {
+            resumeIndex += 1;
+            continue;
+          }
+
+          if (resumeArg === '--skip-git-repo-check' || resumeArg === '--json') {
+            continue;
+          }
+
+          if (!resumeThreadId) {
+            resumeThreadId = resumeArg;
+            continue;
+          }
+
+          if (!promptValueSeen) {
+            promptValueSeen = true;
+            break;
+          }
+        }
+      }
+
+      mode = argv[index + 1] === 'resume' ? 'resume' : 'exec';
     }
   }
 
@@ -84,7 +106,7 @@ const logDir = process.env.FAKE_CODEX_LOG_DIR;
 if (logDir) {
   await fs.mkdir(logDir, { recursive: true });
   const file = path.join(logDir, `${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
-  await fs.writeFile(file, JSON.stringify({ args, prompt, cwd: process.cwd() }, null, 2));
+  await fs.writeFile(file, JSON.stringify({ argv: process.argv.slice(2), args, prompt, cwd: process.cwd() }, null, 2));
 }
 
 const threadId = args.mode === 'resume' ? args.resumeThreadId : `thread-${Math.random().toString(16).slice(2, 10)}`;
