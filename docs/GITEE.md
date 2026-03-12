@@ -1,49 +1,69 @@
 # Git / Gitee
 
-## 本地初始化
+这份文档说明如何把当前项目纳入 Git 管理，并创建一个 Gitee 私有仓库作为远端。
+
+## 1. 初始化本地 Git 仓库
 
 ```bash
 ./scripts/init-git.sh
 ```
 
-这会：
+脚本会：
 
-- 初始化本地 Git 仓库（如果尚未初始化）
-- 保留当前工作区不提交
-- 输出当前状态，方便你确认要提交的内容
+- 如果仓库尚未初始化，则创建 `main` 分支
+- 如果已经是 Git 仓库，则保留现状
+- 输出当前 `git status --short`
 
-## 创建 Gitee 私有仓库
+## 2. 准备 Gitee Token
 
-需要一个可用的 `GITEE_TOKEN`。
+你需要一个可用的 `GITEE_TOKEN`，用于调用 Gitee OpenAPI 创建仓库。
+
+同时建议设置：
 
 ```bash
-export GITEE_TOKEN=你的_token
-export GITEE_OWNER=你的_gitee_用户名
+export GITEE_OWNER=<your-gitee-username>
+```
+
+## 3. 创建 Gitee 私有仓库
+
+```bash
+export GITEE_TOKEN=<your-gitee-token>
 ./scripts/create-gitee-repo.sh codex-discord-bridge
 ```
 
-脚本会：
+默认行为：
 
-- 调用 Gitee OpenAPI 创建仓库
-- 默认请求创建私有仓库
-- 自动把本地 `gitee` remote 指向返回的 `ssh_url`
+- 请求创建私有仓库
+- 仓库名默认为 `codex-discord-bridge`
+- 自动把本地 `gitee` remote 指向新仓库的 `ssh_url`
 
-## 推送示例
+如需自定义：
 
-创建完 remote 后：
+```bash
+DESCRIPTION="Codex bridge for Discord"
+PRIVATE=true
+REMOTE_NAME=gitee
+./scripts/create-gitee-repo.sh custom-repo-name
+```
+
+## 4. 首次推送
 
 ```bash
 git add .
-git commit -m "feat: add discord codex bridge"
+git commit -m "feat: initialize codex discord bridge"
 git push -u gitee main
 ```
 
-## 当前状态说明
+## 5. 后续更新
 
-我已经验证：
+```bash
+git add .
+git commit -m "docs: update deployment guide"
+git push
+```
 
-- 本机 SSH 可以认证到 `gitee.com`
-- 但当前环境里没有现成的 `GITEE_TOKEN`
-- 因此“自动创建私有远端仓库”这一步需要你补一个 token 才能真正执行
+## 6. 注意事项
 
-如果你把 `GITEE_TOKEN` 配上，我就可以继续把远端实际创建并推送上去。
+- `GITEE_TOKEN` 只用于创建仓库，不建议写进项目文件
+- 建议使用 SSH 作为远端地址，避免重复输入账号密码
+- `data/`、`logs/`、`.run/` 已被忽略，不应提交运行态数据

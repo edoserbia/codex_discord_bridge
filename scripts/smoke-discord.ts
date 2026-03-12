@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import path from 'node:path';
 
 import { Client, GatewayIntentBits } from 'discord.js';
 
@@ -8,7 +10,7 @@ interface OpenClawConfig {
 }
 
 async function main(): Promise<void> {
-  const configPath = process.env.OPENCLAW_CONFIG_PATH ?? '~/.openclaw/openclaw.json';
+  const configPath = process.env.OPENCLAW_CONFIG_PATH ?? path.join(homedir(), '.openclaw', 'openclaw.json');
   const config = JSON.parse(readFileSync(configPath, 'utf8')) as OpenClawConfig;
   const token = config.channels?.discord?.token;
   const candidateChannels = (config.bindings ?? [])
