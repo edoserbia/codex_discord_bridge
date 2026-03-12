@@ -113,7 +113,7 @@ export function loadConfig(): AppConfig {
     defaultCodex: {
       model: process.env.DEFAULT_CODEX_MODEL?.trim() || undefined,
       profile: process.env.DEFAULT_CODEX_PROFILE?.trim() || undefined,
-      sandboxMode: parseSandboxMode(process.env.DEFAULT_CODEX_SANDBOX, 'workspace-write'),
+      sandboxMode: parseSandboxMode(process.env.DEFAULT_CODEX_SANDBOX, 'danger-full-access'),
       approvalPolicy: parseApprovalPolicy(process.env.DEFAULT_CODEX_APPROVAL, 'never'),
       search: parseBoolean(process.env.DEFAULT_CODEX_SEARCH, false),
       skipGitRepoCheck: parseBoolean(process.env.DEFAULT_CODEX_SKIP_GIT_REPO_CHECK, true),

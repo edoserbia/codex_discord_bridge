@@ -42,3 +42,41 @@ test('loadConfig reads CODEX_TUNNING_DISCORD_BOT_TOKEN from external secrets fil
     await cleanupDir(rootDir);
   }
 });
+
+test('loadConfig defaults to danger-full-access sandbox', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-config-default-sandbox-');
+  const secretFile = path.join(rootDir, 'secrets.env');
+  await fs.writeFile(secretFile, 'CODEX_TUNNING_DISCORD_BOT_TOKEN="secret-token-from-file"\n', 'utf8');
+
+  const previous = {
+    CODEX_TUNNING_SECRETS_FILE: process.env.CODEX_TUNNING_SECRETS_FILE,
+    CODEX_TUNNING_DISCORD_BOT_TOKEN: process.env.CODEX_TUNNING_DISCORD_BOT_TOKEN,
+    DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
+    DISCORD_TOKEN: process.env.DISCORD_TOKEN,
+    DATA_DIR: process.env.DATA_DIR,
+    WEB_ENABLED: process.env.WEB_ENABLED,
+    DEFAULT_CODEX_SANDBOX: process.env.DEFAULT_CODEX_SANDBOX,
+  };
+
+  delete process.env.CODEX_TUNNING_DISCORD_BOT_TOKEN;
+  delete process.env.DISCORD_BOT_TOKEN;
+  delete process.env.DISCORD_TOKEN;
+  delete process.env.DEFAULT_CODEX_SANDBOX;
+  process.env.CODEX_TUNNING_SECRETS_FILE = secretFile;
+  process.env.DATA_DIR = rootDir;
+  process.env.WEB_ENABLED = 'false';
+
+  try {
+    const config = loadConfig();
+    assert.equal(config.defaultCodex.sandboxMode, 'danger-full-access');
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+    await cleanupDir(rootDir);
+  }
+});
