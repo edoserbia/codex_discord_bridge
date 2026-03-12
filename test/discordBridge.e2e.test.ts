@@ -71,20 +71,42 @@ test('bridge resets existing Codex sessions when bind execution settings change'
 test('bridge can inject guide prompts into an active run and continue on the same session', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-guide-');
   const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-codex-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
   const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
   const rootChannel = new FakeChannel('channel-guide', 'guild-1');
   channels.set(rootChannel.id, rootChannel);
 
-  await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
-  await dispatch(bridge, createUserMessage(rootChannel, '[slow] first task'));
-  await waitFor(() => (bridge as any).getDashboardData().some((entry: any) => entry.conversations.some((conversation: any) => conversation.status === 'running' || conversation.status === 'starting')));
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[slow] first task'));
+    await waitFor(() => (bridge as any).getDashboardData().some((entry: any) => entry.conversations.some((conversation: any) => conversation.status === 'running' || conversation.status === 'starting')));
 
-  await dispatch(bridge, createUserMessage(rootChannel, '!guide 请停止当前步骤，改为优先检查 README', { userId: 'admin-user' }));
-  await waitFor(() => findSent(rootChannel, /已将你的新消息作为引导项插入当前工作/));
-  await waitFor(() => findSent(rootChannel, /resumed=true/), 15_000);
-  await waitFor(() => findSent(rootChannel, /README/), 15_000);
-  assert.ok(!findSent(rootChannel, /已加入队列/));
-  await cleanupDir(rootDir);
+    await dispatch(bridge, createUserMessage(rootChannel, '!guide 现在先优先检查 README，然后继续完成原任务', { userId: 'admin-user' }));
+    await waitFor(() => findSent(rootChannel, /先处理中途引导，再继续原任务/));
+    await waitFor(() => findSent(rootChannel, /resumed=true/), 15_000);
+    await waitFor(() => findSent(rootChannel, /README/), 15_000);
+    await waitFor(async () => {
+      const logFiles = await readdir(logDir).catch(() => []);
+      return logFiles.length >= 2;
+    }, 15_000);
+
+    const logFiles = await readdir(logDir);
+    const payloads = await Promise.all(logFiles.map(async (fileName) => JSON.parse(await readFile(path.join(logDir, fileName), 'utf8')) as {
+      args: { mode: string };
+      prompt: string;
+    }));
+    const resumedPayload = payloads.find((payload) => payload.args.mode === 'resume');
+
+    assert.ok(resumedPayload);
+    assert.match(resumedPayload.prompt, /\[slow\] first task/);
+    assert.match(resumedPayload.prompt, /现在先优先检查 README，然后继续完成原任务/);
+    assert.match(resumedPayload.prompt, /请先处理下面的最新引导，再继续完成原始任务/);
+    assert.ok(!findSent(rootChannel, /已加入队列/));
+  } finally {
+    delete process.env.FAKE_CODEX_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
 });
 
 test('bridge allows binding in a regular channel under a Discord category', { concurrency: false }, async () => {

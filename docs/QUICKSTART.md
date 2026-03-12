@@ -108,6 +108,8 @@ sudo ./scripts/install-service.sh --mode daemon
 !projects
 ```
 
+`!guide` 的语义是“插入中途引导，再继续原任务”，不是直接丢弃当前复杂任务。
+
 ## 7. 附件与图片
 
 - 图片附件会自动透传给 `codex -i`

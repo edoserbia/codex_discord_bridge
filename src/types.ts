@@ -51,6 +51,9 @@ export interface PromptTask {
   id: string;
   prompt: string;
   effectivePrompt: string;
+  rootPrompt: string;
+  rootEffectivePrompt: string;
+  guidancePrompt?: string | undefined;
   requestedBy: string;
   requestedById: string;
   messageId: string;
