@@ -1,4 +1,4 @@
-import type { ChannelBinding, ChannelRuntime, CodexRunResult, ConversationSessionState, DashboardBinding, PlanItem, PromptTask } from './types.js';
+import type { ActiveRunState, ChannelBinding, ChannelRuntime, CodexRunResult, ConversationSessionState, DashboardBinding, PlanItem, PromptTask } from './types.js';
 
 import { sanitizeInlineCode, shortId, tailLines, truncate } from './utils.js';
 
@@ -65,6 +65,10 @@ function appendTaskContextLines(lines: string[], task: PromptTask, normalLabel: 
   }
 
   lines.push(`${normalLabel}：${truncate(task.prompt, maxLength)}`);
+}
+
+function shouldRenderTaskContext(activeRun: ActiveRunState): boolean {
+  return activeRun.status !== 'starting' || Boolean(activeRun.codexThreadId);
 }
 
 export function formatHelp(prefix: string): string {
@@ -145,7 +149,11 @@ export function formatStatus(
 
   if (runtime.activeRun) {
     lines.push(`请求人：${runtime.activeRun.task.requestedBy}`);
-    appendTaskContextLines(lines, runtime.activeRun.task, '当前请求', 180);
+    if (shouldRenderTaskContext(runtime.activeRun)) {
+      appendTaskContextLines(lines, runtime.activeRun.task, '当前请求', 180);
+    } else {
+      lines.push('当前请求：已接收，正在建立 Codex 会话');
+    }
     lines.push(`活动：${truncate(runtime.activeRun.latestActivity, 180)}`);
 
     if (runtime.activeRun.task.attachments.length > 0) {
@@ -201,7 +209,11 @@ export function formatProgressMessage(binding: ChannelBinding, runtime: ChannelR
     `最新活动：${truncate(activeRun.latestActivity, 180)}`,
   ];
 
-  appendTaskContextLines(lines, activeRun.task, '请求', 120);
+  if (shouldRenderTaskContext(activeRun)) {
+    appendTaskContextLines(lines, activeRun.task, '请求', 120);
+  } else {
+    lines.push('请求：已接收，正在建立 Codex 会话');
+  }
 
   appendPlanLines(lines, activeRun.planItems, 8);
 

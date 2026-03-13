@@ -5,6 +5,7 @@ import type { ChannelBinding, ConversationSessionState, PersistedState } from '.
 
 export class JsonStateStore {
   private state: PersistedState = { bindings: {}, sessions: {} };
+  private saveChain: Promise<void> = Promise.resolve();
 
   constructor(private readonly stateFilePath: string) {}
 
@@ -138,8 +139,15 @@ export class JsonStateStore {
   }
 
   private async save(): Promise<void> {
-    const tempFilePath = `${this.stateFilePath}.tmp`;
-    await fs.writeFile(tempFilePath, `${JSON.stringify(this.state, null, 2)}\n`, 'utf8');
-    await fs.rename(tempFilePath, this.stateFilePath);
+    const payload = `${JSON.stringify(this.state, null, 2)}\n`;
+    const runSave = async (): Promise<void> => {
+      const tempFilePath = `${this.stateFilePath}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
+      await fs.writeFile(tempFilePath, payload, 'utf8');
+      await fs.rename(tempFilePath, this.stateFilePath);
+    };
+
+    const nextSave = this.saveChain.then(runSave, runSave);
+    this.saveChain = nextSave.then(() => undefined, () => undefined);
+    await nextSave;
   }
 }

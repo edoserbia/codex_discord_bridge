@@ -32,6 +32,7 @@ export class CodexRunner {
     const usedResume = Boolean(existingThreadId);
     const args = this.buildArgs(binding, input, usedResume, existingThreadId);
     const env = buildCodexChildEnv(binding.workspacePath);
+    let cancelRequested = false;
     const child = spawn(this.config.codexCommand, args, {
       cwd: binding.workspacePath,
       env,
@@ -181,6 +182,14 @@ export class CodexRunner {
       stdoutInterface.close();
       stderrInterface.close();
 
+      if (cancelRequested && stderr.length === 0) {
+        const cancellationMessage = signal
+          ? `Codex process interrupted by ${signal}.`
+          : 'Codex process cancelled by bridge.';
+        stderr.push(cancellationMessage);
+        await hooks.onStderr?.(cancellationMessage);
+      }
+
       const result: CodexRunResult = {
         success: exitCode === 0 && turnCompleted,
         exitCode,
@@ -201,7 +210,10 @@ export class CodexRunner {
 
     return {
       pid: child.pid,
-      cancel: () => terminateChild(child),
+      cancel: () => {
+        cancelRequested = true;
+        terminateChild(child);
+      },
       done,
     };
   }
