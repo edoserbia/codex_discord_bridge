@@ -11,6 +11,7 @@ import type { AppConfig } from './config.js';
 import type { BindCommandOptions, ParsedCommand } from './commandParser.js';
 import type { CodexRunner, RunningCodexJob } from './codexRunner.js';
 import type {
+  ActiveRunState,
   ChannelRuntime,
   ChannelBinding,
   ConversationSessionState,
@@ -19,7 +20,7 @@ import type {
   PromptTask,
 } from './types.js';
 
-import { buildPromptWithAttachments, downloadAttachments, extractMessageAttachments } from './attachments.js';
+import { buildPromptWithAttachments, downloadAttachments, extractMessageAttachments, removeAttachmentDir } from './attachments.js';
 import { isCommandMessage, parseCommand } from './commandParser.js';
 import { formatFailureReply, formatHelp, formatProgressMessage, formatProjects, formatQueue, formatStatus, formatSuccessReply } from './formatters.js';
 import { JsonStateStore } from './store.js';
@@ -90,7 +91,7 @@ export class DiscordCodexBridge {
     private readonly store: JsonStateStore,
     private readonly runner: CodexRunner,
   ) {
-    this.client.once('ready', () => {
+    this.client.once('clientReady', () => {
       console.log(`Discord bot connected as ${this.client.user?.tag ?? 'unknown-user'}`);
     });
 
@@ -429,7 +430,11 @@ export class DiscordCodexBridge {
     }
 
     const runtime = this.getRuntime(resolved.conversationId);
-    const activeJob = this.activeJobs.get(resolved.conversationId);
+    let activeJob = this.activeJobs.get(resolved.conversationId);
+
+    if (!activeJob && runtime.activeRun) {
+      activeJob = await this.waitForActiveJob(resolved.conversationId);
+    }
 
     if (!activeJob || !runtime.activeRun) {
       await message.reply('当前会话没有正在运行的任务。');
@@ -520,7 +525,7 @@ export class DiscordCodexBridge {
 
     if (runtime.activeRun) {
       if (mode === 'guidance') {
-        const activeJob = this.activeJobs.get(resolved.conversationId);
+        let activeJob = this.activeJobs.get(resolved.conversationId);
 
         runtime.queue.splice(runtime.queue.length - 1, 1);
         runtime.queue.unshift(task);
@@ -535,7 +540,14 @@ export class DiscordCodexBridge {
         await this.refreshStatusPanel(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
         await this.refreshProgressMessage(resolved.channel, resolved.binding, runtime);
 
+        if (!activeJob) {
+          activeJob = await this.waitForActiveJob(resolved.conversationId);
+        }
+
         if (activeJob) {
+          if (!runtime.activeRun.codexThreadId) {
+            await this.waitForConversationThreadId(resolved.conversationId);
+          }
           activeJob.cancel();
         } else {
           runtime.activeRun = undefined;
@@ -575,17 +587,7 @@ export class DiscordCodexBridge {
       return;
     }
 
-    const channel = await this.fetchChannel(conversationId);
-
-    if (!channel) {
-      runtime.queue = [];
-      return;
-    }
-
-    const session = await this.store.ensureSession(task.bindingChannelId, conversationId);
-    const isThreadConversation = conversationId !== task.bindingChannelId;
-
-    runtime.activeRun = {
+    const nextRun: ActiveRunState = {
       task,
       status: 'starting',
       startedAt: new Date().toISOString(),
@@ -595,18 +597,30 @@ export class DiscordCodexBridge {
       planItems: [],
       timeline: ['⏳ 已收到请求，准备启动 Codex'],
       stderr: [],
-      usedResume: Boolean(session.codexThreadId),
-      codexThreadId: session.codexThreadId,
+      usedResume: false,
+      codexThreadId: undefined,
       cancellationReason: undefined,
     };
 
+    runtime.activeRun = nextRun;
+
+    const channel = await this.fetchChannel(conversationId);
+
+    if (!channel) {
+      runtime.activeRun = undefined;
+      runtime.queue = [];
+      return;
+    }
+
+    const session = await this.store.ensureSession(task.bindingChannelId, conversationId);
+    const isThreadConversation = conversationId !== task.bindingChannelId;
+    nextRun.usedResume = Boolean(session.codexThreadId);
+    nextRun.codexThreadId = session.codexThreadId;
+
     const currentSession = await this.store.updateSession(conversationId, {
-      lastRunAt: runtime.activeRun.startedAt,
+      lastRunAt: nextRun.startedAt,
       lastPromptBy: task.requestedBy,
     }, task.bindingChannelId);
-
-    await channel.sendTyping().catch(() => undefined);
-    await this.refreshRuntimeViews(channel, binding, currentSession, runtime, isThreadConversation);
 
     const job = this.runner.start(binding, {
       prompt: task.effectivePrompt,
@@ -712,6 +726,8 @@ export class DiscordCodexBridge {
     });
 
     this.activeJobs.set(conversationId, job);
+    await channel.sendTyping().catch(() => undefined);
+    await this.refreshRuntimeViews(channel, binding, currentSession, runtime, isThreadConversation);
 
     try {
       const result = await job.done;
@@ -756,6 +772,7 @@ export class DiscordCodexBridge {
     } finally {
       this.activeJobs.delete(conversationId);
       runtime.activeRun = undefined;
+      await removeAttachmentDir(task.attachmentDir).catch(() => undefined);
       const nextSession = this.store.getSession(conversationId) ?? currentSession;
       await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
 
@@ -837,6 +854,39 @@ export class DiscordCodexBridge {
     if (timeline.length > 12) {
       timeline.splice(0, timeline.length - 12);
     }
+  }
+
+  private async waitForConversationThreadId(conversationId: string, timeoutMs = 1_500): Promise<string | undefined> {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+      const runtime = this.runtimes.get(conversationId);
+      const threadId = runtime?.activeRun?.codexThreadId ?? this.store.getSession(conversationId)?.codexThreadId;
+
+      if (threadId) {
+        return threadId;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+
+    return this.store.getSession(conversationId)?.codexThreadId;
+  }
+
+  private async waitForActiveJob(conversationId: string, timeoutMs = 1_500): Promise<RunningCodexJob | undefined> {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+      const activeJob = this.activeJobs.get(conversationId);
+
+      if (activeJob) {
+        return activeJob;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+
+    return this.activeJobs.get(conversationId);
   }
 
   private async refreshRuntimeViews(
