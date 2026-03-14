@@ -94,6 +94,7 @@ const prompt = await readStdin();
 const scenario = (() => {
   if (prompt.includes('[cancel]')) return 'cancel';
   if (prompt.includes('[slow]')) return 'slow';
+  if (prompt.includes('[flaky-exit]')) return 'flaky-exit';
   if (prompt.includes('[fail]')) return 'fail';
   if (prompt.includes('[invalid-json]')) return 'invalid-json';
   if (prompt.includes('[command]')) return 'command';
@@ -144,6 +145,19 @@ if (scenario === 'cancel') {
 
 if (scenario === 'slow') {
   await sleep(700);
+}
+
+if (scenario === 'flaky-exit') {
+  const markerPath = path.join(process.cwd(), '.fake-codex-flaky-exit');
+
+  try {
+    await fs.access(markerPath);
+    await fs.rm(markerPath, { force: true });
+  } catch {
+    await fs.writeFile(markerPath, prompt, 'utf8');
+    console.error('WARNING: failed to clean up stale arg0 temp dirs: Permission denied (os error 13)');
+    process.exit(1);
+  }
 }
 
 if (scenario === 'plan') {

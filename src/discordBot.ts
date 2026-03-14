@@ -9,11 +9,12 @@ import {
 
 import type { AppConfig } from './config.js';
 import type { BindCommandOptions, ParsedCommand } from './commandParser.js';
-import type { CodexRunner, RunningCodexJob } from './codexRunner.js';
+import type { CodexRunHooks, CodexRunner, RunningCodexJob } from './codexRunner.js';
 import type {
   ActiveRunState,
   ChannelRuntime,
   ChannelBinding,
+  CodexRunResult,
   ConversationSessionState,
   DashboardBinding,
   DashboardConversation,
@@ -21,6 +22,7 @@ import type {
 } from './types.js';
 
 import { buildPromptWithAttachments, downloadAttachments, extractMessageAttachments, removeAttachmentDir } from './attachments.js';
+import { filterDiagnosticStderr, isIgnorableCodexStderrLine, shouldRetryUnexpectedCodexExit } from './codexDiagnostics.js';
 import { isCommandMessage, parseCommand } from './commandParser.js';
 import { formatFailureReply, formatHelp, formatProgressMessage, formatProjects, formatQueue, formatStatus, formatSuccessReply } from './formatters.js';
 import { JsonStateStore } from './store.js';
@@ -44,6 +46,8 @@ interface ResolvedConversation {
   isThreadConversation: boolean;
   channel: SendableChannel;
 }
+
+const MAX_CODEX_ATTEMPTS = 2;
 
 function hasBindingExecutionChanged(previous: ChannelBinding | undefined, next: ChannelBinding): boolean {
   if (!previous) {
@@ -622,12 +626,13 @@ export class DiscordCodexBridge {
       lastPromptBy: task.requestedBy,
     }, task.bindingChannelId);
 
-    const job = this.runner.start(binding, {
+    const runInput = {
       prompt: task.effectivePrompt,
       imagePaths: task.attachments.filter((item) => item.isImage).map((item) => item.localPath),
       extraAddDirs: task.attachmentDir ? [task.attachmentDir] : [],
-    }, currentSession.codexThreadId, {
-      onThreadStarted: async (codexThreadId) => {
+    };
+    const hooks: CodexRunHooks = {
+      onThreadStarted: async (codexThreadId: string) => {
         if (!runtime.activeRun) {
           return;
         }
@@ -637,7 +642,7 @@ export class DiscordCodexBridge {
         const nextSession = await this.store.updateSession(conversationId, { codexThreadId }, task.bindingChannelId);
         await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       },
-      onActivity: async (activity) => {
+      onActivity: async (activity: string) => {
         if (!runtime.activeRun) {
           return;
         }
@@ -648,7 +653,7 @@ export class DiscordCodexBridge {
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
         await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       },
-      onReasoning: async (reasoning) => {
+      onReasoning: async (reasoning: string) => {
         if (!runtime.activeRun) {
           return;
         }
@@ -676,7 +681,7 @@ export class DiscordCodexBridge {
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
         await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       },
-      onAgentMessage: async (agentMessage) => {
+      onAgentMessage: async (agentMessage: string) => {
         if (!runtime.activeRun) {
           return;
         }
@@ -687,7 +692,7 @@ export class DiscordCodexBridge {
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
         await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       },
-      onCommandStarted: async (command) => {
+      onCommandStarted: async (command: string) => {
         if (!runtime.activeRun) {
           return;
         }
@@ -699,7 +704,7 @@ export class DiscordCodexBridge {
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
         await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       },
-      onCommandCompleted: async (command, output, exitCode) => {
+      onCommandCompleted: async (command: string, output: string, exitCode: number | null) => {
         if (!runtime.activeRun) {
           return;
         }
@@ -711,8 +716,12 @@ export class DiscordCodexBridge {
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
         await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       },
-      onStderr: async (line) => {
+      onStderr: async (line: string) => {
         if (!runtime.activeRun) {
+          return;
+        }
+
+        if (isIgnorableCodexStderrLine(line)) {
           return;
         }
 
@@ -723,14 +732,45 @@ export class DiscordCodexBridge {
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
         await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       },
-    });
-
-    this.activeJobs.set(conversationId, job);
-    await channel.sendTyping().catch(() => undefined);
-    await this.refreshRuntimeViews(channel, binding, currentSession, runtime, isThreadConversation);
+    };
+    let result: CodexRunResult;
+    let attemptsUsed = 0;
 
     try {
-      const result = await job.done;
+      while (true) {
+        attemptsUsed += 1;
+        const attemptSession = this.store.getSession(conversationId) ?? currentSession;
+        const existingThreadId = attemptSession.codexThreadId;
+
+        if (attemptsUsed > 1 && runtime.activeRun) {
+          runtime.activeRun.status = 'starting';
+          runtime.activeRun.latestActivity = 'Codex 异常退出，bridge 正在自动重试一次';
+          runtime.activeRun.currentCommand = undefined;
+          this.pushRunTimeline(runtime, '🔁 Codex 异常退出，bridge 正在自动重试一次');
+        }
+
+        const job = this.runner.start(binding, runInput, existingThreadId, hooks);
+        this.activeJobs.set(conversationId, job);
+        this.logCodexAttemptStart(binding, task, conversationId, attemptsUsed, job.pid, existingThreadId);
+
+        await channel.sendTyping().catch(() => undefined);
+        await this.refreshRuntimeViews(channel, binding, attemptSession, runtime, isThreadConversation);
+
+        result = await job.done;
+        const cancellationReason = runtime.activeRun?.cancellationReason;
+        const retryable = shouldRetryUnexpectedCodexExit(result, cancellationReason);
+
+        this.logCodexAttemptExit(binding, task, conversationId, attemptsUsed, result, retryable);
+
+        if (retryable && attemptsUsed < MAX_CODEX_ATTEMPTS) {
+          const nextSession = this.store.getSession(conversationId) ?? attemptSession;
+          await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
+          continue;
+        }
+
+        break;
+      }
+
       const cancellationReason = runtime.activeRun?.cancellationReason;
       const suppressReply = !result.success && (cancellationReason === 'guidance' || cancellationReason === 'binding_reset' || cancellationReason === 'unbind');
       const nextSession = this.store.getSession(conversationId) ?? currentSession;
@@ -854,6 +894,61 @@ export class DiscordCodexBridge {
     if (timeline.length > 12) {
       timeline.splice(0, timeline.length - 12);
     }
+  }
+
+  private logCodexAttemptStart(
+    binding: ChannelBinding,
+    task: PromptTask,
+    conversationId: string,
+    attempt: number,
+    pid: number | undefined,
+    existingThreadId: string | undefined,
+  ): void {
+    console.log(
+      [
+        '[codex-run]',
+        `project=${binding.projectName}`,
+        `conversation=${conversationId}`,
+        `task=${task.id.slice(0, 8)}`,
+        `attempt=${attempt}/${MAX_CODEX_ATTEMPTS}`,
+        `pid=${pid ?? 'null'}`,
+        `resume=${existingThreadId ? 'true' : 'false'}`,
+        `thread=${existingThreadId ?? 'new'}`,
+      ].join(' '),
+    );
+  }
+
+  private logCodexAttemptExit(
+    binding: ChannelBinding,
+    task: PromptTask,
+    conversationId: string,
+    attempt: number,
+    result: CodexRunResult,
+    retryable: boolean,
+  ): void {
+    const diagnosticStderr = filterDiagnosticStderr(result.stderr);
+    const ignoredStderrCount = result.stderr.length - diagnosticStderr.length;
+    const stderrSummary = diagnosticStderr.length > 0
+      ? truncate(diagnosticStderr.slice(-3).join(' | '), 240)
+      : 'none';
+    const log = result.success ? console.log : console.warn;
+
+    log(
+      [
+        '[codex-run]',
+        `project=${binding.projectName}`,
+        `conversation=${conversationId}`,
+        `task=${task.id.slice(0, 8)}`,
+        `attempt=${attempt}/${MAX_CODEX_ATTEMPTS}`,
+        `exitCode=${result.exitCode ?? 'null'}`,
+        `signal=${result.signal ?? 'null'}`,
+        `turnCompleted=${result.turnCompleted}`,
+        `success=${result.success}`,
+        `retryable=${retryable}`,
+        `ignoredStderr=${ignoredStderrCount}`,
+        `stderr=${stderrSummary}`,
+      ].join(' '),
+    );
   }
 
   private async waitForConversationThreadId(conversationId: string, timeoutMs = 1_500): Promise<string | undefined> {
