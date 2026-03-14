@@ -177,6 +177,30 @@ test('bridge retries flaky codex exec exits and does not surface ignorable warni
   await cleanupDir(rootDir);
 });
 
+test('bridge drops a stale resumed Codex session and retries with a fresh session', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-resume-stale-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-resume-stale', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannel, 'first prompt'));
+  await waitFor(() => findSent(rootChannel, /ok: first prompt/), 15_000);
+
+  const firstSession = store.getSession(rootChannel.id);
+  assert.ok(firstSession?.codexThreadId);
+
+  await dispatch(bridge, createUserMessage(rootChannel, '[resume-stale] please recover this session'));
+  await waitFor(() => findSent(rootChannel, /ok: \[resume-stale\] please recover this session/), 15_000);
+
+  const secondSession = store.getSession(rootChannel.id);
+  assert.ok(secondSession?.codexThreadId);
+  assert.notEqual(secondSession?.codexThreadId, firstSession?.codexThreadId);
+  assert.ok(!rootChannel.sent.some((message) => /执行失败，exitCode=1 signal=null/.test(message.content)));
+  await cleanupDir(rootDir);
+});
+
 test('bridge downloads attachments and forwards image files to codex -i', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-attach-');
   const workspace = await createWorkspace(rootDir);
