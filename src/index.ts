@@ -6,6 +6,14 @@ import { DiscordCodexBridge } from './discordBot.js';
 import { JsonStateStore } from './store.js';
 import { AdminWebServer } from './webServer.js';
 
+process.on('unhandledRejection', (reason) => {
+  console.error('[process] unhandledRejection', reason);
+});
+
+process.on('uncaughtExceptionMonitor', (error) => {
+  console.error('[process] uncaughtException', error);
+});
+
 async function main(): Promise<void> {
   const config = loadConfig();
   const store = new JsonStateStore(path.join(config.dataDir, 'state.json'));

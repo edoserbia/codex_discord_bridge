@@ -22,7 +22,15 @@ export class AdminWebServer {
     }
 
     this.server = http.createServer((request, response) => {
-      void this.handleRequest(request, response);
+      void this.handleRequest(request, response).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`[web-server] unhandled request error: ${message}`);
+        if (!response.headersSent) {
+          this.sendText(response, 500, message);
+        } else {
+          response.end();
+        }
+      });
     });
 
     await new Promise<void>((resolve, reject) => {

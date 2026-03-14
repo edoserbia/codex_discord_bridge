@@ -112,7 +112,15 @@ export class DiscordCodexBridge {
     });
 
     this.client.on('messageCreate', (message) => {
-      void this.handleMessage(message);
+      void this.handleIncomingMessage(message);
+    });
+
+    this.client.on('error', (error) => {
+      this.logBridgeError('discord-client', error);
+    });
+
+    this.client.on('warn', (warning) => {
+      console.warn(`[discord-client] ${warning}`);
     });
   }
 
@@ -295,6 +303,15 @@ export class DiscordCodexBridge {
     return runtime;
   }
 
+  private async handleIncomingMessage(message: Message): Promise<void> {
+    try {
+      await this.handleMessage(message);
+    } catch (error) {
+      this.logBridgeError(`messageCreate channel=${message.channelId}`, error);
+      await this.safeMessageReply(message, `Bridge 内部错误：${this.formatErrorMessage(error)}`);
+    }
+  }
+
   private async handleMessage(message: Message): Promise<void> {
     if (message.author.bot || !message.guild || !isSendableChannel(message.channel)) {
       return;
@@ -324,6 +341,75 @@ export class DiscordCodexBridge {
     }
 
     await this.enqueuePrompt(message, resolved, prompt || '请分析我附带的附件内容。');
+  }
+
+  private async safeMessageReply(message: Message, content: string): Promise<void> {
+    await message.reply(content).catch((error) => {
+      this.logBridgeError(`reply message=${message.id}`, error);
+    });
+  }
+
+  private startProcessQueue(conversationId: string): void {
+    void this.processQueue(conversationId).catch(async (error) => {
+      await this.handleProcessQueueError(conversationId, error);
+    });
+  }
+
+  private async handleProcessQueueError(conversationId: string, error: unknown): Promise<void> {
+    this.logBridgeError(`processQueue conversation=${conversationId}`, error);
+
+    const runtime = this.getRuntime(conversationId);
+    const activeRun = runtime.activeRun;
+    if (!activeRun) {
+      return;
+    }
+
+    const errorMessage = this.formatErrorMessage(error);
+    this.touchActiveRun(activeRun);
+    activeRun.status = activeRun.status === 'cancelled' ? 'cancelled' : 'failed';
+    activeRun.latestActivity = `Bridge 内部错误：${errorMessage}`;
+    activeRun.stderr.push(`Bridge internal error: ${errorMessage}`);
+    activeRun.stderr = activeRun.stderr.slice(-20);
+    this.pushRunTimeline(runtime, `💥 Bridge 内部错误：${truncate(errorMessage, 120)}`);
+
+    const binding = this.store.getBinding(activeRun.task.bindingChannelId);
+    const session = this.store.getSession(conversationId);
+    const channel = await this.fetchChannel(conversationId);
+
+    if (binding && session && channel) {
+      await this.refreshRuntimeViews(channel, binding, session, runtime, conversationId !== activeRun.task.bindingChannelId);
+      await this.safeReplyToOriginalMessage(
+        channel,
+        activeRun.task.messageId,
+        `❌ **${binding.projectName}** · ${activeRun.task.requestedBy}\n\nBridge 内部错误，任务已中断。\n\n诊断信息：\n\`\`\`\n${truncate(errorMessage, 900)}\n\`\`\``,
+      );
+    }
+
+    runtime.activeRun = undefined;
+    this.activeJobs.delete(conversationId);
+    await removeAttachmentDir(activeRun.task.attachmentDir).catch(() => undefined);
+
+    if (binding && session && channel) {
+      const nextSession = this.store.getSession(conversationId) ?? session;
+      await this.refreshRuntimeViews(channel, binding, nextSession, runtime, conversationId !== activeRun.task.bindingChannelId);
+    }
+
+    if (runtime.queue.length > 0) {
+      this.startProcessQueue(conversationId);
+    }
+  }
+
+  private logBridgeError(context: string, error: unknown): void {
+    const message = this.formatErrorMessage(error);
+    console.error(`[bridge-error] ${context} ${message}`);
+
+    if (error instanceof Error && error.stack) {
+      console.error(error.stack);
+    }
+  }
+
+  private formatErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
   }
 
   private async handleCommand(message: Message, command: ParsedCommand): Promise<void> {
@@ -553,8 +639,7 @@ export class DiscordCodexBridge {
         await message.reply('已将你的新消息作为引导项插入当前工作，正在中断当前步骤，先处理中途引导，再继续原任务。');
 
         const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
-        await this.refreshStatusPanel(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
-        await this.refreshProgressMessage(resolved.channel, resolved.binding, runtime);
+        await this.refreshRuntimeViews(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
 
         if (!activeJob) {
           activeJob = await this.waitForActiveJob(resolved.conversationId);
@@ -567,7 +652,7 @@ export class DiscordCodexBridge {
           activeJob.cancel();
         } else {
           runtime.activeRun = undefined;
-          void this.processQueue(resolved.conversationId);
+          this.startProcessQueue(resolved.conversationId);
         }
         return;
       }
@@ -579,8 +664,8 @@ export class DiscordCodexBridge {
     }
 
     const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
-    await this.refreshStatusPanel(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
-    void this.processQueue(resolved.conversationId);
+    await this.safeRefreshStatusPanel(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
+    this.startProcessQueue(resolved.conversationId);
   }
 
   private async processQueue(conversationId: string): Promise<void> {
@@ -847,7 +932,7 @@ export class DiscordCodexBridge {
 
       await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       if (!suppressReply) {
-        await this.replyToOriginalMessage(
+        await this.safeReplyToOriginalMessage(
           channel,
           task.messageId,
           result.success
@@ -863,7 +948,7 @@ export class DiscordCodexBridge {
       await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
 
       if (runtime.queue.length > 0) {
-        void this.processQueue(conversationId);
+        this.startProcessQueue(conversationId);
       }
     }
   }
@@ -1165,6 +1250,15 @@ export class DiscordCodexBridge {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.warn(`[discord-view] failed to refresh status panel conversation=${runtime.conversationId} error=${message}`);
+    }
+  }
+
+  private async safeReplyToOriginalMessage(channel: SendableChannel, messageId: string, content: string): Promise<void> {
+    try {
+      await this.replyToOriginalMessage(channel, messageId, content);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[discord-view] failed to reply to original message id=${messageId} error=${message}`);
     }
   }
 

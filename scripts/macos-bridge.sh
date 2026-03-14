@@ -827,6 +827,10 @@ detect_installed_service_mode() {
   return 1
 }
 
+has_multiple_installed_service_modes() {
+  [[ -f "$(agent_plist_path)" && -f "$(daemon_plist_path)" ]]
+}
+
 service_is_bootstrapped() {
   local mode="$1"
   launchctl print "$(service_target_for_mode "${mode}")" >/dev/null 2>&1
@@ -1292,12 +1296,19 @@ run_start() {
 
   if [[ -n "${installed_mode}" ]]; then
     print_header "启动 $(service_mode_label "${installed_mode}")"
+    if has_multiple_installed_service_modes; then
+      print_warn '同时检测到 LaunchAgent 和 LaunchDaemon，属于冲突状态。建议卸载后仅保留一种模式。'
+    fi
     if [[ "${installed_mode}" == 'daemon' && "${EUID}" -ne 0 ]]; then
       rerun_with_sudo '启动开机启动 LaunchDaemon' start
     fi
 
     launchctl bootout "$(service_target_for_mode "${installed_mode}")" >/dev/null 2>&1 || true
-    launchctl bootstrap "$(service_domain_for_mode "${installed_mode}")" "$(service_plist_path_for_mode "${installed_mode}")"
+    if ! launchctl bootstrap "$(service_domain_for_mode "${installed_mode}")" "$(service_plist_path_for_mode "${installed_mode}")"; then
+      print_warn 'launchd 启动失败，回退到普通后台进程启动；本次运行不会具备 launchd 自动拉起能力。'
+      run_start_manual
+      return 0
+    fi
     launchctl kickstart -k "$(service_target_for_mode "${installed_mode}")" >/dev/null 2>&1 || true
     sleep 2
     run_status
@@ -1341,6 +1352,10 @@ run_service_status() {
 
   print_header 'launchd 服务状态'
   print_info "服务标签：${SERVICE_LABEL}"
+
+  if has_multiple_installed_service_modes; then
+    print_warn '同时安装了 LaunchDaemon 与 LaunchAgent；这会增加启动冲突风险。建议卸载后只保留一种。'
+  fi
 
   if [[ -f "$(daemon_plist_path)" ]]; then
     print_info "已安装：$(service_mode_label daemon)"
@@ -1394,6 +1409,10 @@ run_status() {
   if [[ -n "${installed_mode}" ]]; then
     print_info "自启动模式：$(service_mode_label "${installed_mode}")"
     print_info "服务标签：${SERVICE_LABEL}"
+  fi
+
+  if has_multiple_installed_service_modes; then
+    print_warn '当前同时安装了 LaunchDaemon 和 LaunchAgent；建议清理成单一模式。'
   fi
 }
 
