@@ -1,6 +1,6 @@
 {
   "name": "codex-discord-bridge",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "description": "Discord backend bridge for Codex CLI with per-channel project mapping, attachments, thread sessions, web admin, and live progress updates",
   "type": "module",

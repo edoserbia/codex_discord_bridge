@@ -2,7 +2,7 @@
 
 把本机 `codex` CLI 挂到 Discord 文本频道和线程上，让你可以在手机上像使用 Codex 客户端一样控制本地 Codex，并实时看到过程反馈、计划状态、命令输出和最终结果。
 
-> 当前版本：`0.3.2`
+> 当前版本：`0.3.3`
 >
 > 本项目采用 **PolyForm Noncommercial 1.0.0** 许可发布：允许个人和其他非商业用途免费使用、修改和再分发，但**不允许商业使用**。这属于 **source-available**，不是 OSI 定义的开源许可证。详见根目录 `LICENSE`。
 
@@ -19,6 +19,7 @@
 - **测试覆盖**：包含类型检查、单测、本地 smoke 和真实 Discord smoke
 - **异常退出自愈**：对 Codex CLI 偶发的无害异常退出（例如仅出现 `failed to clean up stale arg0 temp dirs` warning）自动重试一次，减少任务被误判失败
 - **脏会话自动切换**：若旧的 resume 会话本身已损坏，bridge 会自动丢弃旧 thread，并改用新会话重试一次
+- **三段式恢复**：若“新会话首轮失败 → 恢复到新 thread 仍失败”，bridge 会第三次自动回退到全新会话，并在最终失败时清空坏 thread，避免后续继续踩坑
 
 ## 工作模型
 
