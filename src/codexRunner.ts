@@ -50,6 +50,21 @@ export class CodexRunner {
     let stdoutChain = Promise.resolve();
     let stderrChain = Promise.resolve();
 
+    const appendDiagnosticLine = (line: string): void => {
+      const normalized = line.trim();
+
+      if (!normalized || stderr.at(-1) === normalized) {
+        return;
+      }
+
+      stderr.push(normalized);
+    };
+
+    const emitDiagnosticLine = async (line: string): Promise<void> => {
+      appendDiagnosticLine(line);
+      await hooks.onStderr?.(line);
+    };
+
     const stdoutInterface = readline.createInterface({ input: child.stdout });
     const stderrInterface = readline.createInterface({ input: child.stderr });
 
@@ -64,8 +79,7 @@ export class CodexRunner {
         try {
           event = JSON.parse(line) as Record<string, unknown>;
         } catch {
-          stderr.push(line);
-          await hooks.onStderr?.(line);
+          await emitDiagnosticLine(line);
           return;
         }
 
@@ -127,6 +141,29 @@ export class CodexRunner {
             turnCompleted = true;
             await hooks.onActivity?.('本轮已完成');
             break;
+          case 'error': {
+            const message = typeof event.message === 'string'
+              ? event.message
+              : typeof (event.error as Record<string, unknown> | null)?.message === 'string'
+                ? String((event.error as Record<string, unknown>).message)
+                : undefined;
+
+            if (message) {
+              await emitDiagnosticLine(`Codex error: ${message}`);
+            }
+            break;
+          }
+          case 'turn.failed': {
+            const error = (event.error ?? null) as Record<string, unknown> | null;
+            const message = typeof error?.message === 'string'
+              ? error.message
+              : typeof event.message === 'string'
+                ? event.message
+                : 'Codex turn failed.';
+
+            await emitDiagnosticLine(`Codex turn failed: ${message}`);
+            break;
+          }
           default:
             break;
         }
@@ -139,7 +176,7 @@ export class CodexRunner {
           return;
         }
 
-        stderr.push(line);
+        appendDiagnosticLine(line);
         await hooks.onStderr?.(line);
       });
     });
@@ -149,7 +186,7 @@ export class CodexRunner {
       child.stdin.end();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      stderr.push(message);
+      appendDiagnosticLine(message);
       stderrChain = stderrChain.then(async () => hooks.onStderr?.(message));
     }
 
@@ -168,12 +205,12 @@ export class CodexRunner {
           signal = outcome.signal as NodeJS.Signals | null;
         } else {
           const message = outcome.error instanceof Error ? outcome.error.message : String(outcome.error);
-          stderr.push(message);
+          appendDiagnosticLine(message);
           await hooks.onStderr?.(message);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        stderr.push(message);
+        appendDiagnosticLine(message);
         await hooks.onStderr?.(message);
       }
 
@@ -186,7 +223,7 @@ export class CodexRunner {
         const cancellationMessage = signal
           ? `Codex process interrupted by ${signal}.`
           : 'Codex process cancelled by bridge.';
-        stderr.push(cancellationMessage);
+        appendDiagnosticLine(cancellationMessage);
         await hooks.onStderr?.(cancellationMessage);
       }
 

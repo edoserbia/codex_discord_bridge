@@ -96,6 +96,9 @@ const scenario = (() => {
   if (prompt.includes('[slow]')) return 'slow';
   if (prompt.includes('[resume-stale]')) return 'resume-stale';
   if (prompt.includes('[fresh-then-resume-stale]')) return 'fresh-then-resume-stale';
+  if (prompt.includes('[json-transient]')) return 'json-transient';
+  if (prompt.includes('[json-stale-session]')) return 'json-stale-session';
+  if (prompt.includes('[zero-exit-no-turn]')) return 'zero-exit-no-turn';
   if (prompt.includes('[flaky-exit]')) return 'flaky-exit';
   if (prompt.includes('[fail]')) return 'fail';
   if (prompt.includes('[invalid-json]')) return 'invalid-json';
@@ -183,6 +186,39 @@ if (scenario === 'fresh-then-resume-stale') {
   if (count === 1 && args.mode === 'resume') {
     console.error('WARNING: failed to clean up stale arg0 temp dirs: Permission denied (os error 13)');
     process.exit(1);
+  }
+}
+
+if (scenario === 'json-transient') {
+  const markerPath = path.join(process.cwd(), '.fake-codex-json-transient');
+
+  try {
+    await fs.access(markerPath);
+    await fs.rm(markerPath, { force: true });
+  } catch {
+    await fs.writeFile(markerPath, prompt, 'utf8');
+    event({ type: 'error', message: 'Reconnecting... 1/5 (stream disconnected before completion: error sending request for url (https://example.invalid/v1/responses))' });
+    event({ type: 'error', message: 'Reconnecting... 2/5 (stream disconnected before completion: error sending request for url (https://example.invalid/v1/responses))' });
+    event({ type: 'turn.failed', error: { message: 'stream disconnected before completion: error sending request for url (https://example.invalid/v1/responses)' } });
+    process.exit(1);
+  }
+}
+
+if (scenario === 'json-stale-session' && args.mode === 'resume') {
+  event({ type: 'turn.failed', error: { message: 'conversation session not found for resume thread' } });
+  process.exit(1);
+}
+
+if (scenario === 'zero-exit-no-turn') {
+  const markerPath = path.join(process.cwd(), '.fake-codex-zero-exit-no-turn');
+
+  try {
+    await fs.access(markerPath);
+    await fs.rm(markerPath, { force: true });
+  } catch {
+    await fs.writeFile(markerPath, prompt, 'utf8');
+    console.error('WARNING: failed to clean up stale arg0 temp dirs: Permission denied (os error 13)');
+    process.exit(0);
   }
 }
 

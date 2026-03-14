@@ -82,6 +82,7 @@ export interface ActiveRunState {
   task: PromptTask;
   status: RunStatus;
   startedAt: string;
+  updatedAt: string;
   latestActivity: string;
   currentCommand?: string | undefined;
   lastCommandOutput?: string | undefined;
