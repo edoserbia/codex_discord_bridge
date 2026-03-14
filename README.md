@@ -2,7 +2,7 @@
 
 把本机 `codex` CLI 挂到 Discord 文本频道和线程上，让你可以在手机上像使用 Codex 客户端一样控制本地 Codex，并实时看到过程反馈、计划状态、命令输出和最终结果。
 
-> 当前版本：`0.3.0`
+> 当前版本：`0.3.1`
 >
 > 本项目采用 **PolyForm Noncommercial 1.0.0** 许可发布：允许个人和其他非商业用途免费使用、修改和再分发，但**不允许商业使用**。这属于 **source-available**，不是 OSI 定义的开源许可证。详见根目录 `LICENSE`。
 
@@ -17,6 +17,7 @@
 - **macOS 服务化部署**：支持 `launchd`，可安装为 `LaunchDaemon` 开机启动或 `LaunchAgent` 登录后启动
 - **本地高权限默认**：默认 `danger-full-access`，便于在 Discord 中直接读写项目文件
 - **测试覆盖**：包含类型检查、单测、本地 smoke 和真实 Discord smoke
+- **异常退出自愈**：对 Codex CLI 偶发的无害异常退出（例如仅出现 `failed to clean up stale arg0 temp dirs` warning）自动重试一次，减少任务被误判失败
 
 ## 工作模型
 
@@ -65,6 +66,8 @@ cd /path/to/codex-discord-bridge
 
 - `daemon`：开机启动，适合长期在线
 - `agent`：登录后启动，不需要 `sudo`
+
+当前脚本在同时存在 daemon/agent 安装痕迹时，会优先识别并操作 **LaunchAgent**，避免因历史残留的 daemon plist 误判当前运行状态。
 
 ## 常用命令
 

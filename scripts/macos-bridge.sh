@@ -814,13 +814,13 @@ service_target_for_mode() {
 }
 
 detect_installed_service_mode() {
-  if [[ -f "$(daemon_plist_path)" ]]; then
-    printf 'daemon'
+  if [[ -f "$(agent_plist_path)" ]]; then
+    printf 'agent'
     return 0
   fi
 
-  if [[ -f "$(agent_plist_path)" ]]; then
-    printf 'agent'
+  if [[ -f "$(daemon_plist_path)" ]]; then
+    printf 'daemon'
     return 0
   fi
 
@@ -1240,17 +1240,9 @@ run_service_run() {
 
   print_header '前台运行服务'
   cd "${ROOT_DIR}"
-  node dist/index.js &
-  local child_pid=$!
-  echo "${child_pid}" > "${PID_FILE}"
-  print_info "服务已进入前台运行，PID=${child_pid}"
-  trap 'kill -TERM "${child_pid}" >/dev/null 2>&1 || true' TERM INT
-  wait "${child_pid}"
-  local exit_code=$?
-  if [[ -f "${PID_FILE}" ]] && [[ "$(cat "${PID_FILE}" 2>/dev/null || true)" == "${child_pid}" ]]; then
-    rm -f "${PID_FILE}"
-  fi
-  return "${exit_code}"
+  echo "$$" > "${PID_FILE}"
+  print_info "服务已进入前台运行，PID=$$"
+  exec node dist/index.js
 }
 
 run_start_manual() {

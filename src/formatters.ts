@@ -1,5 +1,6 @@
 import type { ActiveRunState, ChannelBinding, ChannelRuntime, CodexRunResult, ConversationSessionState, DashboardBinding, PlanItem, PromptTask } from './types.js';
 
+import { filterDiagnosticStderr } from './codexDiagnostics.js';
 import { sanitizeInlineCode, shortId, tailLines, truncate } from './utils.js';
 
 function formatActiveStatus(runtime: ChannelRuntime): string {
@@ -260,7 +261,12 @@ export function formatSuccessReply(binding: ChannelBinding, requestedBy: string,
 }
 
 export function formatFailureReply(binding: ChannelBinding, requestedBy: string, result: CodexRunResult): string {
-  const stderrTail = result.stderr.length > 0 ? tailLines(result.stderr.join('\n'), 10) : '没有捕获到 stderr。';
+  const diagnosticStderr = filterDiagnosticStderr(result.stderr);
+  const stderrTail = diagnosticStderr.length > 0
+    ? tailLines(diagnosticStderr.join('\n'), 10)
+    : result.stderr.length > 0
+      ? '没有捕获到可诊断 stderr；已过滤已知无害 warning。'
+      : '没有捕获到 stderr。';
   const lastAgentMessage = result.agentMessages.at(-1);
   const lines = [
     `❌ **${binding.projectName}** · ${requestedBy}`,
