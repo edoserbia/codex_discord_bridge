@@ -163,6 +163,32 @@ test('bridge posts live progress with reasoning summary and plan updates', { con
   await cleanupDir(rootDir);
 });
 
+test('bridge survives Discord send failures without crashing the process', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-discord-socket-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-discord-socket', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+
+  const originalSend = rootChannel.send.bind(rootChannel);
+  (rootChannel as any).send = async () => {
+    throw new Error('simulated discord socket closed');
+  };
+
+  try {
+    const message = createUserMessage(rootChannel, 'run despite discord send failure');
+    (bridge as any).client.emit('messageCreate', message);
+
+    await waitFor(() => Boolean(store.getSession(rootChannel.id)?.codexThreadId), 15_000);
+    await waitFor(() => !(bridge as any).getDashboardData().some((entry: any) => entry.conversations.some((conversation: any) => conversation.status === 'running' || conversation.status === 'starting')), 15_000);
+  } finally {
+    (rootChannel as any).send = originalSend;
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge retries flaky codex exec exits and does not surface ignorable warning noise', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-retry-');
   const workspace = await createWorkspace(rootDir);
