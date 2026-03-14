@@ -22,11 +22,11 @@ import type {
 } from './types.js';
 
 import { buildPromptWithAttachments, downloadAttachments, extractMessageAttachments, removeAttachmentDir } from './attachments.js';
-import { filterDiagnosticStderr, isIgnorableCodexStderrLine, shouldRetryUnexpectedCodexExit } from './codexDiagnostics.js';
+import { diagnoseCodexFailure, filterDiagnosticStderr, isIgnorableCodexStderrLine } from './codexDiagnostics.js';
 import { isCommandMessage, parseCommand } from './commandParser.js';
 import { formatFailureReply, formatHelp, formatProgressMessage, formatProjects, formatQueue, formatStatus, formatSuccessReply } from './formatters.js';
 import { JsonStateStore } from './store.js';
-import { cloneCodexOptions, isWithinAllowedRoots, normalizeAllowedRoots, resolveExistingDirectory, splitIntoDiscordChunks, summarizeReasoningText, truncate } from './utils.js';
+import { cloneCodexOptions, formatClockTimestamp, isWithinAllowedRoots, normalizeAllowedRoots, resolveExistingDirectory, splitIntoDiscordChunks, summarizeReasoningText, truncate } from './utils.js';
 
 type SendableChannel = {
   id: string;
@@ -48,6 +48,15 @@ interface ResolvedConversation {
 }
 
 const MAX_CODEX_ATTEMPTS = 3;
+const MIN_RUNTIME_VIEW_REFRESH_INTERVAL_MS = 1_200;
+
+interface PendingRuntimeViewRefresh {
+  channel: SendableChannel;
+  binding: ChannelBinding;
+  session: ConversationSessionState;
+  runtime: ChannelRuntime;
+  isThreadConversation: boolean;
+}
 
 function hasBindingExecutionChanged(previous: ChannelBinding | undefined, next: ChannelBinding): boolean {
   if (!previous) {
@@ -89,6 +98,9 @@ export class DiscordCodexBridge {
 
   private readonly runtimes = new Map<string, ChannelRuntime>();
   private readonly activeJobs = new Map<string, RunningCodexJob>();
+  private readonly runtimeViewFlushes = new Map<string, Promise<void>>();
+  private readonly pendingRuntimeViewRefreshes = new Map<string, PendingRuntimeViewRefresh>();
+  private readonly lastRuntimeViewRefreshAt = new Map<string, number>();
 
   constructor(
     private readonly config: AppConfig,
@@ -595,6 +607,7 @@ export class DiscordCodexBridge {
       task,
       status: 'starting',
       startedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       latestActivity: '准备启动 Codex',
       agentMessages: [],
       reasoningSummaries: [],
@@ -637,6 +650,7 @@ export class DiscordCodexBridge {
           return;
         }
 
+        this.touchActiveRun(runtime.activeRun);
         runtime.activeRun.codexThreadId = codexThreadId;
         this.pushRunTimeline(runtime, `🧵 Codex 会话已建立：${codexThreadId.slice(0, 8)}`);
         const nextSession = await this.store.updateSession(conversationId, { codexThreadId }, task.bindingChannelId);
@@ -647,6 +661,7 @@ export class DiscordCodexBridge {
           return;
         }
 
+        this.touchActiveRun(runtime.activeRun);
         runtime.activeRun.status = runtime.activeRun.status === 'cancelled' ? 'cancelled' : 'running';
         runtime.activeRun.latestActivity = activity;
         this.pushRunTimeline(runtime, `🔄 ${activity}`);
@@ -658,6 +673,7 @@ export class DiscordCodexBridge {
           return;
         }
 
+        this.touchActiveRun(runtime.activeRun);
         const summary = summarizeReasoningText(reasoning, 180);
         if (summary) {
           runtime.activeRun.reasoningSummaries.push(summary);
@@ -674,6 +690,7 @@ export class DiscordCodexBridge {
           return;
         }
 
+        this.touchActiveRun(runtime.activeRun);
         runtime.activeRun.planItems = items;
         const completed = items.filter((item) => item.completed).length;
         runtime.activeRun.latestActivity = `计划进度 ${completed}/${items.length}`;
@@ -686,6 +703,7 @@ export class DiscordCodexBridge {
           return;
         }
 
+        this.touchActiveRun(runtime.activeRun);
         runtime.activeRun.agentMessages.push(agentMessage);
         runtime.activeRun.latestActivity = agentMessage;
         this.pushRunTimeline(runtime, `💬 ${truncate(agentMessage, 140)}`);
@@ -697,6 +715,7 @@ export class DiscordCodexBridge {
           return;
         }
 
+        this.touchActiveRun(runtime.activeRun);
         runtime.activeRun.status = runtime.activeRun.status === 'cancelled' ? 'cancelled' : 'running';
         runtime.activeRun.currentCommand = command;
         runtime.activeRun.latestActivity = '正在执行命令';
@@ -709,6 +728,7 @@ export class DiscordCodexBridge {
           return;
         }
 
+        this.touchActiveRun(runtime.activeRun);
         runtime.activeRun.currentCommand = command;
         runtime.activeRun.lastCommandOutput = output;
         runtime.activeRun.latestActivity = exitCode === 0 ? '命令执行完成' : '命令执行失败';
@@ -725,6 +745,7 @@ export class DiscordCodexBridge {
           return;
         }
 
+        this.touchActiveRun(runtime.activeRun);
         runtime.activeRun.stderr.push(line);
         runtime.activeRun.stderr = runtime.activeRun.stderr.slice(-20);
         runtime.activeRun.latestActivity = line;
@@ -735,6 +756,7 @@ export class DiscordCodexBridge {
     };
     let result: CodexRunResult;
     let attemptsUsed = 0;
+    let pendingRetryKind: ReturnType<typeof diagnoseCodexFailure>['kind'] | undefined;
 
     try {
       while (true) {
@@ -742,11 +764,13 @@ export class DiscordCodexBridge {
         const attemptSession = this.store.getSession(conversationId) ?? currentSession;
         const existingThreadId = attemptSession.codexThreadId;
 
-        if (attemptsUsed > 1 && runtime.activeRun) {
+        if (attemptsUsed > 1 && runtime.activeRun && pendingRetryKind) {
+          const retryDescription = this.describeRetry(pendingRetryKind, attemptsUsed - 1);
+          this.touchActiveRun(runtime.activeRun);
           runtime.activeRun.status = 'starting';
-          runtime.activeRun.latestActivity = 'Codex 异常退出，bridge 正在自动重试一次';
+          runtime.activeRun.latestActivity = retryDescription.latestActivity;
           runtime.activeRun.currentCommand = undefined;
-          this.pushRunTimeline(runtime, '🔁 Codex 异常退出，bridge 正在自动重试一次');
+          this.pushRunTimeline(runtime, retryDescription.timeline);
         }
 
         const job = this.runner.start(binding, runInput, existingThreadId, hooks);
@@ -758,28 +782,23 @@ export class DiscordCodexBridge {
 
         result = await job.done;
         const cancellationReason = runtime.activeRun?.cancellationReason;
-        const retryable = shouldRetryUnexpectedCodexExit(result, cancellationReason);
+        const failureDiagnosis = diagnoseCodexFailure(result, cancellationReason);
 
-        this.logCodexAttemptExit(binding, task, conversationId, attemptsUsed, result, retryable);
+        this.logCodexAttemptExit(binding, task, conversationId, attemptsUsed, result, failureDiagnosis.retryable, failureDiagnosis.kind);
 
-        if (retryable && attemptsUsed < MAX_CODEX_ATTEMPTS) {
+        if (failureDiagnosis.retryable && attemptsUsed < MAX_CODEX_ATTEMPTS) {
+          pendingRetryKind = failureDiagnosis.kind;
           let nextSession = this.store.getSession(conversationId) ?? attemptSession;
-          const shouldResetThreadBeforeRetry = Boolean(existingThreadId) || attemptsUsed >= 2;
+          const retryDescription = this.describeRetry(failureDiagnosis.kind, attemptsUsed);
+          const shouldResetThreadBeforeRetry = retryDescription.resetThreadBeforeRetry;
 
           if (shouldResetThreadBeforeRetry) {
             if (runtime.activeRun) {
+              this.touchActiveRun(runtime.activeRun);
               runtime.activeRun.codexThreadId = undefined;
               runtime.activeRun.usedResume = false;
               runtime.activeRun.currentCommand = undefined;
-              runtime.activeRun.latestActivity = existingThreadId
-                ? '检测到旧 Codex 会话可能损坏，bridge 正在丢弃旧会话并重试一次'
-                : 'Codex 新会话恢复失败，bridge 正在放弃当前 thread 并改用全新会话重试';
-              this.pushRunTimeline(
-                runtime,
-                existingThreadId
-                  ? '🧹 检测到旧 Codex 会话可能损坏，bridge 正在丢弃旧会话并重试一次'
-                  : '🧹 Codex 新会话恢复失败，bridge 正在放弃当前 thread 并改用全新会话重试',
-              );
+              runtime.activeRun.latestActivity = retryDescription.latestActivity;
             }
 
             nextSession = await this.store.updateSession(conversationId, { codexThreadId: undefined }, task.bindingChannelId);
@@ -793,14 +812,16 @@ export class DiscordCodexBridge {
       }
 
       const cancellationReason = runtime.activeRun?.cancellationReason;
+      const failureDiagnosis = diagnoseCodexFailure(result, cancellationReason);
       const suppressReply = !result.success && (cancellationReason === 'guidance' || cancellationReason === 'binding_reset' || cancellationReason === 'unbind');
       let nextSession = this.store.getSession(conversationId) ?? currentSession;
 
-      if (!result.success && shouldRetryUnexpectedCodexExit(result, cancellationReason)) {
+      if (!result.success && failureDiagnosis.retryable) {
         nextSession = await this.store.updateSession(conversationId, { codexThreadId: undefined }, task.bindingChannelId);
       }
 
       if (runtime.activeRun) {
+        this.touchActiveRun(runtime.activeRun);
         runtime.activeRun.exitCode = result.exitCode;
         runtime.activeRun.signal = result.signal;
         runtime.activeRun.codexThreadId = result.codexThreadId;
@@ -813,7 +834,7 @@ export class DiscordCodexBridge {
           ? '本轮执行完成'
           : cancellationReason === 'guidance'
             ? '已按新的引导继续原任务'
-            : '本轮执行失败';
+            : failureDiagnosis.diagnosticLines.at(-1) ?? '本轮执行失败';
         this.pushRunTimeline(
           runtime,
           result.success
@@ -910,14 +931,65 @@ export class DiscordCodexBridge {
       return;
     }
 
+    this.touchActiveRun(runtime.activeRun);
     const timeline = runtime.activeRun.timeline;
-    if (timeline.at(-1) === normalized) {
+    const stamped = `${formatClockTimestamp(runtime.activeRun.updatedAt)} ${normalized}`;
+
+    if (timeline.at(-1) === stamped) {
       return;
     }
 
-    timeline.push(normalized);
+    timeline.push(stamped);
     if (timeline.length > 12) {
       timeline.splice(0, timeline.length - 12);
+    }
+  }
+
+  private touchActiveRun(activeRun: ActiveRunState | undefined): void {
+    if (!activeRun) {
+      return;
+    }
+
+    activeRun.updatedAt = new Date().toISOString();
+  }
+
+  private describeRetry(kind: ReturnType<typeof diagnoseCodexFailure>['kind'], attempt: number): {
+    latestActivity: string;
+    timeline: string;
+    resetThreadBeforeRetry: boolean;
+  } {
+    switch (kind) {
+      case 'stale-session':
+        return {
+          latestActivity: '检测到 Codex 会话可能损坏，bridge 正在丢弃当前会话并重试',
+          timeline: '🧹 检测到 Codex 会话可能损坏，bridge 正在丢弃当前会话并重试',
+          resetThreadBeforeRetry: true,
+        };
+      case 'transient':
+        return attempt >= 2
+          ? {
+              latestActivity: 'Codex 连接连续中断，bridge 正在放弃当前会话并改用全新会话重试',
+              timeline: '🧹 Codex 连接连续中断，bridge 正在放弃当前会话并改用全新会话重试',
+              resetThreadBeforeRetry: true,
+            }
+          : {
+              latestActivity: 'Codex 连接中断，bridge 正在继续当前会话并自动重试',
+              timeline: '🔁 Codex 连接中断，bridge 正在继续当前会话并自动重试',
+              resetThreadBeforeRetry: false,
+            };
+      case 'unexpected-empty-exit':
+      default:
+        return attempt >= 2
+          ? {
+              latestActivity: 'Codex 异常退出且未完成当前轮次，bridge 正在改用全新会话重试',
+              timeline: '🧹 Codex 异常退出且未完成当前轮次，bridge 正在改用全新会话重试',
+              resetThreadBeforeRetry: true,
+            }
+          : {
+              latestActivity: 'Codex 异常退出，bridge 正在自动重试一次',
+              timeline: '🔁 Codex 异常退出，bridge 正在自动重试一次',
+              resetThreadBeforeRetry: false,
+            };
     }
   }
 
@@ -950,6 +1022,7 @@ export class DiscordCodexBridge {
     attempt: number,
     result: CodexRunResult,
     retryable: boolean,
+    retryKind: ReturnType<typeof diagnoseCodexFailure>['kind'],
   ): void {
     const diagnosticStderr = filterDiagnosticStderr(result.stderr);
     const ignoredStderrCount = result.stderr.length - diagnosticStderr.length;
@@ -970,6 +1043,7 @@ export class DiscordCodexBridge {
         `turnCompleted=${result.turnCompleted}`,
         `success=${result.success}`,
         `retryable=${retryable}`,
+        `retryKind=${retryKind}`,
         `ignoredStderr=${ignoredStderrCount}`,
         `stderr=${stderrSummary}`,
       ].join(' '),
@@ -1016,8 +1090,82 @@ export class DiscordCodexBridge {
     runtime: ChannelRuntime,
     isThreadConversation: boolean,
   ): Promise<void> {
-    await this.refreshStatusPanel(channel, binding, session, runtime, isThreadConversation);
-    await this.refreshProgressMessage(channel, binding, runtime);
+    const conversationId = runtime.conversationId;
+    this.pendingRuntimeViewRefreshes.set(conversationId, {
+      channel,
+      binding,
+      session,
+      runtime,
+      isThreadConversation,
+    });
+
+    const existingFlush = this.runtimeViewFlushes.get(conversationId);
+    if (existingFlush) {
+      await existingFlush;
+      return;
+    }
+
+    const flush = this.flushRuntimeViews(conversationId);
+    this.runtimeViewFlushes.set(conversationId, flush);
+    await flush;
+  }
+
+  private async flushRuntimeViews(conversationId: string): Promise<void> {
+    try {
+      while (true) {
+        const pending = this.pendingRuntimeViewRefreshes.get(conversationId);
+        if (!pending) {
+          return;
+        }
+
+        const lastRefreshedAt = this.lastRuntimeViewRefreshAt.get(conversationId) ?? 0;
+        const waitMs = Math.max(0, MIN_RUNTIME_VIEW_REFRESH_INTERVAL_MS - (Date.now() - lastRefreshedAt));
+        if (waitMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, waitMs));
+        }
+
+        const latest = this.pendingRuntimeViewRefreshes.get(conversationId);
+        if (!latest) {
+          continue;
+        }
+
+        this.pendingRuntimeViewRefreshes.delete(conversationId);
+        this.touchActiveRun(latest.runtime.activeRun);
+        await this.safeRefreshStatusPanel(latest.channel, latest.binding, latest.session, latest.runtime, latest.isThreadConversation);
+        await this.safeRefreshProgressMessage(latest.channel, latest.binding, latest.runtime);
+        this.lastRuntimeViewRefreshAt.set(conversationId, Date.now());
+      }
+    } finally {
+      this.runtimeViewFlushes.delete(conversationId);
+    }
+  }
+
+  private async safeRefreshProgressMessage(
+    channel: SendableChannel,
+    binding: ChannelBinding,
+    runtime: ChannelRuntime,
+  ): Promise<void> {
+    try {
+      await this.refreshProgressMessage(channel, binding, runtime);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[discord-view] failed to refresh progress message conversation=${runtime.conversationId} error=${message}`);
+    }
+  }
+
+  private async safeRefreshStatusPanel(
+    channel: SendableChannel,
+    binding: ChannelBinding,
+    session: ConversationSessionState,
+    runtime: ChannelRuntime,
+    isThreadConversation: boolean,
+  ): Promise<void> {
+    try {
+      await this.refreshStatusPanel(channel, binding, session, runtime, isThreadConversation);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[discord-view] failed to refresh status panel conversation=${runtime.conversationId} error=${message}`);
+    }
   }
 
   private async refreshProgressMessage(

@@ -1,7 +1,7 @@
 import type { ActiveRunState, ChannelBinding, ChannelRuntime, CodexRunResult, ConversationSessionState, DashboardBinding, PlanItem, PromptTask } from './types.js';
 
 import { filterDiagnosticStderr } from './codexDiagnostics.js';
-import { sanitizeInlineCode, shortId, tailLines, truncate } from './utils.js';
+import { formatClockTimestamp, sanitizeInlineCode, shortId, tailLines, truncate } from './utils.js';
 
 function formatActiveStatus(runtime: ChannelRuntime): string {
   if (runtime.activeRun) {
@@ -149,13 +149,14 @@ export function formatStatus(
   }
 
   if (runtime.activeRun) {
+    lines.push(`最近更新：${formatClockTimestamp(runtime.activeRun.updatedAt)}`);
     lines.push(`请求人：${runtime.activeRun.task.requestedBy}`);
     if (shouldRenderTaskContext(runtime.activeRun)) {
       appendTaskContextLines(lines, runtime.activeRun.task, '当前请求', 180);
     } else {
       lines.push('当前请求：已接收，正在建立 Codex 会话');
     }
-    lines.push(`活动：${truncate(runtime.activeRun.latestActivity, 180)}`);
+    lines.push(`活动：${formatClockTimestamp(runtime.activeRun.updatedAt)} ${truncate(runtime.activeRun.latestActivity, 180)}`);
 
     if (runtime.activeRun.task.attachments.length > 0) {
       lines.push(`附件：${runtime.activeRun.task.attachments.length} 个`);
@@ -182,7 +183,7 @@ export function formatStatus(
     }
 
     if (runtime.activeRun.stderr.length > 0) {
-      lines.push('stderr：');
+      lines.push('诊断信息：');
       lines.push('```');
       lines.push(truncate(tailLines(runtime.activeRun.stderr.join('\n'), 4), 320));
       lines.push('```');
@@ -207,7 +208,8 @@ export function formatProgressMessage(binding: ChannelBinding, runtime: ChannelR
     `项目：**${binding.projectName}**`,
     `请求人：${activeRun.task.requestedBy}`,
     `状态：${formatActiveStatus(runtime)}`,
-    `最新活动：${truncate(activeRun.latestActivity, 180)}`,
+    `最近更新：${formatClockTimestamp(activeRun.updatedAt)}`,
+    `最新活动：${formatClockTimestamp(activeRun.updatedAt)} ${truncate(activeRun.latestActivity, 180)}`,
   ];
 
   if (shouldRenderTaskContext(activeRun)) {
@@ -239,7 +241,7 @@ export function formatProgressMessage(binding: ChannelBinding, runtime: ChannelR
   }
 
   if (activeRun.stderr.length > 0) {
-    lines.push('最新 stderr：');
+    lines.push('最新诊断：');
     lines.push('```');
     lines.push(truncate(tailLines(activeRun.stderr.join('\n'), 5), 360));
     lines.push('```');
@@ -265,8 +267,8 @@ export function formatFailureReply(binding: ChannelBinding, requestedBy: string,
   const stderrTail = diagnosticStderr.length > 0
     ? tailLines(diagnosticStderr.join('\n'), 10)
     : result.stderr.length > 0
-      ? '没有捕获到可诊断 stderr；已过滤已知无害 warning。'
-      : '没有捕获到 stderr。';
+      ? '没有捕获到可诊断信息；已过滤已知无害 warning。'
+      : '没有捕获到诊断信息。';
   const lastAgentMessage = result.agentMessages.at(-1);
   const lines = [
     `❌ **${binding.projectName}** · ${requestedBy}`,
@@ -277,7 +279,7 @@ export function formatFailureReply(binding: ChannelBinding, requestedBy: string,
     lines.push('', `最后一条模型消息：${truncate(lastAgentMessage, 400)}`);
   }
 
-  lines.push('', 'stderr：', '```', truncate(stderrTail, 900), '```', '', '如果是会话损坏，可发送 `!reset` 后重试。');
+  lines.push('', '诊断信息：', '```', truncate(stderrTail, 900), '```', '', '如果是会话损坏，可发送 `!reset` 后重试。');
   return lines.join('\n');
 }
 

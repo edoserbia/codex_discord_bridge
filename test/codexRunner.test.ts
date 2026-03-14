@@ -241,6 +241,20 @@ test('runner propagates stderr and failures', async () => {
   await cleanupDir(rootDir);
 });
 
+test('runner surfaces structured Codex failure events as diagnostics', async () => {
+  const rootDir = await makeTempDir('codex-runner-json-fail-');
+  const workspace = await createWorkspace(rootDir);
+  const runner = new CodexRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+
+  const result = await runner.start(binding, { prompt: '[json-transient] run', imagePaths: [], extraAddDirs: [] }, undefined).done;
+
+  assert.equal(result.success, false);
+  assert.equal(result.exitCode, 1);
+  assert.match(result.stderr.join('\n'), /Codex turn failed: stream disconnected before completion/);
+  await cleanupDir(rootDir);
+});
+
 test('runner survives command-not-found startup errors', async () => {
   const rootDir = await makeTempDir('codex-runner-spawn-');
   const workspace = await createWorkspace(rootDir);

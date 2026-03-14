@@ -21,6 +21,13 @@ export function tailLines(value: string, maxLines: number): string {
   return lines.slice(-maxLines).join('\n');
 }
 
+export function formatClockTimestamp(value: string | number | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `[${hours}:${minutes}]`;
+}
+
 export function splitIntoDiscordChunks(value: string, maxLength = 1900): string[] {
   const normalized = value.replace(/\r\n/g, '\n');
 
