@@ -201,6 +201,23 @@ test('bridge drops a stale resumed Codex session and retries with a fresh sessio
   await cleanupDir(rootDir);
 });
 
+test('bridge falls back to a fresh session after both fresh-start and resumed retry fail', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-fresh-resume-stale-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-fresh-resume-stale', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannel, '[fresh-then-resume-stale] please recover this session'));
+  await waitFor(() => findSent(rootChannel, /ok: \[fresh-then-resume-stale\] please recover this session/), 15_000);
+
+  const session = store.getSession(rootChannel.id);
+  assert.ok(session?.codexThreadId);
+  assert.ok(!rootChannel.sent.some((message) => /执行失败，exitCode=1 signal=null/.test(message.content)));
+  await cleanupDir(rootDir);
+});
+
 test('bridge downloads attachments and forwards image files to codex -i', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-attach-');
   const workspace = await createWorkspace(rootDir);

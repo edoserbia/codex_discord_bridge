@@ -47,7 +47,7 @@ interface ResolvedConversation {
   channel: SendableChannel;
 }
 
-const MAX_CODEX_ATTEMPTS = 2;
+const MAX_CODEX_ATTEMPTS = 3;
 
 function hasBindingExecutionChanged(previous: ChannelBinding | undefined, next: ChannelBinding): boolean {
   if (!previous) {
@@ -764,14 +764,22 @@ export class DiscordCodexBridge {
 
         if (retryable && attemptsUsed < MAX_CODEX_ATTEMPTS) {
           let nextSession = this.store.getSession(conversationId) ?? attemptSession;
+          const shouldResetThreadBeforeRetry = Boolean(existingThreadId) || attemptsUsed >= 2;
 
-          if (existingThreadId) {
+          if (shouldResetThreadBeforeRetry) {
             if (runtime.activeRun) {
               runtime.activeRun.codexThreadId = undefined;
               runtime.activeRun.usedResume = false;
-              runtime.activeRun.latestActivity = '检测到旧 Codex 会话可能损坏，bridge 正在丢弃旧会话并重试一次';
               runtime.activeRun.currentCommand = undefined;
-              this.pushRunTimeline(runtime, '🧹 检测到旧 Codex 会话可能损坏，bridge 正在丢弃旧会话并重试一次');
+              runtime.activeRun.latestActivity = existingThreadId
+                ? '检测到旧 Codex 会话可能损坏，bridge 正在丢弃旧会话并重试一次'
+                : 'Codex 新会话恢复失败，bridge 正在放弃当前 thread 并改用全新会话重试';
+              this.pushRunTimeline(
+                runtime,
+                existingThreadId
+                  ? '🧹 检测到旧 Codex 会话可能损坏，bridge 正在丢弃旧会话并重试一次'
+                  : '🧹 Codex 新会话恢复失败，bridge 正在放弃当前 thread 并改用全新会话重试',
+              );
             }
 
             nextSession = await this.store.updateSession(conversationId, { codexThreadId: undefined }, task.bindingChannelId);
@@ -786,7 +794,11 @@ export class DiscordCodexBridge {
 
       const cancellationReason = runtime.activeRun?.cancellationReason;
       const suppressReply = !result.success && (cancellationReason === 'guidance' || cancellationReason === 'binding_reset' || cancellationReason === 'unbind');
-      const nextSession = this.store.getSession(conversationId) ?? currentSession;
+      let nextSession = this.store.getSession(conversationId) ?? currentSession;
+
+      if (!result.success && shouldRetryUnexpectedCodexExit(result, cancellationReason)) {
+        nextSession = await this.store.updateSession(conversationId, { codexThreadId: undefined }, task.bindingChannelId);
+      }
 
       if (runtime.activeRun) {
         runtime.activeRun.exitCode = result.exitCode;

@@ -95,6 +95,7 @@ const scenario = (() => {
   if (prompt.includes('[cancel]')) return 'cancel';
   if (prompt.includes('[slow]')) return 'slow';
   if (prompt.includes('[resume-stale]')) return 'resume-stale';
+  if (prompt.includes('[fresh-then-resume-stale]')) return 'fresh-then-resume-stale';
   if (prompt.includes('[flaky-exit]')) return 'flaky-exit';
   if (prompt.includes('[fail]')) return 'fail';
   if (prompt.includes('[invalid-json]')) return 'invalid-json';
@@ -164,6 +165,25 @@ if (scenario === 'flaky-exit') {
 if (scenario === 'resume-stale' && args.mode === 'resume') {
   console.error('WARNING: failed to clean up stale arg0 temp dirs: Permission denied (os error 13)');
   process.exit(1);
+}
+
+if (scenario === 'fresh-then-resume-stale') {
+  const markerPath = path.join(process.cwd(), '.fake-codex-fresh-then-resume-stale');
+  let count = 0;
+  try {
+    count = Number(await fs.readFile(markerPath, 'utf8')) || 0;
+  } catch {}
+  await fs.writeFile(markerPath, String(count + 1), 'utf8');
+
+  if (count === 0 && args.mode === 'exec') {
+    console.error('WARNING: failed to clean up stale arg0 temp dirs: Permission denied (os error 13)');
+    process.exit(1);
+  }
+
+  if (count === 1 && args.mode === 'resume') {
+    console.error('WARNING: failed to clean up stale arg0 temp dirs: Permission denied (os error 13)');
+    process.exit(1);
+  }
 }
 
 if (scenario === 'plan') {

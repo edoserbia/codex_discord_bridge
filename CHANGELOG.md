@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## v0.3.3 - 2026-03-14
+
+### 变更概览
+- 修复 `patent_platform` 这类场景中：即使 `!reset` 后，新会话首轮仍异常退出，第二次恢复到新 thread 也再次失败的问题。
+- 将 bridge 的异常恢复从两段扩展为三段：**正常尝试 → 恢复 thread 重试 → 放弃当前 thread 改为全新会话重试**。
+- 对最终仍失败但属于可重试型异常退出的场景，自动清空 session 中残留的坏 `codexThreadId`，避免下条消息继续复用坏会话。
+- 新增 E2E 回归测试覆盖“fresh fail → resumed fail → fresh success”链路。
+
+### 版本差异表
+
+| 改动项 | 旧版本行为 | 新版本行为 | 改动原因 |
+| --- | --- | --- | --- |
+| 新会话恢复失败场景 | 第一次 fresh 失败、第二次 resume 新 thread 再失败后直接终止 | 第三次自动丢弃当前 thread，改用全新会话再次尝试 | 修复 `!reset` 后仍可能失败的问题 |
+| 最终失败后的 session 清理 | 失败后可能仍把坏 `codexThreadId` 留在 session 里 | 对可重试型最终失败自动清空坏 thread | 避免后续消息继续踩坏会话 |
+| 恢复策略覆盖 | 只覆盖“旧 resume 会话损坏” | 额外覆盖“fresh fail + resumed fail + fresh recover” | 贴近 `patent_platform` 的真实故障链路 |
+
 ## v0.3.2 - 2026-03-14
 
 ### 变更概览
