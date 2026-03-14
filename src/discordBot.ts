@@ -763,7 +763,20 @@ export class DiscordCodexBridge {
         this.logCodexAttemptExit(binding, task, conversationId, attemptsUsed, result, retryable);
 
         if (retryable && attemptsUsed < MAX_CODEX_ATTEMPTS) {
-          const nextSession = this.store.getSession(conversationId) ?? attemptSession;
+          let nextSession = this.store.getSession(conversationId) ?? attemptSession;
+
+          if (existingThreadId) {
+            if (runtime.activeRun) {
+              runtime.activeRun.codexThreadId = undefined;
+              runtime.activeRun.usedResume = false;
+              runtime.activeRun.latestActivity = '检测到旧 Codex 会话可能损坏，bridge 正在丢弃旧会话并重试一次';
+              runtime.activeRun.currentCommand = undefined;
+              this.pushRunTimeline(runtime, '🧹 检测到旧 Codex 会话可能损坏，bridge 正在丢弃旧会话并重试一次');
+            }
+
+            nextSession = await this.store.updateSession(conversationId, { codexThreadId: undefined }, task.bindingChannelId);
+          }
+
           await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
           continue;
         }
