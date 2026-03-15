@@ -99,6 +99,12 @@ sudo ./scripts/install-service.sh --mode daemon
 
 ```text
 !help
+!autopilot
+!autopilot status
+!autopilot server on
+!autopilot project on
+!autopilot project interval 30m
+!autopilot project status
 !status
 !queue
 !guide <追加指令>
@@ -110,12 +116,37 @@ sudo ./scripts/install-service.sh --mode daemon
 
 `!guide` 的语义是“插入中途引导，再继续原任务”，不是直接丢弃当前复杂任务。
 
-## 7. 附件与图片
+## 7. 最快开启 Autopilot
+
+绑定成功后，发送：
+
+```text
+!autopilot server on
+!autopilot project on
+!autopilot project interval 30m
+```
+
+然后去自动创建的 `Autopilot` 线程里直接发自然语言方向，例如：
+
+```text
+优先补测试和稳定性，不要做大功能
+```
+
+查看状态：
+
+```text
+!autopilot status
+!autopilot project status
+```
+
+完整说明见 `docs/AUTOPILOT.md`。
+
+## 8. 附件与图片
 
 - 图片附件会自动透传给 `codex -i`
 - 普通文件会下载到 `data/attachments/...` 后再提示 Codex 读取
 
-## 8. 常见问题
+## 9. 常见问题
 
 ### `!bind` 在线程里无效
 

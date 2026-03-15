@@ -183,6 +183,10 @@ test('autopilot help is available in unbound channels and server commands apply 
   await dispatch(bridge, createUserMessage(controlChannel, '!autopilot'));
   assert.ok(controlChannel.sent.some((message) => /Autopilot 使用说明/.test(message.content)));
 
+  await dispatch(bridge, createUserMessage(controlChannel, '!autopilot status'));
+  assert.ok(controlChannel.sent.some((message) => /Autopilot 服务级状态/.test(message.content)));
+  assert.ok(controlChannel.sent.some((message) => /已绑定项目：2/.test(message.content)));
+
   await dispatch(bridge, createUserMessage(controlChannel, '!autopilot server on', { userId: 'admin-user' }));
   assert.equal(store.getAutopilotService('guild-1')?.enabled, true);
   assert.equal(store.getAutopilotService('guild-2')?.enabled, true);
@@ -204,12 +208,15 @@ test('project-level autopilot commands update interval, prompt, and enabled stat
   await dispatch(bridge, createUserMessage(rootChannel, '!autopilot project interval 30m', { userId: 'admin-user' }));
   await dispatch(bridge, createUserMessage(rootChannel, '!autopilot project prompt 优先补测试和稳定性，不要做大功能', { userId: 'admin-user' }));
   await dispatch(bridge, createUserMessage(rootChannel, '!autopilot project on', { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannel, '!autopilot project status', { userId: 'admin-user' }));
 
   const autopilotProject = store.getAutopilotProject(rootChannel.id);
   assert.equal(autopilotProject?.intervalMs, 30 * 60 * 1000);
   assert.equal(autopilotProject?.enabled, true);
   assert.match(autopilotProject?.brief ?? '', /优先补测试和稳定性/);
   assert.ok(rootChannel.sent.some((message) => /已更新 \*\*api\*\* 的项目级 Autopilot 设置/.test(message.content)));
+  assert.ok(rootChannel.sent.some((message) => /Autopilot 项目状态：\*\*api\*\*/.test(message.content)));
+  assert.ok(rootChannel.sent.some((message) => /调度周期：30m/.test(message.content)));
   await cleanupDir(rootDir);
 });
 

@@ -371,9 +371,17 @@ function parsePlanItems(rawItems: unknown): PlanItem[] {
         return undefined;
       }
 
+      const completed = candidate.completed === true
+        || candidate.done === true
+        || candidate.finished === true
+        || candidate.status === 'completed'
+        || candidate.status === 'done'
+        || candidate.state === 'completed'
+        || candidate.state === 'done';
+
       return {
         text: candidate.text,
-        completed: candidate.completed === true,
+        completed,
       } satisfies PlanItem;
     })
     .filter((item): item is PlanItem => Boolean(item));

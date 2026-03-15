@@ -133,14 +133,17 @@ export function formatAutopilotHelp(prefix: string): string {
     '🤖 **Autopilot 使用说明**',
     '',
     '服务级命令：作用于当前 bridge 进程里所有已绑定项目',
+    `- \`${prefix}autopilot status\``,
     `- \`${prefix}autopilot server on\``,
     `- \`${prefix}autopilot server off\``,
     `- \`${prefix}autopilot server clear\``,
+    `- \`${prefix}autopilot server status\``,
     '',
     '项目级命令：只能在已绑定项目频道或它的 Autopilot 线程里使用',
     `- \`${prefix}autopilot project on\``,
     `- \`${prefix}autopilot project off\``,
     `- \`${prefix}autopilot project clear\``,
+    `- \`${prefix}autopilot project status\``,
     `- \`${prefix}autopilot project interval 30m\``,
     `- \`${prefix}autopilot project prompt 优先补测试和稳定性，不要做大功能\``,
     '',
@@ -149,6 +152,105 @@ export function formatAutopilotHelp(prefix: string): string {
     '时长格式支持：`30m`、`2h`、`1d`、`90m`；纯数字默认按分钟处理。',
     `兼容简写：\`${prefix}autopilot on|off|clear\` 等价于服务级命令。`,
   ].join('\n');
+}
+
+export interface AutopilotServiceStatusLine {
+  channelId: string;
+  projectName: string;
+  serviceEnabled: boolean;
+  projectEnabled: boolean;
+  runtimeStatus: string;
+  intervalText: string;
+  nextRunText: string;
+}
+
+export function formatAutopilotServiceStatus(
+  lines: AutopilotServiceStatusLine[],
+  generatedAt: string,
+): string {
+  const serviceEnabledCount = lines.filter((line) => line.serviceEnabled).length;
+  const projectEnabledCount = lines.filter((line) => line.projectEnabled).length;
+  const runningCount = lines.filter((line) => line.runtimeStatus === '运行中').length;
+  const waitingCount = lines.filter((line) => line.runtimeStatus === '待命').length;
+  const pausedCount = lines.length - runningCount - waitingCount;
+  const serviceStateText = serviceEnabledCount === 0
+    ? '已暂停'
+    : serviceEnabledCount === lines.length
+      ? '已开启'
+      : '混合';
+
+  const output = [
+    stampAutopilotLine('Autopilot 服务级状态', generatedAt),
+    '',
+    `服务级开关：${serviceStateText}`,
+    `已绑定项目：${lines.length}`,
+    `项目级已开启：${projectEnabledCount}/${lines.length}`,
+    `运行中：${runningCount} · 待命：${waitingCount} · 暂停：${pausedCount}`,
+  ];
+
+  if (lines.length === 0) {
+    output.push('', '当前 bridge 进程里还没有任何绑定项目。');
+    return output.join('\n');
+  }
+
+  output.push('', '项目列表：');
+  for (const line of lines) {
+    output.push(
+      `- <#${line.channelId}> · **${line.projectName}** · 服务=${line.serviceEnabled ? '开' : '关'} · 项目=${line.projectEnabled ? '开' : '关'} · 状态=${line.runtimeStatus} · 周期=${line.intervalText} · 下次=${line.nextRunText}`,
+    );
+  }
+
+  return output.join('\n');
+}
+
+export function formatAutopilotProjectStatus(
+  binding: ChannelBinding,
+  project: AutopilotProjectState,
+  service: AutopilotServiceState | undefined,
+  options: {
+    generatedAt: string;
+    nextRunText: string;
+  },
+): string {
+  const lines = [
+    stampAutopilotLine(`Autopilot 项目状态：**${binding.projectName}**`, options.generatedAt),
+    '',
+    `频道：<#${binding.channelId}>`,
+    `运行状态：${describeAutopilotProjectState(project, service)}`,
+    `服务开关：${service?.enabled === false ? '已暂停' : '已开启'}`,
+    `项目开关：${project.enabled ? '已开启' : '已暂停'}`,
+    `调度周期：${formatDurationMs(project.intervalMs)}`,
+    `下次运行：${options.nextRunText}`,
+  ];
+
+  if (project.lastRunAt) {
+    lines.push(`最近运行：${project.lastRunAt}`);
+  }
+
+  if (project.currentRunStartedAt) {
+    lines.push(`当前轮开始：${project.currentRunStartedAt}`);
+  }
+
+  lines.push(`项目方向：${truncate(project.brief.replace(/\s+/g, ' '), 220)}`);
+  lines.push(`任务看板：${summarizeAutopilotBoard(project.board)}`);
+
+  if (project.lastGoal) {
+    lines.push(`最近目标：${truncate(project.lastGoal, 180)}`);
+  }
+
+  if (project.lastSummary) {
+    lines.push(`最近结果：${truncate(project.lastSummary, 220)}`);
+  }
+
+  if (project.nextSuggestedWork) {
+    lines.push(`下一步建议：${truncate(project.nextSuggestedWork, 220)}`);
+  }
+
+  if (project.threadChannelId) {
+    lines.push(`Autopilot 线程：<#${project.threadChannelId}>`);
+  }
+
+  return lines.join('\n');
 }
 
 export function formatProjects(bindings: ChannelBinding[]): string {
@@ -390,6 +492,7 @@ export function formatAutopilotThreadWelcome(binding: ChannelBinding, project: A
     '',
     '常用命令：',
     '- !autopilot project on',
+    '- !autopilot project status',
     '- !autopilot project interval 30m',
     '- !autopilot project prompt 优先补测试和稳定性，不要做大功能',
     '',

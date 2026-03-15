@@ -51,6 +51,11 @@ test('parse autopilot server shorthand command', () => {
   assert.deepEqual(parsed, { kind: 'autopilot', scope: 'server', action: 'on' });
 });
 
+test('parse autopilot server status command', () => {
+  const parsed = parseCommand('!autopilot status', '!');
+  assert.deepEqual(parsed, { kind: 'autopilot', scope: 'server', action: 'status' });
+});
+
 test('parse autopilot project interval command', () => {
   const parsed = parseCommand('!autopilot project interval 30m', '!');
   assert.deepEqual(parsed, {
@@ -69,5 +74,14 @@ test('parse autopilot project prompt command', () => {
     scope: 'project',
     action: 'prompt',
     prompt: '优先补测试和稳定性，不要做大功能',
+  });
+});
+
+test('parse autopilot project status command', () => {
+  const parsed = parseCommand('!autopilot project status', '!');
+  assert.deepEqual(parsed, {
+    kind: 'autopilot',
+    scope: 'project',
+    action: 'status',
   });
 });
