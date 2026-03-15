@@ -39,6 +39,8 @@ test('store persists bindings and sessions and cascades deletes', async () => {
     bindingChannelId: 'channel-1',
     guildId: 'guild-1',
     threadChannelId: 'thread-auto-1',
+    enabled: true,
+    intervalMs: 30 * 60 * 1000,
     brief: '优先补测试',
     briefUpdatedAt: '2026-03-11T00:00:00.000Z',
     board: [
@@ -58,6 +60,12 @@ test('store persists bindings and sessions and cascades deletes', async () => {
   assert.equal(store.listBindings().length, 1);
   assert.equal(store.listSessions('channel-1').length, 2);
   assert.equal(store.listAutopilotProjects('guild-1').length, 1);
+  assert.equal(store.getAutopilotProject('channel-1')?.intervalMs, 30 * 60 * 1000);
+
+  const cleared = await store.clearAutopilotProject('channel-1');
+  assert.equal(cleared?.enabled, true);
+  assert.equal(cleared?.intervalMs, 30 * 60 * 1000);
+  assert.deepEqual(cleared?.board, []);
 
   const removed = await store.removeBinding('channel-1');
   assert.equal(removed?.projectName, 'api');

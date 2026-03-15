@@ -146,6 +146,86 @@ export function parseBooleanWord(value: string): boolean | undefined {
   return undefined;
 }
 
+export function parseDurationToMs(value: string): number | undefined {
+  const normalized = value.trim().toLowerCase().replace(/\s+/g, '');
+
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (/^\d+(?:\.\d+)?$/.test(normalized)) {
+    const minutes = Number(normalized);
+    return Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes * 60_000) : undefined;
+  }
+
+  const pattern = /(\d+(?:\.\d+)?)(ms|s|m|h|d)/g;
+  let total = 0;
+  let lastIndex = 0;
+
+  for (const match of normalized.matchAll(pattern)) {
+    if (match.index !== lastIndex) {
+      return undefined;
+    }
+
+    const amount = Number(match[1]);
+    const unit = match[2];
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return undefined;
+    }
+
+    switch (unit) {
+      case 'd':
+        total += amount * 24 * 60 * 60 * 1000;
+        break;
+      case 'h':
+        total += amount * 60 * 60 * 1000;
+        break;
+      case 'm':
+        total += amount * 60 * 1000;
+        break;
+      case 's':
+        total += amount * 1000;
+        break;
+      case 'ms':
+        total += amount;
+        break;
+    }
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex !== normalized.length || total <= 0) {
+    return undefined;
+  }
+
+  return Math.round(total);
+}
+
+export function formatDurationMs(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) {
+    return '未设置';
+  }
+
+  if (value % (24 * 60 * 60 * 1000) === 0) {
+    return `${value / (24 * 60 * 60 * 1000)}d`;
+  }
+
+  if (value % (60 * 60 * 1000) === 0) {
+    return `${value / (60 * 60 * 1000)}h`;
+  }
+
+  if (value % 60_000 === 0) {
+    return `${value / 60_000}m`;
+  }
+
+  if (value % 1000 === 0) {
+    return `${value / 1000}s`;
+  }
+
+  return `${value}ms`;
+}
+
 export function cloneCodexOptions(value: BindingCodexOptions): BindingCodexOptions {
   return {
     ...value,

@@ -14,6 +14,7 @@ const AUTOPILOT_MARKER = 'AUTOPILOT_REPORT';
 const BRIDGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 export const AUTOPILOT_THREAD_NAME_PREFIX = 'Autopilot · ';
+export const DEFAULT_AUTOPILOT_INTERVAL_MS = 12 * 60 * 60 * 1000;
 export const DEFAULT_AUTOPILOT_BRIEF = [
   '默认方向：优先测试覆盖、稳定性、低风险修复和小范围清理。',
   '默认边界：不要主动做大功能、不要改部署/权限模型、不要升级依赖。',
@@ -29,12 +30,12 @@ export interface AutopilotReport {
 
 export function getAutopilotTickMs(): number {
   const parsed = Number.parseInt(process.env.AUTOPILOT_TICK_MS ?? '', 10);
-  return Number.isFinite(parsed) && parsed >= 5_000 ? parsed : 60_000;
+  return Number.isFinite(parsed) && parsed >= 5_000 ? parsed : 10_000;
 }
 
-export function getAutopilotMinIntervalMs(): number {
-  const parsed = Number.parseInt(process.env.AUTOPILOT_MIN_INTERVAL_MS ?? '', 10);
-  return Number.isFinite(parsed) && parsed >= 60_000 ? parsed : 12 * 60 * 60 * 1000;
+export function getAutopilotDefaultIntervalMs(): number {
+  const parsed = Number.parseInt(process.env.AUTOPILOT_DEFAULT_INTERVAL_MS ?? '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_AUTOPILOT_INTERVAL_MS;
 }
 
 export function getAutopilotSkillPath(): string {

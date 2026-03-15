@@ -1,6 +1,6 @@
 import type { ApprovalPolicy, SandboxMode } from './types.js';
 
-import { parseBooleanWord, tokenizeCommand } from './utils.js';
+import { parseBooleanWord, parseDurationToMs, tokenizeCommand } from './utils.js';
 
 export interface BindCommandOptions {
   model?: string | undefined;
@@ -17,7 +17,11 @@ export type ParsedCommand =
   | { kind: 'help' }
   | { kind: 'bind'; projectName: string; workspacePath: string; options: BindCommandOptions }
   | { kind: 'guide'; prompt: string }
-  | { kind: 'autopilot'; action: 'on' | 'off' | 'clear' }
+  | { kind: 'autopilot'; scope: 'help' }
+  | { kind: 'autopilot'; scope: 'server'; action: 'on' | 'off' | 'clear' }
+  | { kind: 'autopilot'; scope: 'project'; action: 'on' | 'off' | 'clear' }
+  | { kind: 'autopilot'; scope: 'project'; action: 'interval'; intervalMs: number; intervalText: string }
+  | { kind: 'autopilot'; scope: 'project'; action: 'prompt'; prompt: string }
   | { kind: 'unbind' }
   | { kind: 'projects' }
   | { kind: 'status' }
@@ -49,6 +53,98 @@ function parseApprovalPolicy(value: string): ApprovalPolicy {
   }
 
   throw new Error(`不支持的 approval 模式：${value}`);
+}
+
+function parseAutopilotCommand(body: string): Extract<ParsedCommand, { kind: 'autopilot' }> {
+  const normalizedBody = body.trim();
+  const lowerBody = normalizedBody.toLowerCase();
+
+  if (lowerBody === 'autopilot' || lowerBody === 'autopilot help' || lowerBody === 'autopilot usage') {
+    return { kind: 'autopilot', scope: 'help' };
+  }
+
+  const projectPromptMatch = normalizedBody.match(/^autopilot\s+project\s+(?:prompt|brief|direction)\s+([\s\S]+)$/i);
+  if (projectPromptMatch?.[1]?.trim()) {
+    return {
+      kind: 'autopilot',
+      scope: 'project',
+      action: 'prompt',
+      prompt: projectPromptMatch[1].trim(),
+    };
+  }
+
+  const projectIntervalMatch = normalizedBody.match(/^autopilot\s+project\s+interval\s+(\S+)\s*$/i);
+  if (projectIntervalMatch?.[1]) {
+    const intervalText = projectIntervalMatch[1].trim();
+    const intervalMs = parseDurationToMs(intervalText);
+
+    if (!intervalMs) {
+      throw new Error('用法：!autopilot project interval <时长>，例如 30m、2h、1d、90m。');
+    }
+
+    return {
+      kind: 'autopilot',
+      scope: 'project',
+      action: 'interval',
+      intervalMs,
+      intervalText,
+    };
+  }
+
+  const tokens = tokenizeCommand(normalizedBody);
+  tokens.shift();
+
+  const scopeOrAction = tokens.shift()?.toLowerCase();
+
+  if (!scopeOrAction) {
+    return { kind: 'autopilot', scope: 'help' };
+  }
+
+  if (scopeOrAction === 'on' || scopeOrAction === 'off' || scopeOrAction === 'clear') {
+    return {
+      kind: 'autopilot',
+      scope: 'server',
+      action: scopeOrAction,
+    };
+  }
+
+  if (scopeOrAction === 'server') {
+    const action = tokens.shift()?.toLowerCase();
+
+    if (action === 'on' || action === 'off' || action === 'clear') {
+      return {
+        kind: 'autopilot',
+        scope: 'server',
+        action,
+      };
+    }
+
+    throw new Error('用法：!autopilot server <on|off|clear>');
+  }
+
+  if (scopeOrAction === 'project') {
+    const action = tokens.shift()?.toLowerCase();
+
+    if (action === 'on' || action === 'off' || action === 'clear') {
+      return {
+        kind: 'autopilot',
+        scope: 'project',
+        action,
+      };
+    }
+
+    if (action === 'interval') {
+      throw new Error('用法：!autopilot project interval <时长>，例如 30m、2h、1d、90m。');
+    }
+
+    if (action === 'prompt' || action === 'brief' || action === 'direction') {
+      throw new Error('用法：!autopilot project prompt <自然语言方向>');
+    }
+
+    throw new Error('用法：!autopilot project <on|off|clear|interval|prompt ...>');
+  }
+
+  throw new Error('用法：!autopilot [help] | !autopilot server <on|off|clear> | !autopilot project <on|off|clear|interval|prompt ...>');
 }
 
 export function isCommandMessage(content: string, prefix: string): boolean {
@@ -89,15 +185,8 @@ export function parseCommand(content: string, prefix: string): ParsedCommand {
       return { kind: 'reset' };
     case 'queue':
       return { kind: 'queue' };
-    case 'autopilot': {
-      const action = tokens.shift()?.toLowerCase();
-
-      if (action === 'on' || action === 'off' || action === 'clear') {
-        return { kind: 'autopilot', action };
-      }
-
-      throw new Error('用法：!autopilot <on|off|clear>');
-    }
+    case 'autopilot':
+      return parseAutopilotCommand(body);
     case 'bind': {
       const projectName = tokens.shift();
       const workspacePath = tokens.shift();

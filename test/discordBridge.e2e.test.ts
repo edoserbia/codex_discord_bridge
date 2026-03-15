@@ -154,12 +154,62 @@ test('bridge creates an autopilot thread and pinned entry card on bind', { concu
 
   const autopilotProject = store.getAutopilotProject(rootChannel.id);
   assert.ok(autopilotProject?.threadChannelId);
+  assert.equal(autopilotProject?.enabled, false);
   assert.ok(rootChannel.sent.some((message) => /Autopilot 入口/.test(message.content)));
   assert.ok(rootChannel.sent.some((message) => message.pinned));
+  assert.ok(rootChannel.sent.some((message) => /项目级调度默认暂停/.test(message.content)));
 
   const autopilotThread = channels.get(autopilotProject!.threadChannelId!);
   assert.ok(autopilotThread);
   assert.ok(autopilotThread!.sent.some((message) => /Autopilot 线程/.test(message.content)));
+  await cleanupDir(rootDir);
+});
+
+test('autopilot help is available in unbound channels and server commands apply to all bound projects', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-autopilot-help-');
+  const workspaceA = await createWorkspace(path.join(rootDir, 'a'));
+  const workspaceB = await createWorkspace(path.join(rootDir, 'b'));
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannelA = new FakeChannel('channel-autopilot-help-a', 'guild-1');
+  const rootChannelB = new FakeChannel('channel-autopilot-help-b', 'guild-2');
+  const controlChannel = new FakeChannel('channel-autopilot-help-control', 'guild-9');
+  channels.set(rootChannelA.id, rootChannelA);
+  channels.set(rootChannelB.id, rootChannelB);
+  channels.set(controlChannel.id, controlChannel);
+
+  await dispatch(bridge, createUserMessage(rootChannelA, `!bind aaa "${workspaceA}"`, { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannelB, `!bind bbb "${workspaceB}"`, { userId: 'admin-user' }));
+
+  await dispatch(bridge, createUserMessage(controlChannel, '!autopilot'));
+  assert.ok(controlChannel.sent.some((message) => /Autopilot 使用说明/.test(message.content)));
+
+  await dispatch(bridge, createUserMessage(controlChannel, '!autopilot server on', { userId: 'admin-user' }));
+  assert.equal(store.getAutopilotService('guild-1')?.enabled, true);
+  assert.equal(store.getAutopilotService('guild-2')?.enabled, true);
+
+  await dispatch(bridge, createUserMessage(controlChannel, '!autopilot server off', { userId: 'admin-user' }));
+  assert.equal(store.getAutopilotService('guild-1')?.enabled, false);
+  assert.equal(store.getAutopilotService('guild-2')?.enabled, false);
+  await cleanupDir(rootDir);
+});
+
+test('project-level autopilot commands update interval, prompt, and enabled state', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-autopilot-project-cmd-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-autopilot-project-cmd', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannel, '!autopilot project interval 30m', { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannel, '!autopilot project prompt 优先补测试和稳定性，不要做大功能', { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannel, '!autopilot project on', { userId: 'admin-user' }));
+
+  const autopilotProject = store.getAutopilotProject(rootChannel.id);
+  assert.equal(autopilotProject?.intervalMs, 30 * 60 * 1000);
+  assert.equal(autopilotProject?.enabled, true);
+  assert.match(autopilotProject?.brief ?? '', /优先补测试和稳定性/);
+  assert.ok(rootChannel.sent.some((message) => /已更新 \*\*api\*\* 的项目级 Autopilot 设置/.test(message.content)));
   await cleanupDir(rootDir);
 });
 
@@ -201,7 +251,9 @@ test('autopilot runs in project thread with timestamped progress and only one pr
 
   await dispatch(bridge, createUserMessage(rootChannelA, `!bind aaa "${workspaceA}"`, { userId: 'admin-user' }));
   await dispatch(bridge, createUserMessage(rootChannelB, `!bind bbb "${workspaceB}"`, { userId: 'admin-user' }));
-  await dispatch(bridge, createUserMessage(rootChannelA, '!autopilot on', { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannelA, '!autopilot server on', { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannelA, '!autopilot project on', { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannelB, '!autopilot project on', { userId: 'admin-user' }));
 
   const projectA = store.getAutopilotProject(rootChannelA.id)!;
   const projectB = store.getAutopilotProject(rootChannelB.id)!;
