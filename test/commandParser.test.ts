@@ -85,3 +85,12 @@ test('parse autopilot project status command', () => {
     action: 'status',
   });
 });
+
+test('parse autopilot project run command', () => {
+  const parsed = parseCommand('!autopilot project run', '!');
+  assert.deepEqual(parsed, {
+    kind: 'autopilot',
+    scope: 'project',
+    action: 'run',
+  });
+});

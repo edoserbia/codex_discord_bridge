@@ -19,7 +19,7 @@ export type ParsedCommand =
   | { kind: 'guide'; prompt: string }
   | { kind: 'autopilot'; scope: 'help' }
   | { kind: 'autopilot'; scope: 'server'; action: 'on' | 'off' | 'clear' | 'status' }
-  | { kind: 'autopilot'; scope: 'project'; action: 'on' | 'off' | 'clear' | 'status' }
+  | { kind: 'autopilot'; scope: 'project'; action: 'on' | 'off' | 'clear' | 'status' | 'run' }
   | { kind: 'autopilot'; scope: 'project'; action: 'interval'; intervalMs: number; intervalText: string }
   | { kind: 'autopilot'; scope: 'project'; action: 'prompt'; prompt: string }
   | { kind: 'unbind' }
@@ -133,7 +133,7 @@ function parseAutopilotCommand(body: string): Extract<ParsedCommand, { kind: 'au
   if (scopeOrAction === 'project') {
     const action = tokens.shift()?.toLowerCase();
 
-    if (action === 'on' || action === 'off' || action === 'clear' || action === 'status') {
+    if (action === 'on' || action === 'off' || action === 'clear' || action === 'status' || action === 'run') {
       return {
         kind: 'autopilot',
         scope: 'project',
@@ -149,10 +149,10 @@ function parseAutopilotCommand(body: string): Extract<ParsedCommand, { kind: 'au
       throw new Error('用法：!autopilot project prompt <自然语言方向>');
     }
 
-    throw new Error('用法：!autopilot project <on|off|clear|status|interval|prompt ...>');
+    throw new Error('用法：!autopilot project <on|off|clear|status|run|interval|prompt ...>');
   }
 
-  throw new Error('用法：!autopilot [help|status] | !autopilot server <on|off|clear|status> | !autopilot project <on|off|clear|status|interval|prompt ...>');
+  throw new Error('用法：!autopilot [help|status] | !autopilot server <on|off|clear|status> | !autopilot project <on|off|clear|status|run|interval|prompt ...>');
 }
 
 export function isCommandMessage(content: string, prefix: string): boolean {
