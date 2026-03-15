@@ -885,7 +885,7 @@ export class DiscordCodexBridge {
       brief,
       briefUpdatedAt: now,
       lastActivityAt: now,
-      lastActivityText: '已更新项目自动迭代方向',
+      lastActivityText: '已更新项目 Autopilot Prompt',
       status: this.getAutopilotProjectStatus(project),
     });
 
@@ -1096,7 +1096,7 @@ export class DiscordCodexBridge {
     }
 
     const goal = this.pickAutopilotGoal(project);
-    const kickoff = await threadChannel.send(formatAutopilotKickoff(binding, project, goal));
+    const kickoff = await threadChannel.send(formatAutopilotKickoff(binding, project));
     const now = new Date().toISOString();
     const nextProject = await this.store.upsertAutopilotProject({
       ...project,
@@ -1110,7 +1110,7 @@ export class DiscordCodexBridge {
     this.activeAutopilotGuilds.add(binding.guildId);
     await this.refreshAutopilotEntryCard(binding, nextProject);
     await this.enqueueSyntheticTask(binding, threadChannel, kickoff.id, {
-      displayPrompt: goal,
+      displayPrompt: nextProject.brief,
       effectivePrompt: buildAutopilotPrompt(binding, nextProject),
       requestedBy: AUTOPILOT_REQUESTED_BY,
       requestedById: AUTOPILOT_REQUESTED_BY_ID,
@@ -1130,7 +1130,7 @@ export class DiscordCodexBridge {
       return ready.title;
     }
 
-    return '根据当前项目方向选择 1 个低风险、可验证的改进任务';
+    return '根据当前 Prompt 选择 1 个低风险、可验证的改进任务';
   }
 
   private async finishAutopilotTask(
