@@ -154,12 +154,15 @@ Autopilot · api
 !autopilot server on
 !autopilot server off
 !autopilot server clear
+!autopilot server concurrency 5
 ```
 
 说明：
 
 - `!autopilot status` 是 `!autopilot server status` 的简写
 - 服务级命令查看或修改的是当前 bridge 进程里的全部绑定项目
+- 服务级默认并行度为 `5`
+- `!autopilot server concurrency <N>` 可以随时调整并行数
 
 ### 项目级
 
@@ -175,9 +178,15 @@ Autopilot · api
 !autopilot project on
 !autopilot project off
 !autopilot project clear
+!autopilot project run
 !autopilot project interval 30m
 !autopilot project prompt 优先补测试和稳定性，不要做大功能
 ```
+
+补充说明：
+
+- `!autopilot project run` 会立刻触发当前项目执行 1 次
+- 本轮完成后，下一次周期时间会按本轮完成时间重新计算
 
 ## 6. 周期格式
 
@@ -205,6 +214,7 @@ Autopilot · api
 `!autopilot status` / `!autopilot server status` 会显示：
 
 - 服务级总开关状态
+- 服务并行数
 - 当前 bridge 进程里已绑定项目总数
 - 项目级已开启数量
 - 运行中 / 待命 / 暂停数量
@@ -213,6 +223,7 @@ Autopilot · api
   - 服务开关
   - 项目开关
   - 当前状态
+  - 当前并行槽占用
   - 周期
   - 下次运行时间
 
@@ -222,6 +233,8 @@ Autopilot · api
 
 - 当前项目频道
 - 服务开关
+- 服务并行数
+- 当前 Autopilot 运行槽占用
 - 项目开关
 - 当前运行状态
 - 调度周期
@@ -254,14 +267,15 @@ Codex 的计划项在实时进度里固定显示为：
 
 ## 9. 当前调度语义
 
-当前版本采用偏保守的调度策略：
+当前版本的调度语义是：
 
 - 定时器按全局 tick 周期定时扫描项目
 - 每个项目是否到期，完全由它自己的 `intervalMs` 决定
-- 同一时刻整个 Discord 服务器只允许运行一个 Autopilot 任务
-- 如果同一个服务器里已经有任何手动 Codex 任务在运行，Autopilot 会跳过本轮扫描，等下一个周期再检查
-
-这样做的原因是当前实现还没有做工作目录隔离，避免手动任务和自动任务同时在同一服务器里改文件造成冲突。
+- 每个 Discord 服务器都有一个服务级并行数，默认是 `5`
+- 同一服务器里，Autopilot 最多会同时运行到该并行数上限
+- `!autopilot server concurrency <N>` 可以在运行期间随时调整并行数
+- 已运行中的 Autopilot 不会因为并行数调整而被取消
+- 主频道和普通线程里的手动 Codex 会话，与 Autopilot 调度彼此独立，不互相占用运行槽
 
 ## 10. 当前实现结构
 
@@ -271,6 +285,11 @@ Autopilot 的状态落在 `state.json` 里，分成两块：
 
 - `autopilotServices`
 - `autopilotProjects`
+
+其中服务状态会保存：
+
+- 服务级开关
+- 服务级并行数
 
 其中项目状态会保存：
 
@@ -323,7 +342,7 @@ Bridge 会从中解析：
 - 还没有 worktree 隔离
 - 调度是“按项目周期检查”，不是 cron 表达式
 - 服务级是“当前 bridge 进程级别”，不是跨多个 bridge 实例的全局控制平面
-- 同一服务器内为了安全，Autopilot 和手动任务不会并发执行
+- 同一项目如果工作目录本身存在冲突风险，仍需要用户自己通过 Prompt 和并行数控制范围
 
 ## 12. 推荐使用方式
 
@@ -331,9 +350,11 @@ Bridge 会从中解析：
 
 1. 在项目主频道 `!bind`
 2. `!autopilot server on`
-3. 在每个项目里分别执行 `!autopilot project on`
-4. 给每个项目单独设置周期
-5. 在各自 Autopilot 线程里持续用自然语言细化方向
-6. 用 `!autopilot status` 看全局，用 `!autopilot project status` 看单项目
+3. 视机器能力决定是否保留默认并行度 `5`，或改成 `!autopilot server concurrency <N>`
+4. 在每个项目里分别执行 `!autopilot project on`
+5. 给每个项目单独设置周期
+6. 在各自 Autopilot 线程里持续用自然语言细化方向
+7. 需要立即执行时，用 `!autopilot project run`
+8. 用 `!autopilot status` 看全局，用 `!autopilot project status` 看单项目
 
 这样最容易控制范围，也最容易排查问题。

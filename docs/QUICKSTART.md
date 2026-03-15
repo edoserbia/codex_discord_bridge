@@ -102,7 +102,9 @@ sudo ./scripts/install-service.sh --mode daemon
 !autopilot
 !autopilot status
 !autopilot server on
+!autopilot server concurrency 5
 !autopilot project on
+!autopilot project run
 !autopilot project interval 30m
 !autopilot project status
 !status
@@ -125,6 +127,12 @@ sudo ./scripts/install-service.sh --mode daemon
 !autopilot project on
 !autopilot project interval 30m
 ```
+
+说明：
+
+- 服务级 Autopilot 默认并行度为 `5`
+- 可以随时用 `!autopilot server concurrency <N>` 调整
+- 主频道手动 Codex 与 Autopilot 定时任务彼此独立，不互相阻塞
 
 然后去自动创建的 `Autopilot` 线程里直接发自然语言方向，例如：
 

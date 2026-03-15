@@ -14,6 +14,7 @@ import {
   buildAutopilotPrompt,
   DEFAULT_AUTOPILOT_BRIEF,
   getAutopilotDefaultIntervalMs,
+  normalizeAutopilotParallelism,
   getAutopilotSkillDir,
   getAutopilotThreadName,
   getAutopilotTickMs,
@@ -153,7 +154,7 @@ export class DiscordCodexBridge {
   private readonly runtimeViewFlushes = new Map<string, Promise<void>>();
   private readonly pendingRuntimeViewRefreshes = new Map<string, PendingRuntimeViewRefresh>();
   private readonly lastRuntimeViewRefreshAt = new Map<string, number>();
-  private readonly activeAutopilotGuilds = new Set<string>();
+  private readonly activeAutopilotProjects = new Set<string>();
   private autopilotTicker: NodeJS.Timeout | undefined;
   private autopilotTickInFlight = false;
 
@@ -295,8 +296,8 @@ export class DiscordCodexBridge {
       this.runtimes.delete(session.conversationId);
     }
 
-    if (autopilotProject?.guildId && autopilotProject.status === 'running') {
-      this.activeAutopilotGuilds.delete(autopilotProject.guildId);
+    if (autopilotProject?.status === 'running') {
+      this.activeAutopilotProjects.delete(bindingChannelId);
     }
 
     return this.store.removeBinding(bindingChannelId);
@@ -472,7 +473,7 @@ export class DiscordCodexBridge {
     await removeAttachmentDir(activeRun.task.attachmentDir).catch(() => undefined);
 
     if (binding && activeRun.task.origin === 'autopilot') {
-      this.activeAutopilotGuilds.delete(binding.guildId);
+      this.activeAutopilotProjects.delete(activeRun.task.bindingChannelId);
       await this.markAutopilotProjectFailed(binding, errorMessage);
     }
 
@@ -698,6 +699,12 @@ export class DiscordCodexBridge {
         return;
       }
 
+      if (command.action === 'concurrency') {
+        await this.setAutopilotParallelismAcrossBindings(command.parallelism);
+        await message.reply(formatAutopilotServiceAck('concurrency', command.parallelism));
+        return;
+      }
+
       if (command.action === 'clear') {
         await this.clearAllAutopilotProjects();
         await message.reply(formatAutopilotServiceAck('clear'));
@@ -746,7 +753,8 @@ export class DiscordCodexBridge {
           return;
         }
         if (trigger.status === 'busy') {
-          await message.reply('当前服务器已有正在执行的 Codex 任务；Autopilot 仍保持单项目串行，请等待当前任务结束后再试。');
+          const service = this.store.getAutopilotService(binding.guildId);
+          await message.reply(`当前服务器的 Autopilot 已达到并行上限 ${this.getAutopilotParallelism(service)}，请稍后再试，或先执行 \`!autopilot server concurrency <N>\` 调大并行数。`);
           return;
         }
         if (trigger.status === 'unavailable') {
@@ -771,7 +779,7 @@ export class DiscordCodexBridge {
 
   private async handleAutopilotThreadMessage(message: Message, project: AutopilotProjectState): Promise<void> {
     if (!this.isAdmin(message)) {
-      await message.reply('只有管理员才能更新当前项目的 Autopilot 方向。');
+      await message.reply('只有管理员才能更新当前项目的 Autopilot Prompt。');
       return;
     }
 
@@ -784,7 +792,7 @@ export class DiscordCodexBridge {
 
     const binding = this.store.getBinding(project.bindingChannelId);
     if (!binding) {
-      await message.reply('当前项目绑定不存在，无法更新 Autopilot 方向。');
+      await message.reply('当前项目绑定不存在，无法更新 Autopilot Prompt。');
       return;
     }
 
@@ -809,6 +817,27 @@ export class DiscordCodexBridge {
     }
 
     return '待命';
+  }
+
+  private getAutopilotParallelism(service: AutopilotServiceState | undefined): number {
+    return normalizeAutopilotParallelism(service?.parallelism);
+  }
+
+  private isAutopilotProjectActive(bindingChannelId: string): boolean {
+    return this.activeAutopilotProjects.has(bindingChannelId);
+  }
+
+  private countActiveAutopilotRuns(guildId: string): number {
+    let count = 0;
+
+    for (const bindingChannelId of this.activeAutopilotProjects) {
+      const project = this.store.getAutopilotProject(bindingChannelId);
+      if (project?.guildId === guildId) {
+        count += 1;
+      }
+    }
+
+    return count;
   }
 
   private buildAutopilotNextRunText(
@@ -862,6 +891,8 @@ export class DiscordCodexBridge {
         runtimeStatus: this.describeAutopilotProjectRuntime(project, service),
         intervalText: formatDurationMs(project.intervalMs),
         nextRunText: this.buildAutopilotNextRunText(project, service),
+        parallelism: this.getAutopilotParallelism(service),
+        activeAutopilotRuns: this.countActiveAutopilotRuns(binding.guildId),
       });
     }
 
@@ -876,6 +907,8 @@ export class DiscordCodexBridge {
     return formatAutopilotProjectStatus(binding, project, service, {
       generatedAt: new Date().toISOString(),
       nextRunText: this.buildAutopilotNextRunText(project, service),
+      serviceParallelism: this.getAutopilotParallelism(service),
+      activeAutopilotRuns: this.countActiveAutopilotRuns(binding.guildId),
     });
   }
 
@@ -884,7 +917,7 @@ export class DiscordCodexBridge {
     serviceEnabled = this.store.getAutopilotService(project.guildId)?.enabled ?? false,
     preserveRunning = true,
   ): AutopilotProjectState['status'] {
-    if (preserveRunning && project.status === 'running') {
+    if (preserveRunning && project.status === 'running' && this.isAutopilotProjectActive(project.bindingChannelId)) {
       return 'running';
     }
 
@@ -911,9 +944,11 @@ export class DiscordCodexBridge {
   }
 
   private async setAutopilotEnabled(guildId: string, enabled: boolean): Promise<AutopilotServiceState> {
+    const existingService = this.store.getAutopilotService(guildId);
     const nextService = await this.store.upsertAutopilotService({
       guildId,
       enabled,
+      parallelism: this.getAutopilotParallelism(existingService),
       updatedAt: new Date().toISOString(),
     });
 
@@ -928,6 +963,19 @@ export class DiscordCodexBridge {
     return nextService;
   }
 
+  private async setAutopilotParallelism(guildId: string, parallelism: number): Promise<AutopilotServiceState> {
+    const existingService = this.store.getAutopilotService(guildId);
+    const nextService = await this.store.upsertAutopilotService({
+      guildId,
+      enabled: existingService?.enabled ?? false,
+      parallelism: normalizeAutopilotParallelism(parallelism),
+      updatedAt: new Date().toISOString(),
+    });
+
+    await this.refreshAutopilotEntryCards(guildId);
+    return nextService;
+  }
+
   private async setAutopilotEnabledAcrossBindings(enabled: boolean): Promise<void> {
     const guildIds = uniqueStrings([
       ...this.store.listBindings().map((binding) => binding.guildId),
@@ -936,6 +984,17 @@ export class DiscordCodexBridge {
 
     for (const guildId of guildIds) {
       await this.setAutopilotEnabled(guildId, enabled);
+    }
+  }
+
+  private async setAutopilotParallelismAcrossBindings(parallelism: number): Promise<void> {
+    const guildIds = uniqueStrings([
+      ...this.store.listBindings().map((binding) => binding.guildId),
+      ...this.store.listAutopilotServices().map((service) => service.guildId),
+    ]);
+
+    for (const guildId of guildIds) {
+      await this.setAutopilotParallelism(guildId, parallelism);
     }
   }
 
@@ -1036,20 +1095,23 @@ export class DiscordCodexBridge {
 
     try {
       for (const service of this.store.listAutopilotServices()) {
-        if (!service.enabled || this.activeAutopilotGuilds.has(service.guildId)) {
+        if (!service.enabled) {
           continue;
         }
 
-        if (this.hasAnyActiveRunInGuild(service.guildId)) {
+        const availableSlots = this.getAutopilotParallelism(service) - this.countActiveAutopilotRuns(service.guildId);
+        if (availableSlots <= 0) {
           continue;
         }
 
-        const binding = await this.pickDueAutopilotBinding(service.guildId);
-        if (!binding) {
-          continue;
-        }
+        for (let index = 0; index < availableSlots; index += 1) {
+          const binding = await this.pickDueAutopilotBinding(service.guildId);
+          if (!binding) {
+            break;
+          }
 
-        await this.launchAutopilotForBinding(binding);
+          await this.launchAutopilotForBinding(binding);
+        }
       }
     } finally {
       this.autopilotTickInFlight = false;
@@ -1062,7 +1124,7 @@ export class DiscordCodexBridge {
     for (const binding of this.store.listBindings(guildId)) {
       const project = await this.ensureAutopilotResources(binding);
 
-      if (!project.enabled || project.status === 'running') {
+      if (!project.enabled || project.status === 'running' || this.isAutopilotProjectActive(binding.channelId)) {
         continue;
       }
 
@@ -1081,19 +1143,6 @@ export class DiscordCodexBridge {
     }
 
     return undefined;
-  }
-
-  private hasAnyActiveRunInGuild(guildId: string): boolean {
-    for (const binding of this.store.listBindings(guildId)) {
-      for (const session of this.store.listSessions(binding.channelId)) {
-        const activeRun = this.getRuntime(session.conversationId).activeRun;
-        if (activeRun && ['starting', 'running', 'cancelled'].includes(activeRun.status)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
   }
 
   private async launchAutopilotForBinding(binding: ChannelBinding): Promise<void> {
@@ -1123,7 +1172,8 @@ export class DiscordCodexBridge {
       return { status: 'unavailable', project };
     }
 
-    if (this.activeAutopilotGuilds.has(binding.guildId) || this.hasAnyActiveRunInGuild(binding.guildId)) {
+    const service = this.store.getAutopilotService(binding.guildId);
+    if (this.countActiveAutopilotRuns(binding.guildId) >= this.getAutopilotParallelism(service)) {
       return { status: 'busy', project };
     }
 
@@ -1138,42 +1188,49 @@ export class DiscordCodexBridge {
     binding: ChannelBinding,
     project: AutopilotProjectState,
   ): Promise<AutopilotProjectState | undefined> {
-    if (!project.threadChannelId) {
+    if (!project.threadChannelId || this.isAutopilotProjectActive(binding.channelId)) {
       return undefined;
     }
 
-    const threadChannel = await this.fetchChannel(project.threadChannelId);
-    if (!threadChannel) {
-      return undefined;
+    this.activeAutopilotProjects.add(binding.channelId);
+
+    try {
+      const threadChannel = await this.fetchChannel(project.threadChannelId);
+      if (!threadChannel) {
+        this.activeAutopilotProjects.delete(binding.channelId);
+        return undefined;
+      }
+
+      if (threadChannel.setArchived) {
+        await threadChannel.setArchived(false).catch(() => undefined);
+      }
+
+      const goal = this.pickAutopilotGoal(project);
+      const kickoff = await threadChannel.send(formatAutopilotKickoff(binding, project));
+      const now = new Date().toISOString();
+      const nextProject = await this.store.upsertAutopilotProject({
+        ...project,
+        status: 'running',
+        currentGoal: goal,
+        currentRunStartedAt: now,
+        lastActivityAt: now,
+        lastActivityText: 'Autopilot 已启动',
+      });
+
+      await this.refreshAutopilotEntryCard(binding, nextProject);
+      await this.enqueueSyntheticTask(binding, threadChannel, kickoff.id, {
+        displayPrompt: nextProject.brief,
+        effectivePrompt: buildAutopilotPrompt(binding, nextProject),
+        requestedBy: AUTOPILOT_REQUESTED_BY,
+        requestedById: AUTOPILOT_REQUESTED_BY_ID,
+        extraAddDirs: [getAutopilotSkillDir()],
+        origin: 'autopilot',
+      });
+      return nextProject;
+    } catch (error) {
+      this.activeAutopilotProjects.delete(binding.channelId);
+      throw error;
     }
-
-    if (threadChannel.setArchived) {
-      await threadChannel.setArchived(false).catch(() => undefined);
-    }
-
-    const goal = this.pickAutopilotGoal(project);
-    const kickoff = await threadChannel.send(formatAutopilotKickoff(binding, project));
-    const now = new Date().toISOString();
-    const nextProject = await this.store.upsertAutopilotProject({
-      ...project,
-      status: 'running',
-      currentGoal: goal,
-      currentRunStartedAt: now,
-      lastActivityAt: now,
-      lastActivityText: 'Autopilot 已启动',
-    });
-
-    this.activeAutopilotGuilds.add(binding.guildId);
-    await this.refreshAutopilotEntryCard(binding, nextProject);
-    await this.enqueueSyntheticTask(binding, threadChannel, kickoff.id, {
-      displayPrompt: nextProject.brief,
-      effectivePrompt: buildAutopilotPrompt(binding, nextProject),
-      requestedBy: AUTOPILOT_REQUESTED_BY,
-      requestedById: AUTOPILOT_REQUESTED_BY_ID,
-      extraAddDirs: [getAutopilotSkillDir()],
-      origin: 'autopilot',
-    });
-    return nextProject;
   }
 
   private pickAutopilotGoal(project: AutopilotProjectState): string {
@@ -1277,6 +1334,7 @@ export class DiscordCodexBridge {
       service = await this.store.upsertAutopilotService({
         guildId: binding.guildId,
         enabled: false,
+        parallelism: this.getAutopilotParallelism(undefined),
         updatedAt: new Date().toISOString(),
       });
     }
@@ -1816,7 +1874,7 @@ export class DiscordCodexBridge {
       }
 
       if (task.origin === 'autopilot') {
-        this.activeAutopilotGuilds.delete(binding.guildId);
+        this.activeAutopilotProjects.delete(task.bindingChannelId);
         await this.finishAutopilotTask(binding, task, result, channel);
       }
     } finally {
@@ -1827,7 +1885,7 @@ export class DiscordCodexBridge {
       await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
 
       if (task.origin === 'autopilot') {
-        this.activeAutopilotGuilds.delete(binding.guildId);
+        this.activeAutopilotProjects.delete(task.bindingChannelId);
       }
 
       if (runtime.queue.length > 0) {

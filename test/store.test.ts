@@ -32,6 +32,7 @@ test('store persists bindings and sessions and cascades deletes', async () => {
   await store.upsertAutopilotService({
     guildId: 'guild-1',
     enabled: true,
+    parallelism: 2,
     updatedAt: '2026-03-11T00:00:00.000Z',
   });
 
@@ -61,6 +62,7 @@ test('store persists bindings and sessions and cascades deletes', async () => {
   assert.equal(store.listSessions('channel-1').length, 2);
   assert.equal(store.listAutopilotProjects('guild-1').length, 1);
   assert.equal(store.getAutopilotProject('channel-1')?.intervalMs, 30 * 60 * 1000);
+  assert.equal(store.getAutopilotService('guild-1')?.parallelism, 2);
 
   const cleared = await store.clearAutopilotProject('channel-1');
   assert.equal(cleared?.enabled, true);
@@ -73,6 +75,7 @@ test('store persists bindings and sessions and cascades deletes', async () => {
   assert.equal(store.listSessions('channel-1').length, 0);
   assert.equal(store.listAutopilotProjects('guild-1').length, 0);
   assert.equal(store.getAutopilotService('guild-1')?.enabled, true);
+  assert.equal(store.getAutopilotService('guild-1')?.parallelism, 2);
 
   await cleanupDir(rootDir);
 });

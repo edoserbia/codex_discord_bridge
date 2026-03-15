@@ -19,6 +19,7 @@ export type ParsedCommand =
   | { kind: 'guide'; prompt: string }
   | { kind: 'autopilot'; scope: 'help' }
   | { kind: 'autopilot'; scope: 'server'; action: 'on' | 'off' | 'clear' | 'status' }
+  | { kind: 'autopilot'; scope: 'server'; action: 'concurrency'; parallelism: number }
   | { kind: 'autopilot'; scope: 'project'; action: 'on' | 'off' | 'clear' | 'status' | 'run' }
   | { kind: 'autopilot'; scope: 'project'; action: 'interval'; intervalMs: number; intervalText: string }
   | { kind: 'autopilot'; scope: 'project'; action: 'prompt'; prompt: string }
@@ -53,6 +54,19 @@ function parseApprovalPolicy(value: string): ApprovalPolicy {
   }
 
   throw new Error(`不支持的 approval 模式：${value}`);
+}
+
+function parseAutopilotParallelism(value: string): number {
+  if (!/^\d+$/.test(value)) {
+    throw new Error('用法：!autopilot server concurrency <正整数>，例如 1、2、4。');
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error('用法：!autopilot server concurrency <正整数>，例如 1、2、4。');
+  }
+
+  return parsed;
 }
 
 function parseAutopilotCommand(body: string): Extract<ParsedCommand, { kind: 'autopilot' }> {
@@ -108,6 +122,15 @@ function parseAutopilotCommand(body: string): Extract<ParsedCommand, { kind: 'au
     };
   }
 
+  if (scopeOrAction === 'concurrency' || scopeOrAction === 'parallel' || scopeOrAction === 'parallelism') {
+    return {
+      kind: 'autopilot',
+      scope: 'server',
+      action: 'concurrency',
+      parallelism: parseAutopilotParallelism(readValue(tokens, `!autopilot ${scopeOrAction}`)),
+    };
+  }
+
   if (scopeOrAction === 'on' || scopeOrAction === 'off' || scopeOrAction === 'clear') {
     return {
       kind: 'autopilot',
@@ -127,7 +150,16 @@ function parseAutopilotCommand(body: string): Extract<ParsedCommand, { kind: 'au
       };
     }
 
-    throw new Error('用法：!autopilot server <on|off|clear|status>');
+    if (action === 'concurrency' || action === 'parallel' || action === 'parallelism') {
+      return {
+        kind: 'autopilot',
+        scope: 'server',
+        action: 'concurrency',
+        parallelism: parseAutopilotParallelism(readValue(tokens, `!autopilot server ${action}`)),
+      };
+    }
+
+    throw new Error('用法：!autopilot server <on|off|clear|status|concurrency N>');
   }
 
   if (scopeOrAction === 'project') {
@@ -152,7 +184,7 @@ function parseAutopilotCommand(body: string): Extract<ParsedCommand, { kind: 'au
     throw new Error('用法：!autopilot project <on|off|clear|status|run|interval|prompt ...>');
   }
 
-  throw new Error('用法：!autopilot [help|status] | !autopilot server <on|off|clear|status> | !autopilot project <on|off|clear|status|run|interval|prompt ...>');
+  throw new Error('用法：!autopilot [help|status|concurrency N] | !autopilot server <on|off|clear|status|concurrency N> | !autopilot project <on|off|clear|status|run|interval|prompt ...>');
 }
 
 export function isCommandMessage(content: string, prefix: string): boolean {
