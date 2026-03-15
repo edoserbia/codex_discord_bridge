@@ -11,7 +11,7 @@ import type {
   PromptTask,
 } from './types.js';
 
-import { summarizeAutopilotBoard, stampAutopilotLine } from './autopilot.js';
+import { normalizeAutopilotParallelism, summarizeAutopilotBoard, stampAutopilotLine } from './autopilot.js';
 import { filterDiagnosticStderr } from './codexDiagnostics.js';
 import { formatClockTimestamp, formatDurationMs, sanitizeInlineCode, shortId, tailLines, truncate } from './utils.js';
 
@@ -138,6 +138,7 @@ export function formatAutopilotHelp(prefix: string): string {
     `- \`${prefix}autopilot server off\``,
     `- \`${prefix}autopilot server clear\``,
     `- \`${prefix}autopilot server status\``,
+    `- \`${prefix}autopilot server concurrency 2\``,
     '',
     '项目级命令：只能在已绑定项目频道或它的 Autopilot 线程里使用',
     `- \`${prefix}autopilot project on\``,
@@ -150,9 +151,11 @@ export function formatAutopilotHelp(prefix: string): string {
     '',
     '自然语言方向也可以直接发在项目的 Autopilot 线程里，不一定要用命令。',
     '调度规则：只有服务级和项目级都开启时，项目才会按配置周期自动运行。',
+    '并行规则：服务级并行数可随时调整；已运行中的 Autopilot 不会被中断，新配置立即影响后续调度。',
+    '隔离规则：主频道和普通线程里的手动 Codex 会话，与 Autopilot 调度彼此独立，不互相占用运行槽。',
     '手动执行规则：`!autopilot project run` 会立即运行 1 次，并按本轮完成时间刷新下一次周期时间。',
     '时长格式支持：`30m`、`2h`、`1d`、`90m`；纯数字默认按分钟处理。',
-    `兼容简写：\`${prefix}autopilot on|off|clear\` 等价于服务级命令。`,
+    `兼容简写：\`${prefix}autopilot on|off|clear|concurrency 2\` 等价于服务级命令。`,
   ].join('\n');
 }
 
@@ -164,6 +167,8 @@ export interface AutopilotServiceStatusLine {
   runtimeStatus: string;
   intervalText: string;
   nextRunText: string;
+  parallelism: number;
+  activeAutopilotRuns: number;
 }
 
 export function formatAutopilotServiceStatus(
@@ -175,6 +180,7 @@ export function formatAutopilotServiceStatus(
   const runningCount = lines.filter((line) => line.runtimeStatus === '运行中').length;
   const waitingCount = lines.filter((line) => line.runtimeStatus === '待命').length;
   const pausedCount = lines.length - runningCount - waitingCount;
+  const parallelismValues = [...new Set(lines.map((line) => line.parallelism))];
   const serviceStateText = serviceEnabledCount === 0
     ? '已暂停'
     : serviceEnabledCount === lines.length
@@ -185,6 +191,7 @@ export function formatAutopilotServiceStatus(
     stampAutopilotLine('Autopilot 服务级状态', generatedAt),
     '',
     `服务级开关：${serviceStateText}`,
+    `服务并行数：${parallelismValues.length === 0 ? '-' : parallelismValues.length === 1 ? parallelismValues[0] : '混合'}`,
     `已绑定项目：${lines.length}`,
     `项目级已开启：${projectEnabledCount}/${lines.length}`,
     `运行中：${runningCount} · 待命：${waitingCount} · 暂停：${pausedCount}`,
@@ -198,7 +205,7 @@ export function formatAutopilotServiceStatus(
   output.push('', '项目列表：');
   for (const line of lines) {
     output.push(
-      `- <#${line.channelId}> · **${line.projectName}** · 服务=${line.serviceEnabled ? '开' : '关'} · 项目=${line.projectEnabled ? '开' : '关'} · 状态=${line.runtimeStatus} · 周期=${line.intervalText} · 下次=${line.nextRunText}`,
+      `- <#${line.channelId}> · **${line.projectName}** · 服务=${line.serviceEnabled ? '开' : '关'} · 项目=${line.projectEnabled ? '开' : '关'} · 状态=${line.runtimeStatus} · 并行=${line.activeAutopilotRuns}/${line.parallelism} · 周期=${line.intervalText} · 下次=${line.nextRunText}`,
     );
   }
 
@@ -212,6 +219,8 @@ export function formatAutopilotProjectStatus(
   options: {
     generatedAt: string;
     nextRunText: string;
+    serviceParallelism: number;
+    activeAutopilotRuns: number;
   },
 ): string {
   const lines = [
@@ -220,6 +229,8 @@ export function formatAutopilotProjectStatus(
     `频道：<#${binding.channelId}>`,
     `运行状态：${describeAutopilotProjectState(project, service)}`,
     `服务开关：${service?.enabled === false ? '已暂停' : '已开启'}`,
+    `服务并行数：${options.serviceParallelism}`,
+    `Autopilot 运行槽：${options.activeAutopilotRuns}/${options.serviceParallelism}`,
     `项目开关：${project.enabled ? '已开启' : '已暂停'}`,
     `调度周期：${formatDurationMs(project.intervalMs)}`,
     `下次运行：${options.nextRunText}`,
@@ -453,6 +464,7 @@ export function formatAutopilotEntryCard(
     `项目：**${binding.projectName}**`,
     `运行状态：${describeAutopilotProjectState(project, service)}`,
     `服务开关：${service?.enabled === false ? '已暂停' : '已开启'}`,
+    `服务并行数：${normalizeAutopilotParallelism(service?.parallelism)}`,
     `项目开关：${project.enabled ? '已开启' : '已暂停'}`,
     `调度周期：${formatDurationMs(project.intervalMs)}`,
     `更新时间：${formatClockTimestamp(updatedAt)}`,
@@ -490,6 +502,7 @@ export function formatAutopilotThreadWelcome(binding: ChannelBinding, project: A
     '- !autopilot project run',
     '- !autopilot project interval 30m',
     '- !autopilot project prompt 优先补测试和稳定性，不要做大功能',
+    '- !autopilot server concurrency 2',
     '',
     '你可以直接发送类似下面的自然语言：',
     '- 优先补测试和稳定性，不要做大功能',
@@ -516,7 +529,10 @@ export function formatAutopilotBriefAck(project: AutopilotProjectState): string 
   ].join('\n');
 }
 
-export function formatAutopilotServiceAck(action: 'on' | 'off' | 'clear'): string {
+export function formatAutopilotServiceAck(
+  action: 'on' | 'off' | 'clear' | 'concurrency',
+  parallelism?: number,
+): string {
   switch (action) {
     case 'on':
       return `${stampAutopilotLine('已开启当前 bridge 进程里所有已绑定项目的服务级 Autopilot。')}\n\n项目仍需单独执行 \`!autopilot project on\` 才会按周期运行。`;
@@ -524,6 +540,8 @@ export function formatAutopilotServiceAck(action: 'on' | 'off' | 'clear'): strin
       return `${stampAutopilotLine('已暂停当前 bridge 进程里所有已绑定项目的服务级 Autopilot。')}\n\n不会启动新的自动迭代任务。`;
     case 'clear':
       return `${stampAutopilotLine('已清空当前 bridge 进程里所有已绑定项目的 Autopilot 任务看板和历史状态。')}\n\nPrompt、项目开关和调度周期会保留。`;
+    case 'concurrency':
+      return `${stampAutopilotLine(`已将当前 bridge 进程里所有已绑定项目的服务级 Autopilot 并行数设置为 ${parallelism ?? normalizeAutopilotParallelism(undefined)}。`)}\n\n新并行数会立即影响后续调度；已运行中的 Autopilot 不会被中断，主项目手动 Codex 也不会受影响。`;
   }
 }
 

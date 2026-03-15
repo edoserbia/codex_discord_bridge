@@ -56,6 +56,26 @@ test('parse autopilot server status command', () => {
   assert.deepEqual(parsed, { kind: 'autopilot', scope: 'server', action: 'status' });
 });
 
+test('parse autopilot server concurrency command', () => {
+  const parsed = parseCommand('!autopilot server concurrency 3', '!');
+  assert.deepEqual(parsed, {
+    kind: 'autopilot',
+    scope: 'server',
+    action: 'concurrency',
+    parallelism: 3,
+  });
+});
+
+test('parse autopilot concurrency shorthand command', () => {
+  const parsed = parseCommand('!autopilot concurrency 2', '!');
+  assert.deepEqual(parsed, {
+    kind: 'autopilot',
+    scope: 'server',
+    action: 'concurrency',
+    parallelism: 2,
+  });
+});
+
 test('parse autopilot project interval command', () => {
   const parsed = parseCommand('!autopilot project interval 30m', '!');
   assert.deepEqual(parsed, {

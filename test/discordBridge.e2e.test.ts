@@ -186,10 +186,17 @@ test('autopilot help is available in unbound channels and server commands apply 
   await dispatch(bridge, createUserMessage(controlChannel, '!autopilot status'));
   assert.ok(controlChannel.sent.some((message) => /Autopilot 服务级状态/.test(message.content)));
   assert.ok(controlChannel.sent.some((message) => /已绑定项目：2/.test(message.content)));
+  assert.equal(store.getAutopilotService('guild-1')?.parallelism, 5);
+  assert.equal(store.getAutopilotService('guild-2')?.parallelism, 5);
 
   await dispatch(bridge, createUserMessage(controlChannel, '!autopilot server on', { userId: 'admin-user' }));
   assert.equal(store.getAutopilotService('guild-1')?.enabled, true);
   assert.equal(store.getAutopilotService('guild-2')?.enabled, true);
+
+  await dispatch(bridge, createUserMessage(controlChannel, '!autopilot server concurrency 2', { userId: 'admin-user' }));
+  assert.equal(store.getAutopilotService('guild-1')?.parallelism, 2);
+  assert.equal(store.getAutopilotService('guild-2')?.parallelism, 2);
+  assert.ok(controlChannel.sent.some((message) => /服务级 Autopilot 并行数设置为 2/.test(message.content)));
 
   await dispatch(bridge, createUserMessage(controlChannel, '!autopilot server off', { userId: 'admin-user' }));
   assert.equal(store.getAutopilotService('guild-1')?.enabled, false);
@@ -273,7 +280,7 @@ test('autopilot thread natural-language messages update project direction instea
   await cleanupDir(rootDir);
 });
 
-test('autopilot runs in project thread with timestamped progress and only one project per guild per cycle', { concurrency: false }, async () => {
+test('autopilot respects a single-slot concurrency setting and posts timestamped project-thread progress', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-autopilot-run-');
   const workspaceA = await createWorkspace(path.join(rootDir, 'a'));
   const workspaceB = await createWorkspace(path.join(rootDir, 'b'));
@@ -286,6 +293,7 @@ test('autopilot runs in project thread with timestamped progress and only one pr
   await dispatch(bridge, createUserMessage(rootChannelA, `!bind aaa "${workspaceA}"`, { userId: 'admin-user' }));
   await dispatch(bridge, createUserMessage(rootChannelB, `!bind bbb "${workspaceB}"`, { userId: 'admin-user' }));
   await dispatch(bridge, createUserMessage(rootChannelA, '!autopilot server on', { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannelA, '!autopilot server concurrency 1', { userId: 'admin-user' }));
   await dispatch(bridge, createUserMessage(rootChannelA, '!autopilot project prompt 优先补测试和稳定性，不要做大功能', { userId: 'admin-user' }));
   await dispatch(bridge, createUserMessage(rootChannelA, '!autopilot project on', { userId: 'admin-user' }));
   await dispatch(bridge, createUserMessage(rootChannelB, '!autopilot project on', { userId: 'admin-user' }));
@@ -311,6 +319,45 @@ test('autopilot runs in project thread with timestamped progress and only one pr
   await (bridge as any).runAutopilotTick();
   await waitFor(() => threadB.sent.some((message) => /Autopilot 已启动/.test(message.content)), 15_000);
   await waitFor(() => threadB.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 15_000);
+  await cleanupDir(rootDir);
+});
+
+test('autopilot uses configurable parallelism and does not block or get blocked by manual project codex runs', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-autopilot-parallel-');
+  const workspaceA = await createWorkspace(path.join(rootDir, 'parallel-a'));
+  const workspaceB = await createWorkspace(path.join(rootDir, 'parallel-b'));
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannelA = new FakeChannel('channel-autopilot-parallel-a', 'guild-1');
+  const rootChannelB = new FakeChannel('channel-autopilot-parallel-b', 'guild-1');
+  channels.set(rootChannelA.id, rootChannelA);
+  channels.set(rootChannelB.id, rootChannelB);
+
+  await dispatch(bridge, createUserMessage(rootChannelA, `!bind aaa "${workspaceA}"`, { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannelB, `!bind bbb "${workspaceB}"`, { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannelA, '!autopilot server on', { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannelA, '!autopilot server concurrency 2', { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannelA, '!autopilot project on', { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannelB, '!autopilot project on', { userId: 'admin-user' }));
+
+  const projectA = store.getAutopilotProject(rootChannelA.id)!;
+  const projectB = store.getAutopilotProject(rootChannelB.id)!;
+  const threadA = channels.get(projectA.threadChannelId!)!;
+  const threadB = channels.get(projectB.threadChannelId!)!;
+
+  await dispatch(bridge, createUserMessage(rootChannelA, '[slow] manual root task'));
+  await waitFor(() => (
+    bridge as any
+  ).getDashboardData().some((entry: any) => entry.binding.channelId === rootChannelA.id
+    && entry.conversations.some((conversation: any) => conversation.conversationId === rootChannelA.id
+      && ['starting', 'running'].includes(conversation.status))), 15_000);
+
+  await (bridge as any).runAutopilotTick();
+  await waitFor(() => threadA.sent.some((message) => /Autopilot 已启动/.test(message.content)), 15_000);
+  await waitFor(() => threadB.sent.some((message) => /Autopilot 已启动/.test(message.content)), 15_000);
+  await waitFor(() => rootChannelA.sent.some((message) => /ok: \[slow\] manual root task/.test(message.content)), 15_000);
+  await waitFor(() => threadA.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 15_000);
+  await waitFor(() => threadB.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 15_000);
+  assert.equal(store.getAutopilotService('guild-1')?.parallelism, 2);
   await cleanupDir(rootDir);
 });
 

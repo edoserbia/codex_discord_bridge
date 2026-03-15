@@ -26,6 +26,7 @@ export interface ChannelBinding {
 export interface AutopilotServiceState {
   guildId: string;
   enabled: boolean;
+  parallelism: number;
   updatedAt: string;
 }
 

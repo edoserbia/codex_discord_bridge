@@ -15,6 +15,7 @@ const BRIDGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 
 export const AUTOPILOT_THREAD_NAME_PREFIX = 'Autopilot · ';
 export const DEFAULT_AUTOPILOT_INTERVAL_MS = 12 * 60 * 60 * 1000;
+export const DEFAULT_AUTOPILOT_PARALLELISM = 5;
 export const DEFAULT_AUTOPILOT_BRIEF = [
   '默认方向：优先测试覆盖、稳定性、低风险修复和小范围清理。',
   '默认边界：不要主动做大功能、不要改部署/权限模型、不要升级依赖。',
@@ -36,6 +37,12 @@ export function getAutopilotTickMs(): number {
 export function getAutopilotDefaultIntervalMs(): number {
   const parsed = Number.parseInt(process.env.AUTOPILOT_DEFAULT_INTERVAL_MS ?? '', 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_AUTOPILOT_INTERVAL_MS;
+}
+
+export function normalizeAutopilotParallelism(value: number | undefined): number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0
+    ? value
+    : DEFAULT_AUTOPILOT_PARALLELISM;
 }
 
 export function getAutopilotSkillPath(): string {

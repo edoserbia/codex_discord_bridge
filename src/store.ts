@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-import { getAutopilotDefaultIntervalMs } from './autopilot.js';
+import { getAutopilotDefaultIntervalMs, normalizeAutopilotParallelism } from './autopilot.js';
 import type {
   AutopilotProjectState,
   AutopilotServiceState,
@@ -31,7 +31,15 @@ export class JsonStateStore {
       this.state = {
         bindings: parsed.bindings ?? {},
         sessions: parsed.sessions ?? {},
-        autopilotServices: parsed.autopilotServices ?? {},
+        autopilotServices: Object.fromEntries(
+          Object.entries(parsed.autopilotServices ?? {}).map(([guildId, service]) => [
+            guildId,
+            {
+              ...service,
+              parallelism: normalizeAutopilotParallelism(service.parallelism),
+            } satisfies AutopilotServiceState,
+          ]),
+        ),
         autopilotProjects: Object.fromEntries(
           Object.entries(parsed.autopilotProjects ?? {}).map(([bindingChannelId, project]) => [
             bindingChannelId,
