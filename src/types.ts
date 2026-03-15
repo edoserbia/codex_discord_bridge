@@ -44,6 +44,8 @@ export interface AutopilotProjectState {
   guildId: string;
   threadChannelId?: string | undefined;
   entryMessageId?: string | undefined;
+  enabled: boolean;
+  intervalMs: number;
   brief: string;
   briefUpdatedAt: string;
   board: AutopilotBoardItem[];

@@ -41,7 +41,33 @@ test('reject invalid sandbox mode', () => {
   assert.throws(() => parseCommand('!bind api /tmp --sandbox unsafe', '!'), /sandbox/);
 });
 
-test('parse autopilot command', () => {
+test('parse autopilot help command', () => {
+  const parsed = parseCommand('!autopilot', '!');
+  assert.deepEqual(parsed, { kind: 'autopilot', scope: 'help' });
+});
+
+test('parse autopilot server shorthand command', () => {
   const parsed = parseCommand('!autopilot on', '!');
-  assert.deepEqual(parsed, { kind: 'autopilot', action: 'on' });
+  assert.deepEqual(parsed, { kind: 'autopilot', scope: 'server', action: 'on' });
+});
+
+test('parse autopilot project interval command', () => {
+  const parsed = parseCommand('!autopilot project interval 30m', '!');
+  assert.deepEqual(parsed, {
+    kind: 'autopilot',
+    scope: 'project',
+    action: 'interval',
+    intervalMs: 30 * 60 * 1000,
+    intervalText: '30m',
+  });
+});
+
+test('parse autopilot project prompt command', () => {
+  const parsed = parseCommand('!autopilot project prompt 优先补测试和稳定性，不要做大功能', '!');
+  assert.deepEqual(parsed, {
+    kind: 'autopilot',
+    scope: 'project',
+    action: 'prompt',
+    prompt: '优先补测试和稳定性，不要做大功能',
+  });
 });

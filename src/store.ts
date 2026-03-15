@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
+import { getAutopilotDefaultIntervalMs } from './autopilot.js';
 import type {
   AutopilotProjectState,
   AutopilotServiceState,
@@ -26,11 +27,23 @@ export class JsonStateStore {
     try {
       const raw = await fs.readFile(this.stateFilePath, 'utf8');
       const parsed = JSON.parse(raw) as PersistedState;
+      const defaultIntervalMs = getAutopilotDefaultIntervalMs();
       this.state = {
         bindings: parsed.bindings ?? {},
         sessions: parsed.sessions ?? {},
         autopilotServices: parsed.autopilotServices ?? {},
-        autopilotProjects: parsed.autopilotProjects ?? {},
+        autopilotProjects: Object.fromEntries(
+          Object.entries(parsed.autopilotProjects ?? {}).map(([bindingChannelId, project]) => [
+            bindingChannelId,
+            {
+              ...project,
+              enabled: project.enabled ?? false,
+              intervalMs: Number.isFinite(project.intervalMs) && project.intervalMs > 0
+                ? project.intervalMs
+                : defaultIntervalMs,
+            } satisfies AutopilotProjectState,
+          ]),
+        ),
       };
     } catch (error) {
       const nodeError = error as NodeJS.ErrnoException;
@@ -193,22 +206,53 @@ export class JsonStateStore {
         continue;
       }
 
-      this.state.autopilotProjects[bindingChannelId] = {
-        ...project,
-        board: [],
-        status: this.state.autopilotServices[guildId]?.enabled === false ? 'paused' : 'idle',
-        currentGoal: undefined,
-        currentRunStartedAt: undefined,
-        lastActivityAt: undefined,
-        lastActivityText: undefined,
-        lastResultStatus: undefined,
-        lastGoal: undefined,
-        lastSummary: undefined,
-        nextSuggestedWork: undefined,
-      };
+      this.state.autopilotProjects[bindingChannelId] = this.buildClearedAutopilotProject(project);
     }
 
     await this.save();
+  }
+
+  async clearAutopilotProject(bindingChannelId: string): Promise<AutopilotProjectState | undefined> {
+    const project = this.state.autopilotProjects[bindingChannelId];
+
+    if (!project) {
+      return undefined;
+    }
+
+    const nextProject = this.buildClearedAutopilotProject(project);
+    this.state.autopilotProjects[bindingChannelId] = nextProject;
+    await this.save();
+    return structuredClone(nextProject);
+  }
+
+  async clearAutopilotAll(): Promise<void> {
+    for (const [bindingChannelId, project] of Object.entries(this.state.autopilotProjects)) {
+      this.state.autopilotProjects[bindingChannelId] = this.buildClearedAutopilotProject(project);
+    }
+
+    await this.save();
+  }
+
+  private buildClearedAutopilotProject(project: AutopilotProjectState): AutopilotProjectState {
+    const serviceEnabled = this.state.autopilotServices[project.guildId]?.enabled ?? false;
+
+    return {
+      ...project,
+      board: [],
+      status: project.status === 'running'
+        ? 'running'
+        : serviceEnabled && project.enabled
+          ? 'idle'
+          : 'paused',
+      currentGoal: undefined,
+      currentRunStartedAt: undefined,
+      lastActivityAt: undefined,
+      lastActivityText: undefined,
+      lastResultStatus: undefined,
+      lastGoal: undefined,
+      lastSummary: undefined,
+      nextSuggestedWork: undefined,
+    };
   }
 
   private async save(): Promise<void> {

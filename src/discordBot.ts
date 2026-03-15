@@ -13,7 +13,7 @@ import {
   buildAutopilotFallbackSummary,
   buildAutopilotPrompt,
   DEFAULT_AUTOPILOT_BRIEF,
-  getAutopilotMinIntervalMs,
+  getAutopilotDefaultIntervalMs,
   getAutopilotSkillDir,
   getAutopilotThreadName,
   getAutopilotTickMs,
@@ -41,7 +41,9 @@ import { isCommandMessage, parseCommand } from './commandParser.js';
 import {
   formatAutopilotBriefAck,
   formatAutopilotEntryCard,
+  formatAutopilotHelp,
   formatAutopilotKickoff,
+  formatAutopilotProjectAck,
   formatAutopilotRunSummary,
   formatAutopilotServiceAck,
   formatAutopilotSkipNotice,
@@ -55,7 +57,7 @@ import {
   formatSuccessReply,
 } from './formatters.js';
 import { JsonStateStore } from './store.js';
-import { cloneCodexOptions, formatClockTimestamp, isWithinAllowedRoots, normalizeAllowedRoots, resolveExistingDirectory, splitIntoDiscordChunks, summarizeReasoningText, truncate } from './utils.js';
+import { cloneCodexOptions, formatClockTimestamp, isWithinAllowedRoots, normalizeAllowedRoots, resolveExistingDirectory, splitIntoDiscordChunks, summarizeReasoningText, truncate, uniqueStrings } from './utils.js';
 
 type SendableMessage = {
   id: string;
@@ -291,7 +293,7 @@ export class DiscordCodexBridge {
       this.runtimes.delete(session.conversationId);
     }
 
-    if (autopilotProject?.guildId) {
+    if (autopilotProject?.guildId && autopilotProject.status === 'running') {
       this.activeAutopilotGuilds.delete(autopilotProject.guildId);
     }
 
@@ -497,11 +499,15 @@ export class DiscordCodexBridge {
         await this.handleGuideCommand(message, resolved, command.prompt);
         return;
       case 'autopilot':
+        if (command.scope === 'help') {
+          await message.reply(formatAutopilotHelp(this.config.commandPrefix));
+          return;
+        }
         if (!this.isAdmin(message)) {
           await message.reply('只有管理员才能管理 Autopilot。');
           return;
         }
-        await this.handleAutopilotCommand(message, command.action);
+        await this.handleAutopilotCommand(message, resolved, command);
         return;
       case 'bind':
         if (isThread) {
@@ -576,6 +582,7 @@ export class DiscordCodexBridge {
         autopilotProject?.threadChannelId
           ? `Autopilot 线程：<#${autopilotProject.threadChannelId}>`
           : 'Autopilot 线程：创建失败或当前频道不支持线程，请检查频道类型与权限。',
+        'Autopilot 默认已创建但项目级调度默认暂停；可用 `!autopilot project on` 开启，`!autopilot` 查看完整说明。',
         executionChanged
           ? '检测到绑定配置已变更，已重置当前频道及其线程的 Codex 会话；下一条消息会按新权限新建会话。'
           : '现在主频道和其下线程都可以直接控制 Codex。',
@@ -665,22 +672,58 @@ export class DiscordCodexBridge {
     await this.enqueuePrompt(message, resolved, prompt, 'guidance');
   }
 
-  private async handleAutopilotCommand(message: Message, action: 'on' | 'off' | 'clear'): Promise<void> {
-    const guildId = message.guildId ?? message.guild?.id;
+  private async handleAutopilotCommand(
+    message: Message,
+    resolved: ResolvedConversation | undefined,
+    command: Exclude<Extract<ParsedCommand, { kind: 'autopilot' }>, { scope: 'help' }>,
+  ): Promise<void> {
+    if (command.scope === 'server') {
+      if (command.action === 'clear') {
+        await this.clearAllAutopilotProjects();
+        await message.reply(formatAutopilotServiceAck('clear'));
+        return;
+      }
 
-    if (!guildId) {
-      await message.reply('当前消息不在服务器中，无法管理 Autopilot。');
+      await this.setAutopilotEnabledAcrossBindings(command.action === 'on');
+      await message.reply(formatAutopilotServiceAck(command.action));
       return;
     }
 
-    if (action === 'clear') {
-      await this.clearGuildAutopilot(guildId);
-      await message.reply(formatAutopilotServiceAck('clear'));
+    if (!resolved) {
+      await message.reply('项目级 Autopilot 命令只能在已绑定项目频道或该项目的 Autopilot 线程里使用。');
       return;
     }
 
-    await this.setAutopilotEnabled(guildId, action === 'on');
-    await message.reply(formatAutopilotServiceAck(action));
+    const binding = resolved.binding;
+    const project = await this.ensureAutopilotResources(binding);
+
+    switch (command.action) {
+      case 'on': {
+        const nextProject = await this.setAutopilotProjectEnabled(binding, project, true);
+        await message.reply(formatAutopilotProjectAck('on', binding, nextProject));
+        return;
+      }
+      case 'off': {
+        const nextProject = await this.setAutopilotProjectEnabled(binding, project, false);
+        await message.reply(formatAutopilotProjectAck('off', binding, nextProject));
+        return;
+      }
+      case 'clear': {
+        const nextProject = await this.clearAutopilotProject(binding, project, '已清空项目 Autopilot 状态');
+        await message.reply(formatAutopilotProjectAck('clear', binding, nextProject));
+        return;
+      }
+      case 'interval': {
+        const nextProject = await this.setAutopilotProjectInterval(binding, project, command.intervalMs);
+        await message.reply(formatAutopilotProjectAck('interval', binding, nextProject));
+        return;
+      }
+      case 'prompt': {
+        const nextProject = await this.updateAutopilotProjectBrief(binding, project, command.prompt);
+        await message.reply(formatAutopilotProjectAck('prompt', binding, nextProject));
+        return;
+      }
+    }
   }
 
   private async handleAutopilotThreadMessage(message: Message, project: AutopilotProjectState): Promise<void> {
@@ -696,6 +739,33 @@ export class DiscordCodexBridge {
       return;
     }
 
+    const binding = this.store.getBinding(project.bindingChannelId);
+    if (!binding) {
+      await message.reply('当前项目绑定不存在，无法更新 Autopilot 方向。');
+      return;
+    }
+
+    const nextProject = await this.updateAutopilotProjectBrief(binding, project, brief);
+    await message.reply(formatAutopilotBriefAck(nextProject));
+  }
+
+  private getAutopilotProjectStatus(
+    project: AutopilotProjectState,
+    serviceEnabled = this.store.getAutopilotService(project.guildId)?.enabled ?? false,
+    preserveRunning = true,
+  ): AutopilotProjectState['status'] {
+    if (preserveRunning && project.status === 'running') {
+      return 'running';
+    }
+
+    return serviceEnabled && project.enabled ? 'idle' : 'paused';
+  }
+
+  private async updateAutopilotProjectBrief(
+    binding: ChannelBinding,
+    project: AutopilotProjectState,
+    brief: string,
+  ): Promise<AutopilotProjectState> {
     const now = new Date().toISOString();
     const nextProject = await this.store.upsertAutopilotProject({
       ...project,
@@ -703,14 +773,11 @@ export class DiscordCodexBridge {
       briefUpdatedAt: now,
       lastActivityAt: now,
       lastActivityText: '已更新项目自动迭代方向',
+      status: this.getAutopilotProjectStatus(project),
     });
 
-    const binding = this.store.getBinding(project.bindingChannelId);
-    if (binding) {
-      await this.refreshAutopilotEntryCard(binding, nextProject);
-    }
-
-    await message.reply(formatAutopilotBriefAck(nextProject));
+    await this.refreshAutopilotEntryCard(binding, nextProject);
+    return nextProject;
   }
 
   private async setAutopilotEnabled(guildId: string, enabled: boolean): Promise<AutopilotServiceState> {
@@ -723,11 +790,7 @@ export class DiscordCodexBridge {
     for (const project of this.store.listAutopilotProjects(guildId)) {
       await this.store.upsertAutopilotProject({
         ...project,
-        status: project.status === 'running'
-          ? 'running'
-          : enabled
-            ? 'idle'
-            : 'paused',
+        status: this.getAutopilotProjectStatus(project, enabled),
       });
     }
 
@@ -735,21 +798,80 @@ export class DiscordCodexBridge {
     return nextService;
   }
 
-  private async clearGuildAutopilot(guildId: string): Promise<void> {
-    for (const project of this.store.listAutopilotProjects(guildId)) {
-      if (!project.threadChannelId) {
+  private async setAutopilotEnabledAcrossBindings(enabled: boolean): Promise<void> {
+    const guildIds = uniqueStrings([
+      ...this.store.listBindings().map((binding) => binding.guildId),
+      ...this.store.listAutopilotServices().map((service) => service.guildId),
+    ]);
+
+    for (const guildId of guildIds) {
+      await this.setAutopilotEnabled(guildId, enabled);
+    }
+  }
+
+  private async setAutopilotProjectEnabled(
+    binding: ChannelBinding,
+    project: AutopilotProjectState,
+    enabled: boolean,
+  ): Promise<AutopilotProjectState> {
+    const now = new Date().toISOString();
+    const nextProject = await this.store.upsertAutopilotProject({
+      ...project,
+      enabled,
+      status: this.getAutopilotProjectStatus({ ...project, enabled }),
+      lastActivityAt: now,
+      lastActivityText: enabled ? '项目级 Autopilot 已开启' : '项目级 Autopilot 已暂停',
+    });
+
+    await this.refreshAutopilotEntryCard(binding, nextProject);
+    return nextProject;
+  }
+
+  private async setAutopilotProjectInterval(
+    binding: ChannelBinding,
+    project: AutopilotProjectState,
+    intervalMs: number,
+  ): Promise<AutopilotProjectState> {
+    const now = new Date().toISOString();
+    const nextProject = await this.store.upsertAutopilotProject({
+      ...project,
+      intervalMs,
+      status: this.getAutopilotProjectStatus(project),
+      lastActivityAt: now,
+      lastActivityText: '已更新项目 Autopilot 调度周期',
+    });
+
+    await this.refreshAutopilotEntryCard(binding, nextProject);
+    return nextProject;
+  }
+
+  private async clearAutopilotProject(
+    binding: ChannelBinding,
+    project: AutopilotProjectState,
+    activityText: string,
+  ): Promise<AutopilotProjectState> {
+    const clearedProject = await this.store.clearAutopilotProject(binding.channelId) ?? project;
+    const now = new Date().toISOString();
+    const nextProject = await this.store.upsertAutopilotProject({
+      ...clearedProject,
+      status: this.getAutopilotProjectStatus(clearedProject),
+      lastActivityAt: now,
+      lastActivityText: activityText,
+    });
+
+    await this.refreshAutopilotEntryCard(binding, nextProject);
+    return nextProject;
+  }
+
+  private async clearAllAutopilotProjects(): Promise<void> {
+    for (const binding of this.store.listBindings()) {
+      const project = this.store.getAutopilotProject(binding.channelId);
+      if (!project) {
         continue;
       }
 
-      const activeJob = this.activeJobs.get(project.threadChannelId);
-      if (activeJob) {
-        activeJob.cancel();
-      }
+      await this.clearAutopilotProject(binding, project, '服务级已清空 Autopilot 状态');
     }
-
-    this.activeAutopilotGuilds.delete(guildId);
-    await this.store.clearAutopilotGuild(guildId);
-    await this.refreshAutopilotEntryCards(guildId);
   }
 
   private async reconcileAutopilotResources(): Promise<void> {
@@ -806,12 +928,11 @@ export class DiscordCodexBridge {
 
   private async pickDueAutopilotBinding(guildId: string): Promise<ChannelBinding | undefined> {
     const now = Date.now();
-    const minIntervalMs = getAutopilotMinIntervalMs();
 
     for (const binding of this.store.listBindings(guildId)) {
       const project = await this.ensureAutopilotResources(binding);
 
-      if (project.status === 'running') {
+      if (!project.enabled || project.status === 'running') {
         continue;
       }
 
@@ -824,7 +945,7 @@ export class DiscordCodexBridge {
       }
 
       const lastRunAt = new Date(project.lastRunAt).getTime();
-      if (!Number.isFinite(lastRunAt) || now - lastRunAt >= minIntervalMs) {
+      if (!Number.isFinite(lastRunAt) || now - lastRunAt >= project.intervalMs) {
         return binding;
       }
     }
@@ -848,7 +969,7 @@ export class DiscordCodexBridge {
   private async launchAutopilotForBinding(binding: ChannelBinding): Promise<void> {
     const project = await this.ensureAutopilotResources(binding);
 
-    if (!project.threadChannelId) {
+    if (!project.threadChannelId || !project.enabled) {
       return;
     }
 
@@ -914,7 +1035,7 @@ export class DiscordCodexBridge {
     const now = new Date().toISOString();
     const nextProject: AutopilotProjectState = {
       ...project,
-      status: this.store.getAutopilotService(binding.guildId)?.enabled === false ? 'paused' : 'idle',
+      status: this.getAutopilotProjectStatus(project, undefined, false),
       board: report
         ? boardItemsFromReport(report, project.board)
         : this.buildFallbackAutopilotBoard(project, result.success),
@@ -962,7 +1083,7 @@ export class DiscordCodexBridge {
     const now = new Date().toISOString();
     const nextProject = await this.store.upsertAutopilotProject({
       ...project,
-      status: this.store.getAutopilotService(binding.guildId)?.enabled === false ? 'paused' : 'idle',
+      status: this.getAutopilotProjectStatus(project, undefined, false),
       lastRunAt: now,
       lastResultStatus: 'failed',
       lastSummary: errorMessage,
@@ -995,11 +1116,28 @@ export class DiscordCodexBridge {
       project = await this.store.upsertAutopilotProject({
         bindingChannelId: binding.channelId,
         guildId: binding.guildId,
+        enabled: false,
+        intervalMs: getAutopilotDefaultIntervalMs(),
         brief: DEFAULT_AUTOPILOT_BRIEF,
         briefUpdatedAt: new Date().toISOString(),
         board: [],
-        status: service.enabled ? 'idle' : 'paused',
+        status: 'paused',
       });
+    } else if (!Number.isFinite(project.intervalMs) || project.intervalMs <= 0) {
+      project = await this.store.upsertAutopilotProject({
+        ...project,
+        enabled: project.enabled ?? false,
+        intervalMs: getAutopilotDefaultIntervalMs(),
+        status: this.getAutopilotProjectStatus(project),
+      });
+    } else {
+      const nextStatus = this.getAutopilotProjectStatus(project, service.enabled);
+      if (project.status !== nextStatus) {
+        project = await this.store.upsertAutopilotProject({
+          ...project,
+          status: nextStatus,
+        });
+      }
     }
 
     const rootChannel = await this.fetchChannel(binding.channelId);
