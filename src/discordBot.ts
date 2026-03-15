@@ -44,8 +44,10 @@ import {
   formatAutopilotHelp,
   formatAutopilotKickoff,
   formatAutopilotProjectAck,
+  formatAutopilotProjectStatus,
   formatAutopilotRunSummary,
   formatAutopilotServiceAck,
+  formatAutopilotServiceStatus,
   formatAutopilotSkipNotice,
   formatAutopilotThreadWelcome,
   formatFailureReply,
@@ -57,7 +59,7 @@ import {
   formatSuccessReply,
 } from './formatters.js';
 import { JsonStateStore } from './store.js';
-import { cloneCodexOptions, formatClockTimestamp, isWithinAllowedRoots, normalizeAllowedRoots, resolveExistingDirectory, splitIntoDiscordChunks, summarizeReasoningText, truncate, uniqueStrings } from './utils.js';
+import { cloneCodexOptions, formatClockTimestamp, formatDurationMs, isWithinAllowedRoots, normalizeAllowedRoots, resolveExistingDirectory, splitIntoDiscordChunks, summarizeReasoningText, truncate, uniqueStrings } from './utils.js';
 
 type SendableMessage = {
   id: string;
@@ -416,6 +418,19 @@ export class DiscordCodexBridge {
     });
   }
 
+  private async replyWithChunks(message: Message, content: string): Promise<void> {
+    const chunks = splitIntoDiscordChunks(content, 1800);
+    const [firstChunk, ...remainingChunks] = chunks;
+
+    if (firstChunk) {
+      await message.reply(firstChunk);
+    }
+
+    for (const chunk of remainingChunks) {
+      await (message.channel as SendableChannel).send(chunk);
+    }
+  }
+
   private startProcessQueue(conversationId: string): void {
     void this.processQueue(conversationId).catch(async (error) => {
       await this.handleProcessQueueError(conversationId, error);
@@ -500,10 +515,10 @@ export class DiscordCodexBridge {
         return;
       case 'autopilot':
         if (command.scope === 'help') {
-          await message.reply(formatAutopilotHelp(this.config.commandPrefix));
+          await this.replyWithChunks(message, formatAutopilotHelp(this.config.commandPrefix));
           return;
         }
-        if (!this.isAdmin(message)) {
+        if (command.action !== 'status' && !this.isAdmin(message)) {
           await message.reply('只有管理员才能管理 Autopilot。');
           return;
         }
@@ -678,6 +693,11 @@ export class DiscordCodexBridge {
     command: Exclude<Extract<ParsedCommand, { kind: 'autopilot' }>, { scope: 'help' }>,
   ): Promise<void> {
     if (command.scope === 'server') {
+      if (command.action === 'status') {
+        await this.replyWithChunks(message, await this.buildAutopilotServiceStatusText());
+        return;
+      }
+
       if (command.action === 'clear') {
         await this.clearAllAutopilotProjects();
         await message.reply(formatAutopilotServiceAck('clear'));
@@ -698,6 +718,12 @@ export class DiscordCodexBridge {
     const project = await this.ensureAutopilotResources(binding);
 
     switch (command.action) {
+      case 'status':
+        await this.replyWithChunks(
+          message,
+          this.buildAutopilotProjectStatusText(binding, project, this.store.getAutopilotService(binding.guildId)),
+        );
+        return;
       case 'on': {
         const nextProject = await this.setAutopilotProjectEnabled(binding, project, true);
         await message.reply(formatAutopilotProjectAck('on', binding, nextProject));
@@ -747,6 +773,93 @@ export class DiscordCodexBridge {
 
     const nextProject = await this.updateAutopilotProjectBrief(binding, project, brief);
     await message.reply(formatAutopilotBriefAck(nextProject));
+  }
+
+  private describeAutopilotProjectRuntime(
+    project: AutopilotProjectState,
+    service = this.store.getAutopilotService(project.guildId),
+  ): string {
+    if (project.status === 'running') {
+      return '运行中';
+    }
+
+    if (service?.enabled === false) {
+      return '服务已暂停';
+    }
+
+    if (!project.enabled) {
+      return '项目已暂停';
+    }
+
+    return '待命';
+  }
+
+  private buildAutopilotNextRunText(
+    project: AutopilotProjectState,
+    service = this.store.getAutopilotService(project.guildId),
+    nowMs = Date.now(),
+  ): string {
+    if (project.status === 'running') {
+      return project.currentRunStartedAt
+        ? `当前运行中（开始于 ${project.currentRunStartedAt}）`
+        : '当前运行中';
+    }
+
+    if (service?.enabled === false) {
+      return '服务级已暂停';
+    }
+
+    if (!project.enabled) {
+      return '项目级已暂停';
+    }
+
+    if (!project.lastRunAt) {
+      return '立即可运行';
+    }
+
+    const lastRunAtMs = new Date(project.lastRunAt).getTime();
+    if (!Number.isFinite(lastRunAtMs)) {
+      return '立即可运行';
+    }
+
+    const nextRunAtMs = lastRunAtMs + project.intervalMs;
+    if (nextRunAtMs <= nowMs) {
+      return '立即可运行';
+    }
+
+    return new Date(nextRunAtMs).toISOString();
+  }
+
+  private async buildAutopilotServiceStatusText(): Promise<string> {
+    const generatedAt = new Date().toISOString();
+    const lines = [];
+
+    for (const binding of this.store.listBindings()) {
+      const project = await this.ensureAutopilotResources(binding);
+      const service = this.store.getAutopilotService(binding.guildId);
+      lines.push({
+        channelId: binding.channelId,
+        projectName: binding.projectName,
+        serviceEnabled: service?.enabled ?? false,
+        projectEnabled: project.enabled,
+        runtimeStatus: this.describeAutopilotProjectRuntime(project, service),
+        intervalText: formatDurationMs(project.intervalMs),
+        nextRunText: this.buildAutopilotNextRunText(project, service),
+      });
+    }
+
+    return formatAutopilotServiceStatus(lines, generatedAt);
+  }
+
+  private buildAutopilotProjectStatusText(
+    binding: ChannelBinding,
+    project: AutopilotProjectState,
+    service: AutopilotServiceState | undefined,
+  ): string {
+    return formatAutopilotProjectStatus(binding, project, service, {
+      generatedAt: new Date().toISOString(),
+      nextRunText: this.buildAutopilotNextRunText(project, service),
+    });
   }
 
   private getAutopilotProjectStatus(

@@ -95,6 +95,24 @@ test('runner surfaces reasoning and todo list updates', async () => {
   await cleanupDir(rootDir);
 });
 
+test('runner treats completed todo status fields as checked plan items', async () => {
+  const rootDir = await makeTempDir('codex-runner-plan-status-');
+  const workspace = await createWorkspace(rootDir);
+  const runner = new CodexRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+  const planSnapshots: Array<Array<{ text: string; completed: boolean }>> = [];
+
+  const result = await runner.start(binding, { prompt: '[plan-status] inspect', imagePaths: [], extraAddDirs: [] }, undefined, {
+    onTodoListChanged: async (items) => { planSnapshots.push(items.map((item) => ({ ...item }))); },
+  }).done;
+
+  assert.equal(result.success, true);
+  assert.ok(planSnapshots.length >= 2);
+  assert.equal(planSnapshots[0]?.[0]?.completed, true);
+  assert.equal(planSnapshots.at(-1)?.every((item) => item.completed), true);
+  await cleanupDir(rootDir);
+});
+
 test('runner handles resume and command events', async () => {
   const rootDir = await makeTempDir('codex-runner-resume-');
   const workspace = await createWorkspace(rootDir);

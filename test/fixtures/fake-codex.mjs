@@ -104,6 +104,7 @@ const scenario = (() => {
   if (prompt.includes('[invalid-json]')) return 'invalid-json';
   if (prompt.includes('[command]')) return 'command';
   if (prompt.includes('[plan]')) return 'plan';
+  if (prompt.includes('[plan-status]')) return 'plan-status';
   if (prompt.includes('[attachments]')) return 'attachments';
   if (prompt.includes('AUTOPILOT_REPORT')) return 'autopilot';
   return 'simple';
@@ -265,6 +266,33 @@ if (scenario === 'plan') {
         { text: 'Create a short plan', completed: true },
         { text: 'Run pwd', completed: true },
         { text: 'Summarize the result', completed: true },
+      ],
+    },
+  });
+}
+
+if (scenario === 'plan-status') {
+  event({
+    type: 'item.started',
+    item: {
+      id: 'todo_status_1',
+      type: 'todo_list',
+      items: [
+        { text: 'Inspect files', status: 'completed' },
+        { text: 'Patch code', status: 'in_progress' },
+        { text: 'Run tests', status: 'pending' },
+      ],
+    },
+  });
+  event({
+    type: 'item.updated',
+    item: {
+      id: 'todo_status_1',
+      type: 'todo_list',
+      items: [
+        { text: 'Inspect files', status: 'completed' },
+        { text: 'Patch code', status: 'completed' },
+        { text: 'Run tests', status: 'completed' },
       ],
     },
   });
