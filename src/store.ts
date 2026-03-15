@@ -1,10 +1,21 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-import type { ChannelBinding, ConversationSessionState, PersistedState } from './types.js';
+import type {
+  AutopilotProjectState,
+  AutopilotServiceState,
+  ChannelBinding,
+  ConversationSessionState,
+  PersistedState,
+} from './types.js';
 
 export class JsonStateStore {
-  private state: PersistedState = { bindings: {}, sessions: {} };
+  private state: PersistedState = {
+    bindings: {},
+    sessions: {},
+    autopilotServices: {},
+    autopilotProjects: {},
+  };
   private saveChain: Promise<void> = Promise.resolve();
 
   constructor(private readonly stateFilePath: string) {}
@@ -18,6 +29,8 @@ export class JsonStateStore {
       this.state = {
         bindings: parsed.bindings ?? {},
         sessions: parsed.sessions ?? {},
+        autopilotServices: parsed.autopilotServices ?? {},
+        autopilotProjects: parsed.autopilotProjects ?? {},
       };
     } catch (error) {
       const nodeError = error as NodeJS.ErrnoException;
@@ -56,6 +69,7 @@ export class JsonStateStore {
     }
 
     delete this.state.bindings[channelId];
+    delete this.state.autopilotProjects[channelId];
 
     for (const [conversationId, session] of Object.entries(this.state.sessions)) {
       if (session.bindingChannelId === channelId) {
@@ -135,6 +149,65 @@ export class JsonStateStore {
 
   async removeSession(conversationId: string): Promise<void> {
     delete this.state.sessions[conversationId];
+    await this.save();
+  }
+
+  getAutopilotService(guildId: string): AutopilotServiceState | undefined {
+    const service = this.state.autopilotServices[guildId];
+    return service ? structuredClone(service) : undefined;
+  }
+
+  listAutopilotServices(): AutopilotServiceState[] {
+    return Object.values(this.state.autopilotServices)
+      .sort((left, right) => left.guildId.localeCompare(right.guildId))
+      .map((service) => structuredClone(service));
+  }
+
+  async upsertAutopilotService(service: AutopilotServiceState): Promise<AutopilotServiceState> {
+    this.state.autopilotServices[service.guildId] = structuredClone(service);
+    await this.save();
+    return structuredClone(service);
+  }
+
+  getAutopilotProject(bindingChannelId: string): AutopilotProjectState | undefined {
+    const project = this.state.autopilotProjects[bindingChannelId];
+    return project ? structuredClone(project) : undefined;
+  }
+
+  listAutopilotProjects(guildId?: string): AutopilotProjectState[] {
+    return Object.values(this.state.autopilotProjects)
+      .filter((project) => !guildId || project.guildId === guildId)
+      .sort((left, right) => left.bindingChannelId.localeCompare(right.bindingChannelId))
+      .map((project) => structuredClone(project));
+  }
+
+  async upsertAutopilotProject(project: AutopilotProjectState): Promise<AutopilotProjectState> {
+    this.state.autopilotProjects[project.bindingChannelId] = structuredClone(project);
+    await this.save();
+    return structuredClone(project);
+  }
+
+  async clearAutopilotGuild(guildId: string): Promise<void> {
+    for (const [bindingChannelId, project] of Object.entries(this.state.autopilotProjects)) {
+      if (project.guildId !== guildId) {
+        continue;
+      }
+
+      this.state.autopilotProjects[bindingChannelId] = {
+        ...project,
+        board: [],
+        status: this.state.autopilotServices[guildId]?.enabled === false ? 'paused' : 'idle',
+        currentGoal: undefined,
+        currentRunStartedAt: undefined,
+        lastActivityAt: undefined,
+        lastActivityText: undefined,
+        lastResultStatus: undefined,
+        lastGoal: undefined,
+        lastSummary: undefined,
+        nextSuggestedWork: undefined,
+      };
+    }
+
     await this.save();
   }
 

@@ -1,5 +1,17 @@
-import type { ActiveRunState, ChannelBinding, ChannelRuntime, CodexRunResult, ConversationSessionState, DashboardBinding, PlanItem, PromptTask } from './types.js';
+import type {
+  ActiveRunState,
+  AutopilotProjectState,
+  AutopilotServiceState,
+  ChannelBinding,
+  ChannelRuntime,
+  CodexRunResult,
+  ConversationSessionState,
+  DashboardBinding,
+  PlanItem,
+  PromptTask,
+} from './types.js';
 
+import { summarizeAutopilotBoard, stampAutopilotLine } from './autopilot.js';
 import { filterDiagnosticStderr } from './codexDiagnostics.js';
 import { formatClockTimestamp, sanitizeInlineCode, shortId, tailLines, truncate } from './utils.js';
 
@@ -77,6 +89,7 @@ export function formatHelp(prefix: string): string {
     '🤖 **Codex Discord Bridge 帮助**',
     '',
     `- 绑定频道：\`${prefix}bind <项目名> <目录> [--sandbox ...] [--approval ...] [--search on|off]\``,
+    `- Autopilot 开关：\`${prefix}autopilot <on|off|clear>\``,
     `- 查看状态：\`${prefix}status\``,
     `- 查看队列：\`${prefix}queue\``,
     `- 运行中引导：\`${prefix}guide <追加指令>\``,
@@ -86,6 +99,7 @@ export function formatHelp(prefix: string): string {
     `- 查看所有项目：\`${prefix}projects\``,
     '',
     '绑定成功后，主频道和其下 Discord 线程里的普通消息都会直接作为 Codex prompt 发送。',
+    '绑定后还会自动创建一个 Autopilot 项目线程；在线程里发送管理员自然语言消息，会更新该项目的自动迭代方向。',
     '现在会在频道里持续更新实时进度、命令执行和计划状态。',
     '如果当前任务正在运行，可用 `!guide <内容>` 插入中途引导，bridge 会中断当前步骤，先处理引导，再按同一会话继续原任务。',
     '图片附件会自动透传到 `codex -i`，普通文件会下载到本地附件目录供 Codex 读取。',
@@ -281,6 +295,129 @@ export function formatFailureReply(binding: ChannelBinding, requestedBy: string,
 
   lines.push('', '诊断信息：', '```', truncate(stderrTail, 900), '```', '', '如果是会话损坏，可发送 `!reset` 后重试。');
   return lines.join('\n');
+}
+
+export function formatAutopilotEntryCard(
+  binding: ChannelBinding,
+  project: AutopilotProjectState,
+  service: AutopilotServiceState | undefined,
+): string {
+  const lines = [
+    '🤖 **Autopilot 入口**',
+    `项目：**${binding.projectName}**`,
+    `状态：${service?.enabled === false ? '已暂停' : project.status === 'running' ? '运行中' : '待命'}`,
+    `更新时间：${formatClockTimestamp(project.lastActivityAt ?? project.briefUpdatedAt)}`,
+    `项目方向：${truncate(project.brief.replace(/\s+/g, ' '), 150)}`,
+    `任务看板：${summarizeAutopilotBoard(project.board)}`,
+  ];
+
+  if (project.threadChannelId) {
+    lines.push(`Autopilot 线程：<#${project.threadChannelId}>`);
+  }
+
+  if (project.lastGoal) {
+    lines.push(`最近目标：${truncate(project.lastGoal, 140)}`);
+  }
+
+  if (project.lastSummary) {
+    lines.push(`最近结果：${truncate(project.lastSummary, 160)}`);
+  }
+
+  if (project.nextSuggestedWork) {
+    lines.push(`下一步建议：${truncate(project.nextSuggestedWork, 160)}`);
+  }
+
+  lines.push('说明：主频道保留这条入口消息；自动迭代的详细过程和自然语言方向，都在线程里进行。');
+  return truncate(lines.join('\n'), 1900);
+}
+
+export function formatAutopilotThreadWelcome(binding: ChannelBinding, project: AutopilotProjectState): string {
+  return [
+    stampAutopilotLine(`已创建 **${binding.projectName}** 的 Autopilot 线程。`),
+    '',
+    '这个线程只做两件事：',
+    '- 接收当前项目的自动迭代方向自然语言',
+    '- 展示每一轮自动迭代的实时进度和总结',
+    '',
+    '你可以直接发送类似下面的自然语言：',
+    '- 优先补测试和稳定性，不要做大功能',
+    '- 先处理会话恢复和绑定重置，部署脚本先不要动',
+    '- 可以做围绕绑定体验的小功能，但权限模型先只提建议',
+    '',
+    `当前项目方向：${project.brief}`,
+  ].join('\n');
+}
+
+export function formatAutopilotBriefAck(project: AutopilotProjectState): string {
+  return [
+    stampAutopilotLine('已更新当前项目的自动迭代方向。'),
+    '',
+    '当前理解：',
+    project.brief,
+    '',
+    `当前任务看板：${summarizeAutopilotBoard(project.board)}`,
+    '新的要求会在下一次 Autopilot 周期生效。',
+  ].join('\n');
+}
+
+export function formatAutopilotServiceAck(action: 'on' | 'off' | 'clear'): string {
+  switch (action) {
+    case 'on':
+      return `${stampAutopilotLine('已开启当前服务器的 Autopilot。')}\n\n已绑定项目会在后续周期自动检查是否需要执行。`;
+    case 'off':
+      return `${stampAutopilotLine('已暂停当前服务器的 Autopilot。')}\n\n不会启动新的自动迭代任务。`;
+    case 'clear':
+      return `${stampAutopilotLine('已清空当前服务器的 Autopilot 任务看板和排队状态。')}\n\n项目方向保留，后续可以继续恢复运行。`;
+  }
+}
+
+export function formatAutopilotKickoff(
+  binding: ChannelBinding,
+  project: AutopilotProjectState,
+  goal: string,
+): string {
+  return [
+    stampAutopilotLine(`Autopilot 已启动：**${binding.projectName}**`),
+    '',
+    `本轮目标：${goal}`,
+    `当前项目方向：${truncate(project.brief.replace(/\s+/g, ' '), 240)}`,
+    `任务看板：${summarizeAutopilotBoard(project.board)}`,
+    '说明：下面会持续同步本轮计划、命令、输出和最终结果。',
+  ].join('\n');
+}
+
+export function formatAutopilotRunSummary(
+  binding: ChannelBinding,
+  project: AutopilotProjectState,
+): string {
+  const lines = [
+    stampAutopilotLine(`Autopilot 本轮结束：**${binding.projectName}**`),
+    '',
+    `结果：${project.lastResultStatus ?? 'unknown'}`,
+  ];
+
+  if (project.lastGoal) {
+    lines.push(`本轮目标：${project.lastGoal}`);
+  }
+
+  if (project.lastSummary) {
+    lines.push(`完成情况：${project.lastSummary}`);
+  }
+
+  if (project.nextSuggestedWork) {
+    lines.push(`下一步建议：${project.nextSuggestedWork}`);
+  }
+
+  lines.push(`任务看板：${summarizeAutopilotBoard(project.board)}`);
+  return lines.join('\n');
+}
+
+export function formatAutopilotSkipNotice(binding: ChannelBinding, reason: string): string {
+  return [
+    stampAutopilotLine(`Autopilot 跳过：**${binding.projectName}**`),
+    '',
+    `原因：${reason}`,
+  ].join('\n');
 }
 
 export function formatDashboardHtml(data: DashboardBinding[]): string {

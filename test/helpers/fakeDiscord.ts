@@ -11,7 +11,9 @@ export class FakePermissions {
 export class FakeChannel {
   public readonly sent: FakeMessage[] = [];
   public typingCount = 0;
+  public archived = false;
   private readonly store = new Map<string, FakeMessage>();
+  private registry?: Map<string, FakeChannel>;
 
   public readonly messages = {
     fetch: async (messageId: string): Promise<any> => {
@@ -22,6 +24,20 @@ export class FakeChannel {
       }
 
       return message as any;
+    },
+  };
+
+  public readonly threads = {
+    create: async (options: { name: string }): Promise<any> => {
+      const channel = new FakeChannel(
+        `thread-${randomUUID().slice(0, 8)}`,
+        this.guildId,
+        this.id,
+        true,
+        this.registry,
+      );
+      this.registry?.set(channel.id, channel);
+      return channel as any;
     },
   };
 
@@ -54,6 +70,14 @@ export class FakeChannel {
     this.typingCount += 1;
   }
 
+  async setArchived(archived: boolean): Promise<void> {
+    this.archived = archived;
+  }
+
+  attachRegistry(registry: Map<string, FakeChannel>): void {
+    this.registry = registry;
+  }
+
   getMessage(id: string): FakeMessage | undefined {
     return this.store.get(id);
   }
@@ -84,6 +108,7 @@ export class FakeMessage {
   public readonly member: { permissions: FakePermissions };
   public readonly attachments: Map<string, any>;
   public readonly reactions: string[] = [];
+  public pinned = false;
 
   constructor(init: FakeMessageInit) {
     this.id = init.id ?? randomUUID();
@@ -107,6 +132,11 @@ export class FakeMessage {
 
   async edit(content: string): Promise<any> {
     this.content = content;
+    return this as any;
+  }
+
+  async pin(): Promise<any> {
+    this.pinned = true;
     return this as any;
   }
 }

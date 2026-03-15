@@ -17,6 +17,7 @@ export type ParsedCommand =
   | { kind: 'help' }
   | { kind: 'bind'; projectName: string; workspacePath: string; options: BindCommandOptions }
   | { kind: 'guide'; prompt: string }
+  | { kind: 'autopilot'; action: 'on' | 'off' | 'clear' }
   | { kind: 'unbind' }
   | { kind: 'projects' }
   | { kind: 'status' }
@@ -88,6 +89,15 @@ export function parseCommand(content: string, prefix: string): ParsedCommand {
       return { kind: 'reset' };
     case 'queue':
       return { kind: 'queue' };
+    case 'autopilot': {
+      const action = tokens.shift()?.toLowerCase();
+
+      if (action === 'on' || action === 'off' || action === 'clear') {
+        return { kind: 'autopilot', action };
+      }
+
+      throw new Error('用法：!autopilot <on|off|clear>');
+    }
     case 'bind': {
       const projectName = tokens.shift();
       const workspacePath = tokens.shift();

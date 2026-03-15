@@ -105,6 +105,7 @@ const scenario = (() => {
   if (prompt.includes('[command]')) return 'command';
   if (prompt.includes('[plan]')) return 'plan';
   if (prompt.includes('[attachments]')) return 'attachments';
+  if (prompt.includes('AUTOPILOT_REPORT')) return 'autopilot';
   return 'simple';
 })();
 
@@ -269,6 +270,53 @@ if (scenario === 'plan') {
   });
 }
 
+if (scenario === 'autopilot') {
+  event({
+    type: 'item.completed',
+    item: {
+      id: 'reason_auto',
+      type: 'reasoning',
+      text: 'I will pick one low-risk task, run validation, and then update the lightweight autopilot board.',
+    },
+  });
+  event({
+    type: 'item.updated',
+    item: {
+      id: 'todo_auto',
+      type: 'todo_list',
+      items: [
+        { text: 'Pick one low-risk task', completed: true },
+        { text: 'Implement and validate it', completed: true },
+        { text: 'Update AUTOPILOT_REPORT', completed: true },
+      ],
+    },
+  });
+  event({ type: 'item.started', item: { id: 'cmd_auto_1', type: 'command_execution', command: '/bin/zsh -lc "npm run check"' } });
+  event({
+    type: 'item.completed',
+    item: {
+      id: 'cmd_auto_1',
+      type: 'command_execution',
+      command: '/bin/zsh -lc "npm run check"',
+      aggregated_output: 'check ok\n',
+      exit_code: 0,
+      status: 'completed',
+    },
+  });
+  event({ type: 'item.started', item: { id: 'cmd_auto_2', type: 'command_execution', command: '/bin/zsh -lc "npm test"' } });
+  event({
+    type: 'item.completed',
+    item: {
+      id: 'cmd_auto_2',
+      type: 'command_execution',
+      command: '/bin/zsh -lc "npm test"',
+      aggregated_output: 'test ok\n',
+      exit_code: 0,
+      status: 'completed',
+    },
+  });
+}
+
 if (scenario === 'command' || scenario === 'attachments') {
   event({ type: 'item.started', item: { id: 'cmd_1', type: 'command_execution', command: '/bin/zsh -lc "ls -la"' } });
   const output = scenario === 'attachments'
@@ -302,6 +350,26 @@ const finalText = scenario === 'attachments'
   ? `attachments ok; resumed=${args.mode === 'resume'}; images=${args.images.length}; dirs=${args.addDirs.length}`
   : scenario === 'plan'
     ? `plan ok; resumed=${args.mode === 'resume'}; cwd=${process.cwd()}`
+    : scenario === 'autopilot'
+      ? [
+        'Autopilot finished one low-risk task and validation passed.',
+        '',
+        'AUTOPILOT_REPORT',
+        '```json',
+        JSON.stringify({
+          goal: '补齐会话恢复相关测试',
+          summary: '补齐了会话恢复相关测试，并完成本地验证。',
+          next: '下一轮可以补充绑定重置和 web reset 的覆盖。',
+          board: {
+            ready: ['补充绑定重置相关测试', '补充 web reset 覆盖'],
+            doing: [],
+            blocked: [],
+            done: ['补齐会话恢复相关测试'],
+            deferred: ['大范围重构会话状态模型'],
+          },
+        }, null, 2),
+        '```',
+      ].join('\n')
     : `ok: ${prompt} | resumed=${args.mode === 'resume'} | thread=${threadId}`;
 
 event({ type: 'item.completed', item: { id: 'msg_1', type: 'agent_message', text: finalText } });

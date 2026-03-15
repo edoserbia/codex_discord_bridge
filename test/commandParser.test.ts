@@ -40,3 +40,8 @@ test('reject unknown flag', () => {
 test('reject invalid sandbox mode', () => {
   assert.throws(() => parseCommand('!bind api /tmp --sandbox unsafe', '!'), /sandbox/);
 });
+
+test('parse autopilot command', () => {
+  const parsed = parseCommand('!autopilot on', '!');
+  assert.deepEqual(parsed, { kind: 'autopilot', action: 'on' });
+});
