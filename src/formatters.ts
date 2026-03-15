@@ -231,12 +231,8 @@ export function formatAutopilotProjectStatus(
     lines.push(`当前轮开始：${project.currentRunStartedAt}`);
   }
 
-  lines.push(`项目方向：${truncate(project.brief.replace(/\s+/g, ' '), 220)}`);
+  lines.push(`Prompt：${truncate(project.brief.replace(/\s+/g, ' '), 220)}`);
   lines.push(`任务看板：${summarizeAutopilotBoard(project.board)}`);
-
-  if (project.lastGoal) {
-    lines.push(`最近目标：${truncate(project.lastGoal, 180)}`);
-  }
 
   if (project.lastSummary) {
     lines.push(`最近结果：${truncate(project.lastSummary, 220)}`);
@@ -458,16 +454,12 @@ export function formatAutopilotEntryCard(
     `项目开关：${project.enabled ? '已开启' : '已暂停'}`,
     `调度周期：${formatDurationMs(project.intervalMs)}`,
     `更新时间：${formatClockTimestamp(updatedAt)}`,
-    `项目方向：${truncate(project.brief.replace(/\s+/g, ' '), 150)}`,
+    `Prompt：${truncate(project.brief.replace(/\s+/g, ' '), 150)}`,
     `任务看板：${summarizeAutopilotBoard(project.board)}`,
   ];
 
   if (project.threadChannelId) {
     lines.push(`Autopilot 线程：<#${project.threadChannelId}>`);
-  }
-
-  if (project.lastGoal) {
-    lines.push(`最近目标：${truncate(project.lastGoal, 140)}`);
   }
 
   if (project.lastSummary) {
@@ -487,7 +479,7 @@ export function formatAutopilotThreadWelcome(binding: ChannelBinding, project: A
     stampAutopilotLine(`已创建 **${binding.projectName}** 的 Autopilot 线程。`),
     '',
     '这个线程只做两件事：',
-    '- 接收当前项目的自动迭代方向自然语言',
+    '- 接收当前项目的 Autopilot Prompt 自然语言',
     '- 展示每一轮自动迭代的实时进度和总结',
     '',
     '常用命令：',
@@ -503,15 +495,15 @@ export function formatAutopilotThreadWelcome(binding: ChannelBinding, project: A
     '',
     `当前项目开关：${project.enabled ? '已开启' : '已暂停'}`,
     `当前调度周期：${formatDurationMs(project.intervalMs)}`,
-    `当前项目方向：${project.brief}`,
+    `当前 Prompt：${project.brief}`,
   ].join('\n');
 }
 
 export function formatAutopilotBriefAck(project: AutopilotProjectState): string {
   return [
-    stampAutopilotLine('已更新当前项目的自动迭代方向。'),
+    stampAutopilotLine('已更新当前项目的 Autopilot Prompt。'),
     '',
-    '当前理解：',
+    '当前 Prompt：',
     project.brief,
     '',
     `当前项目开关：${project.enabled ? '已开启' : '已暂停'}`,
@@ -528,7 +520,7 @@ export function formatAutopilotServiceAck(action: 'on' | 'off' | 'clear'): strin
     case 'off':
       return `${stampAutopilotLine('已暂停当前 bridge 进程里所有已绑定项目的服务级 Autopilot。')}\n\n不会启动新的自动迭代任务。`;
     case 'clear':
-      return `${stampAutopilotLine('已清空当前 bridge 进程里所有已绑定项目的 Autopilot 任务看板和历史状态。')}\n\n项目方向、项目开关和调度周期会保留。`;
+      return `${stampAutopilotLine('已清空当前 bridge 进程里所有已绑定项目的 Autopilot 任务看板和历史状态。')}\n\nPrompt、项目开关和调度周期会保留。`;
   }
 }
 
@@ -553,8 +545,8 @@ export function formatAutopilotProjectAck(
       lines.push(`调度周期：${formatDurationMs(project.intervalMs)}`);
       break;
     case 'prompt':
-      lines.push('已更新项目的自动迭代方向');
-      lines.push(`方向：${truncate(project.brief.replace(/\s+/g, ' '), 220)}`);
+      lines.push('已更新项目的 Autopilot Prompt');
+      lines.push(`Prompt：${truncate(project.brief.replace(/\s+/g, ' '), 220)}`);
       break;
   }
 
@@ -573,13 +565,11 @@ export function formatAutopilotProjectAck(
 export function formatAutopilotKickoff(
   binding: ChannelBinding,
   project: AutopilotProjectState,
-  goal: string,
 ): string {
   return [
     stampAutopilotLine(`Autopilot 已启动：**${binding.projectName}**`),
     '',
-    `本轮目标：${goal}`,
-    `当前项目方向：${truncate(project.brief.replace(/\s+/g, ' '), 240)}`,
+    `Prompt：${truncate(project.brief.replace(/\s+/g, ' '), 240)}`,
     `任务看板：${summarizeAutopilotBoard(project.board)}`,
     '说明：下面会持续同步本轮计划、命令、输出和最终结果。',
   ].join('\n');
@@ -594,10 +584,6 @@ export function formatAutopilotRunSummary(
     '',
     `结果：${project.lastResultStatus ?? 'unknown'}`,
   ];
-
-  if (project.lastGoal) {
-    lines.push(`本轮目标：${project.lastGoal}`);
-  }
 
   if (project.lastSummary) {
     lines.push(`完成情况：${project.lastSummary}`);

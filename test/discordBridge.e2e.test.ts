@@ -216,6 +216,7 @@ test('project-level autopilot commands update interval, prompt, and enabled stat
   assert.match(autopilotProject?.brief ?? '', /优先补测试和稳定性/);
   assert.ok(rootChannel.sent.some((message) => /已更新 \*\*api\*\* 的项目级 Autopilot 设置/.test(message.content)));
   assert.ok(rootChannel.sent.some((message) => /Autopilot 项目状态：\*\*api\*\*/.test(message.content)));
+  assert.ok(rootChannel.sent.some((message) => /Prompt：优先补测试和稳定性，不要做大功能/.test(message.content)));
   assert.ok(rootChannel.sent.some((message) => /调度周期：30m/.test(message.content)));
   await cleanupDir(rootDir);
 });
@@ -241,7 +242,7 @@ test('autopilot thread natural-language messages update project direction instea
   );
 
   assert.match(store.getAutopilotProject(rootChannel.id)?.brief ?? '', /优先补测试和稳定性/);
-  assert.ok(autopilotThread.sent.some((message) => /已更新当前项目的自动迭代方向/.test(message.content)));
+  assert.ok(autopilotThread.sent.some((message) => /已更新当前项目的 Autopilot Prompt/.test(message.content)));
   assert.equal(store.getSession(autopilotThread.id), undefined);
   await cleanupDir(rootDir);
 });
@@ -259,6 +260,7 @@ test('autopilot runs in project thread with timestamped progress and only one pr
   await dispatch(bridge, createUserMessage(rootChannelA, `!bind aaa "${workspaceA}"`, { userId: 'admin-user' }));
   await dispatch(bridge, createUserMessage(rootChannelB, `!bind bbb "${workspaceB}"`, { userId: 'admin-user' }));
   await dispatch(bridge, createUserMessage(rootChannelA, '!autopilot server on', { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannelA, '!autopilot project prompt 优先补测试和稳定性，不要做大功能', { userId: 'admin-user' }));
   await dispatch(bridge, createUserMessage(rootChannelA, '!autopilot project on', { userId: 'admin-user' }));
   await dispatch(bridge, createUserMessage(rootChannelB, '!autopilot project on', { userId: 'admin-user' }));
 
@@ -269,6 +271,8 @@ test('autopilot runs in project thread with timestamped progress and only one pr
 
   await (bridge as any).runAutopilotTick();
   await waitFor(() => threadA.sent.some((message) => /Autopilot 已启动/.test(message.content)));
+  assert.ok(threadA.sent.some((message) => /Prompt：优先补测试和稳定性，不要做大功能/.test(message.content)));
+  assert.ok(!threadA.sent.some((message) => /本轮目标：/.test(message.content)));
   await (bridge as any).runAutopilotTick();
 
   assert.ok(!threadB.sent.some((message) => /Autopilot 已启动/.test(message.content)));
@@ -276,6 +280,7 @@ test('autopilot runs in project thread with timestamped progress and only one pr
   assert.ok(threadA.sent.some((message) => /\[\d{2}:\d{2}\]/.test(message.content)));
   await waitFor(() => threadA.sent.some((message) => /Codex 实时进度/.test(message.content)), 15_000);
   await waitFor(() => threadA.sent.some((message) => /当前命令：/.test(message.content)), 15_000);
+  await waitFor(() => threadA.sent.some((message) => /请求：优先补测试和稳定性，不要做大功能/.test(message.content)), 15_000);
 
   await (bridge as any).runAutopilotTick();
   await waitFor(() => threadB.sent.some((message) => /Autopilot 已启动/.test(message.content)), 15_000);
