@@ -221,6 +221,32 @@ test('project-level autopilot commands update interval, prompt, and enabled stat
   await cleanupDir(rootDir);
 });
 
+test('project-level autopilot run command triggers an immediate run and refreshes the next cycle time', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-autopilot-project-run-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-autopilot-project-run', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannel, '!autopilot server on', { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannel, '!autopilot project on', { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannel, '!autopilot project interval 30m', { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannel, '!autopilot project run', { userId: 'admin-user' }));
+
+  const autopilotProject = store.getAutopilotProject(rootChannel.id)!;
+  const autopilotThread = channels.get(autopilotProject.threadChannelId!)!;
+
+  assert.ok(rootChannel.sent.some((message) => /已触发当前项目立即执行 1 次 Autopilot/.test(message.content)));
+  await waitFor(() => autopilotThread.sent.some((message) => /Autopilot 已启动/.test(message.content)), 15_000);
+  await waitFor(() => autopilotThread.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 15_000);
+  assert.ok(store.getAutopilotProject(rootChannel.id)?.lastRunAt);
+
+  await dispatch(bridge, createUserMessage(rootChannel, '!autopilot project status', { userId: 'admin-user' }));
+  assert.ok(rootChannel.sent.some((message) => /下次运行：20\d\d-\d\d-\d\dT/.test(message.content)));
+  await cleanupDir(rootDir);
+});
+
 test('autopilot thread natural-language messages update project direction instead of running codex', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-autopilot-brief-');
   const workspace = await createWorkspace(rootDir);

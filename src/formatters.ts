@@ -144,11 +144,13 @@ export function formatAutopilotHelp(prefix: string): string {
     `- \`${prefix}autopilot project off\``,
     `- \`${prefix}autopilot project clear\``,
     `- \`${prefix}autopilot project status\``,
+    `- \`${prefix}autopilot project run\``,
     `- \`${prefix}autopilot project interval 30m\``,
     `- \`${prefix}autopilot project prompt 优先补测试和稳定性，不要做大功能\``,
     '',
     '自然语言方向也可以直接发在项目的 Autopilot 线程里，不一定要用命令。',
     '调度规则：只有服务级和项目级都开启时，项目才会按配置周期自动运行。',
+    '手动执行规则：`!autopilot project run` 会立即运行 1 次，并按本轮完成时间刷新下一次周期时间。',
     '时长格式支持：`30m`、`2h`、`1d`、`90m`；纯数字默认按分钟处理。',
     `兼容简写：\`${prefix}autopilot on|off|clear\` 等价于服务级命令。`,
   ].join('\n');
@@ -485,6 +487,7 @@ export function formatAutopilotThreadWelcome(binding: ChannelBinding, project: A
     '常用命令：',
     '- !autopilot project on',
     '- !autopilot project status',
+    '- !autopilot project run',
     '- !autopilot project interval 30m',
     '- !autopilot project prompt 优先补测试和稳定性，不要做大功能',
     '',
@@ -525,7 +528,7 @@ export function formatAutopilotServiceAck(action: 'on' | 'off' | 'clear'): strin
 }
 
 export function formatAutopilotProjectAck(
-  action: 'on' | 'off' | 'clear' | 'interval' | 'prompt',
+  action: 'on' | 'off' | 'clear' | 'status' | 'run' | 'interval' | 'prompt',
   binding: ChannelBinding,
   project: AutopilotProjectState,
 ): string {
@@ -541,6 +544,15 @@ export function formatAutopilotProjectAck(
     case 'clear':
       lines.push('已清空该项目的 Autopilot 看板和历史状态');
       break;
+    case 'run':
+      lines.push('已触发当前项目立即执行 1 次 Autopilot');
+      if (project.threadChannelId) {
+        lines.push(`执行线程：<#${project.threadChannelId}>`);
+      }
+      lines.push('下一次周期会按本轮完成时间重新计算');
+      break;
+    case 'status':
+      break;
     case 'interval':
       lines.push(`调度周期：${formatDurationMs(project.intervalMs)}`);
       break;
@@ -550,15 +562,17 @@ export function formatAutopilotProjectAck(
       break;
   }
 
-  if (action !== 'on' && action !== 'off') {
+  if (action !== 'on' && action !== 'off' && action !== 'status') {
     lines.push(`项目级开关：${project.enabled ? '已开启' : '已暂停'}`);
   }
 
-  if (action !== 'interval') {
+  if (action !== 'interval' && action !== 'status') {
     lines.push(`调度周期：${formatDurationMs(project.intervalMs)}`);
   }
 
-  lines.push(`任务看板：${summarizeAutopilotBoard(project.board)}`);
+  if (action !== 'status') {
+    lines.push(`任务看板：${summarizeAutopilotBoard(project.board)}`);
+  }
   return lines.join('\n');
 }
 

@@ -739,6 +739,23 @@ export class DiscordCodexBridge {
         await message.reply(formatAutopilotProjectAck('clear', binding, nextProject));
         return;
       }
+      case 'run': {
+        const trigger = await this.triggerAutopilotProjectRun(binding);
+        if (trigger.status === 'already-running') {
+          await message.reply('当前项目的 Autopilot 已在运行中。');
+          return;
+        }
+        if (trigger.status === 'busy') {
+          await message.reply('当前服务器已有正在执行的 Codex 任务；Autopilot 仍保持单项目串行，请等待当前任务结束后再试。');
+          return;
+        }
+        if (trigger.status === 'unavailable') {
+          await message.reply('当前项目的 Autopilot 线程不可用，暂时无法立即执行。');
+          return;
+        }
+        await message.reply(formatAutopilotProjectAck('run', binding, trigger.project));
+        return;
+      }
       case 'interval': {
         const nextProject = await this.setAutopilotProjectInterval(binding, project, command.intervalMs);
         await message.reply(formatAutopilotProjectAck('interval', binding, nextProject));
@@ -1085,10 +1102,49 @@ export class DiscordCodexBridge {
     if (!project.threadChannelId || !project.enabled) {
       return;
     }
+    await this.startAutopilotRun(binding, project);
+  }
+
+  private async triggerAutopilotProjectRun(
+    binding: ChannelBinding,
+  ): Promise<
+    | { status: 'started'; project: AutopilotProjectState }
+    | { status: 'already-running'; project: AutopilotProjectState }
+    | { status: 'busy'; project: AutopilotProjectState }
+    | { status: 'unavailable'; project: AutopilotProjectState }
+  > {
+    const project = await this.ensureAutopilotResources(binding);
+
+    if (project.status === 'running') {
+      return { status: 'already-running', project };
+    }
+
+    if (!project.threadChannelId) {
+      return { status: 'unavailable', project };
+    }
+
+    if (this.activeAutopilotGuilds.has(binding.guildId) || this.hasAnyActiveRunInGuild(binding.guildId)) {
+      return { status: 'busy', project };
+    }
+
+    const nextProject = await this.startAutopilotRun(binding, project);
+    return {
+      status: nextProject ? 'started' : 'unavailable',
+      project: nextProject ?? project,
+    };
+  }
+
+  private async startAutopilotRun(
+    binding: ChannelBinding,
+    project: AutopilotProjectState,
+  ): Promise<AutopilotProjectState | undefined> {
+    if (!project.threadChannelId) {
+      return undefined;
+    }
 
     const threadChannel = await this.fetchChannel(project.threadChannelId);
     if (!threadChannel) {
-      return;
+      return undefined;
     }
 
     if (threadChannel.setArchived) {
@@ -1117,6 +1173,7 @@ export class DiscordCodexBridge {
       extraAddDirs: [getAutopilotSkillDir()],
       origin: 'autopilot',
     });
+    return nextProject;
   }
 
   private pickAutopilotGoal(project: AutopilotProjectState): string {
