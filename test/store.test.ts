@@ -29,16 +29,42 @@ test('store persists bindings and sessions and cascades deletes', async () => {
     updatedAt: '2026-03-11T00:00:00.000Z',
   });
 
+  await store.upsertAutopilotService({
+    guildId: 'guild-1',
+    enabled: true,
+    updatedAt: '2026-03-11T00:00:00.000Z',
+  });
+
+  await store.upsertAutopilotProject({
+    bindingChannelId: 'channel-1',
+    guildId: 'guild-1',
+    threadChannelId: 'thread-auto-1',
+    brief: '优先补测试',
+    briefUpdatedAt: '2026-03-11T00:00:00.000Z',
+    board: [
+      {
+        id: 'task-1',
+        title: '补测试',
+        status: 'ready',
+        updatedAt: '2026-03-11T00:00:00.000Z',
+      },
+    ],
+    status: 'idle',
+  });
+
   await store.ensureSession('channel-1', 'channel-1');
   await store.updateSession('thread-1', { codexThreadId: 'codex-thread-1' }, 'channel-1');
 
   assert.equal(store.listBindings().length, 1);
   assert.equal(store.listSessions('channel-1').length, 2);
+  assert.equal(store.listAutopilotProjects('guild-1').length, 1);
 
   const removed = await store.removeBinding('channel-1');
   assert.equal(removed?.projectName, 'api');
   assert.equal(store.listBindings().length, 0);
   assert.equal(store.listSessions('channel-1').length, 0);
+  assert.equal(store.listAutopilotProjects('guild-1').length, 0);
+  assert.equal(store.getAutopilotService('guild-1')?.enabled, true);
 
   await cleanupDir(rootDir);
 });

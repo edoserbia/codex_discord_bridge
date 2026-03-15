@@ -23,6 +23,42 @@ export interface ChannelBinding {
   updatedAt: string;
 }
 
+export interface AutopilotServiceState {
+  guildId: string;
+  enabled: boolean;
+  updatedAt: string;
+}
+
+export type AutopilotBoardStatus = 'ready' | 'doing' | 'blocked' | 'done' | 'deferred';
+
+export interface AutopilotBoardItem {
+  id: string;
+  title: string;
+  status: AutopilotBoardStatus;
+  updatedAt: string;
+  notes?: string | undefined;
+}
+
+export interface AutopilotProjectState {
+  bindingChannelId: string;
+  guildId: string;
+  threadChannelId?: string | undefined;
+  entryMessageId?: string | undefined;
+  brief: string;
+  briefUpdatedAt: string;
+  board: AutopilotBoardItem[];
+  status: 'idle' | 'running' | 'paused' | 'waiting';
+  lastRunAt?: string | undefined;
+  lastResultStatus?: 'success' | 'failed' | 'skipped' | undefined;
+  lastGoal?: string | undefined;
+  lastSummary?: string | undefined;
+  nextSuggestedWork?: string | undefined;
+  currentGoal?: string | undefined;
+  currentRunStartedAt?: string | undefined;
+  lastActivityAt?: string | undefined;
+  lastActivityText?: string | undefined;
+}
+
 export interface ConversationSessionState {
   conversationId: string;
   bindingChannelId: string;
@@ -36,6 +72,8 @@ export interface ConversationSessionState {
 export interface PersistedState {
   bindings: Record<string, ChannelBinding>;
   sessions: Record<string, ConversationSessionState>;
+  autopilotServices: Record<string, AutopilotServiceState>;
+  autopilotProjects: Record<string, AutopilotProjectState>;
 }
 
 export interface AttachmentRef {
@@ -62,6 +100,8 @@ export interface PromptTask {
   conversationId: string;
   attachments: AttachmentRef[];
   attachmentDir?: string | undefined;
+  extraAddDirs: string[];
+  origin: 'user' | 'autopilot';
 }
 
 export interface CommandRecord {

@@ -8,6 +8,13 @@ import { JsonStateStore } from '../../src/store.js';
 
 import { FakeChannel } from './fakeDiscord.js';
 
+class FakeChannelRegistry extends Map<string, FakeChannel> {
+  override set(key: string, value: FakeChannel): this {
+    value.attachRegistry(this);
+    return super.set(key, value);
+  }
+}
+
 export async function createBridgeTestRig(options: {
   rootDir: string;
   codexCommand?: string;
@@ -49,7 +56,7 @@ export async function createBridgeTestRig(options: {
 
   const runner = new CodexRunner(config);
   const bridge = new DiscordCodexBridge(config, store, runner);
-  const channels = new Map<string, FakeChannel>();
+  const channels = new FakeChannelRegistry();
 
   (bridge as any).client.channels.fetch = async (channelId: string) => channels.get(channelId) ?? null;
   (bridge as any).client.login = async () => 'logged-in';

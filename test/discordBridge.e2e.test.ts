@@ -143,6 +143,87 @@ test('bridge gives Discord threads their own Codex session under the parent bind
   await cleanupDir(rootDir);
 });
 
+test('bridge creates an autopilot thread and pinned entry card on bind', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-autopilot-bind-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-autopilot-root', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+
+  const autopilotProject = store.getAutopilotProject(rootChannel.id);
+  assert.ok(autopilotProject?.threadChannelId);
+  assert.ok(rootChannel.sent.some((message) => /Autopilot 入口/.test(message.content)));
+  assert.ok(rootChannel.sent.some((message) => message.pinned));
+
+  const autopilotThread = channels.get(autopilotProject!.threadChannelId!);
+  assert.ok(autopilotThread);
+  assert.ok(autopilotThread!.sent.some((message) => /Autopilot 线程/.test(message.content)));
+  await cleanupDir(rootDir);
+});
+
+test('autopilot thread natural-language messages update project direction instead of running codex', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-autopilot-brief-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-autopilot-brief-root', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+  const autopilotProject = store.getAutopilotProject(rootChannel.id)!;
+  const autopilotThread = channels.get(autopilotProject.threadChannelId!)!;
+
+  await dispatch(
+    bridge,
+    createUserMessage(
+      autopilotThread,
+      '优先补测试和稳定性，不要做大功能，部署脚本和权限逻辑先不要动。',
+      { userId: 'admin-user' },
+    ),
+  );
+
+  assert.match(store.getAutopilotProject(rootChannel.id)?.brief ?? '', /优先补测试和稳定性/);
+  assert.ok(autopilotThread.sent.some((message) => /已更新当前项目的自动迭代方向/.test(message.content)));
+  assert.equal(store.getSession(autopilotThread.id), undefined);
+  await cleanupDir(rootDir);
+});
+
+test('autopilot runs in project thread with timestamped progress and only one project per guild per cycle', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-autopilot-run-');
+  const workspaceA = await createWorkspace(path.join(rootDir, 'a'));
+  const workspaceB = await createWorkspace(path.join(rootDir, 'b'));
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannelA = new FakeChannel('channel-autopilot-a', 'guild-1');
+  const rootChannelB = new FakeChannel('channel-autopilot-b', 'guild-1');
+  channels.set(rootChannelA.id, rootChannelA);
+  channels.set(rootChannelB.id, rootChannelB);
+
+  await dispatch(bridge, createUserMessage(rootChannelA, `!bind aaa "${workspaceA}"`, { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannelB, `!bind bbb "${workspaceB}"`, { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannelA, '!autopilot on', { userId: 'admin-user' }));
+
+  const projectA = store.getAutopilotProject(rootChannelA.id)!;
+  const projectB = store.getAutopilotProject(rootChannelB.id)!;
+  const threadA = channels.get(projectA.threadChannelId!)!;
+  const threadB = channels.get(projectB.threadChannelId!)!;
+
+  await (bridge as any).runAutopilotTick();
+  await waitFor(() => threadA.sent.some((message) => /Autopilot 已启动/.test(message.content)));
+  await (bridge as any).runAutopilotTick();
+
+  assert.ok(!threadB.sent.some((message) => /Autopilot 已启动/.test(message.content)));
+  await waitFor(() => threadA.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 15_000);
+  assert.ok(threadA.sent.some((message) => /\[\d{2}:\d{2}\]/.test(message.content)));
+  await waitFor(() => threadA.sent.some((message) => /Codex 实时进度/.test(message.content)), 15_000);
+  await waitFor(() => threadA.sent.some((message) => /当前命令：/.test(message.content)), 15_000);
+
+  await (bridge as any).runAutopilotTick();
+  await waitFor(() => threadB.sent.some((message) => /Autopilot 已启动/.test(message.content)), 15_000);
+  await waitFor(() => threadB.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 15_000);
+  await cleanupDir(rootDir);
+});
+
 test('bridge posts live progress with reasoning summary and plan updates', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-progress-');
   const workspace = await createWorkspace(rootDir);
