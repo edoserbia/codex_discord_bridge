@@ -111,8 +111,9 @@ export class CodexRunner {
             }
 
             if (item.type === 'todo_list') {
-              const nextPlanItems = parsePlanItems(item.items);
-              if (nextPlanItems.length > 0) {
+              const hasRawTodoItems = Array.isArray(item.items);
+              const nextPlanItems = parsePlanItems(item.items, planItems);
+              if (hasRawTodoItems) {
                 planItems = nextPlanItems;
                 await hooks.onTodoListChanged?.(nextPlanItems);
               }
@@ -359,32 +360,102 @@ function buildCodexChildEnv(workspacePath: string): NodeJS.ProcessEnv {
   return env;
 }
 
-function parsePlanItems(rawItems: unknown): PlanItem[] {
+function parsePlanItems(rawItems: unknown, existingItems: PlanItem[] = []): PlanItem[] {
   if (!Array.isArray(rawItems)) {
     return [];
   }
 
-  return rawItems
-    .map((item) => {
+  const existingById = new Map(
+    existingItems
+      .filter((item) => typeof item.id === 'string' && item.id)
+      .map((item) => [item.id as string, item]),
+  );
+
+  const parsed: Array<PlanItem | undefined> = rawItems
+    .map((item, index) => {
       const candidate = item as Record<string, unknown> | null;
-      if (!candidate || typeof candidate.text !== 'string') {
+      if (!candidate) {
         return undefined;
       }
+
+      const id = typeof candidate.id === 'string' && candidate.id.trim()
+        ? candidate.id.trim()
+        : undefined;
+      const previous = (id ? existingById.get(id) : undefined) ?? existingItems[index];
+      const text = extractPlanItemText(candidate) || previous?.text;
+      if (!text) {
+        return undefined;
+      }
+
+      const status = normalizePlanStatus(candidate.status ?? candidate.state ?? candidate.phase);
 
       const completed = candidate.completed === true
         || candidate.done === true
         || candidate.finished === true
-        || candidate.status === 'completed'
-        || candidate.status === 'done'
-        || candidate.state === 'completed'
-        || candidate.state === 'done';
+        || status === 'completed'
+        || status === 'complete'
+        || status === 'done'
+        || status === 'checked'
+        || status === 'finished'
+        || status === 'resolved'
+        || status === 'success'
+        || status === 'succeeded';
 
       return {
-        text: candidate.text,
+        id,
+        text,
         completed,
       } satisfies PlanItem;
-    })
-    .filter((item): item is PlanItem => Boolean(item));
+    });
+
+  return parsed.filter((item): item is PlanItem => item !== undefined);
+}
+
+function extractPlanItemText(candidate: Record<string, unknown>): string | undefined {
+  return coercePlanText(
+    candidate.text
+      ?? candidate.title
+      ?? candidate.label
+      ?? candidate.content
+      ?? candidate.name
+      ?? candidate.task
+      ?? candidate.description,
+  );
+}
+
+function coercePlanText(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    return normalized || undefined;
+  }
+
+  if (Array.isArray(value)) {
+    const joined = value
+      .map((entry) => coercePlanText(entry))
+      .filter((entry): entry is string => Boolean(entry))
+      .join(' ')
+      .trim();
+    return joined || undefined;
+  }
+
+  if (value && typeof value === 'object') {
+    const candidate = value as Record<string, unknown>;
+    return coercePlanText(
+      candidate.text
+        ?? candidate.value
+        ?? candidate.label
+        ?? candidate.title
+        ?? candidate.content,
+    );
+  }
+
+  return undefined;
+}
+
+function normalizePlanStatus(value: unknown): string | undefined {
+  return typeof value === 'string'
+    ? value.trim().toLowerCase()
+    : undefined;
 }
 
 function terminateChild(child: ReturnType<typeof spawn>): void {

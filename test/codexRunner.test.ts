@@ -113,6 +113,32 @@ test('runner treats completed todo status fields as checked plan items', async (
   await cleanupDir(rootDir);
 });
 
+test('runner preserves plan text across todo updates that only change status fields', async () => {
+  const rootDir = await makeTempDir('codex-runner-plan-live-');
+  const workspace = await createWorkspace(rootDir);
+  const runner = new CodexRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+  const planSnapshots: Array<Array<{ id?: string; text: string; completed: boolean }>> = [];
+
+  const result = await runner.start(binding, { prompt: '[plan-live] inspect', imagePaths: [], extraAddDirs: [] }, undefined, {
+    onTodoListChanged: async (items) => { planSnapshots.push(items.map((item) => ({ ...item }))); },
+  }).done;
+
+  assert.equal(result.success, true);
+  assert.ok(planSnapshots.length >= 2);
+  assert.deepEqual(
+    planSnapshots[0]?.map((item) => item.text),
+    ['Inspect files', 'Patch code', 'Run tests'],
+  );
+  assert.equal(planSnapshots[0]?.[1]?.completed, false);
+  assert.equal(planSnapshots.at(-1)?.every((item) => item.completed), true);
+  assert.deepEqual(
+    planSnapshots.at(-1)?.map((item) => item.text),
+    ['Inspect files', 'Patch code', 'Run tests'],
+  );
+  await cleanupDir(rootDir);
+});
+
 test('runner handles resume and command events', async () => {
   const rootDir = await makeTempDir('codex-runner-resume-');
   const workspace = await createWorkspace(rootDir);

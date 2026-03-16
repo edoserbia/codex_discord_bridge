@@ -108,6 +108,7 @@ const scenario = (() => {
   if (prompt.includes('[invalid-json]')) return 'invalid-json';
   if (prompt.includes('[command]')) return 'command';
   if (prompt.includes('[plan]')) return 'plan';
+  if (prompt.includes('[plan-live]')) return 'plan-live';
   if (prompt.includes('[plan-status]')) return 'plan-status';
   if (prompt.includes('[attachments]')) return 'attachments';
   if (prompt.includes('AUTOPILOT_REPORT')) return 'autopilot';
@@ -297,6 +298,34 @@ if (scenario === 'plan-status') {
         { text: 'Inspect files', status: 'completed' },
         { text: 'Patch code', status: 'completed' },
         { text: 'Run tests', status: 'completed' },
+      ],
+    },
+  });
+}
+
+if (scenario === 'plan-live') {
+  event({
+    type: 'item.started',
+    item: {
+      id: 'todo_live_1',
+      type: 'todo_list',
+      items: [
+        { id: 'live-1', text: 'Inspect files', status: 'completed' },
+        { id: 'live-2', text: 'Patch code', status: 'in_progress' },
+        { id: 'live-3', text: 'Run tests', status: 'pending' },
+      ],
+    },
+  });
+  await sleep(1_400);
+  event({
+    type: 'item.updated',
+    item: {
+      id: 'todo_live_1',
+      type: 'todo_list',
+      items: [
+        { id: 'live-1', state: 'completed' },
+        { id: 'live-2', title: 'Patch code', state: 'completed' },
+        { id: 'live-3', content: { value: 'Run tests' }, state: 'completed' },
       ],
     },
   });

@@ -67,7 +67,7 @@ function appendPlanLines(lines: string[], planItems: PlanItem[], maxItems = 6): 
 
   lines.push('计划：');
   for (const item of planItems.slice(0, maxItems)) {
-    lines.push(`- ${item.completed ? '✅' : '⬜️'} ${truncate(item.text, 120)}`);
+    lines.push(`- ${item.completed ? '✓' : '□'} ${truncate(item.text, 120)}`);
   }
 }
 
