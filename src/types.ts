@@ -37,12 +37,14 @@ export interface AutopilotBoardItem {
   title: string;
   status: AutopilotBoardStatus;
   updatedAt: string;
+  createdAt?: string | undefined;
   notes?: string | undefined;
 }
 
 export interface AutopilotProjectState {
   bindingChannelId: string;
   guildId: string;
+  workspacePath?: string | undefined;
   threadChannelId?: string | undefined;
   entryMessageId?: string | undefined;
   enabled: boolean;

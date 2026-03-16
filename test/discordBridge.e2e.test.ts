@@ -245,9 +245,17 @@ test('project-level autopilot run command triggers an immediate run and refreshe
   const autopilotThread = channels.get(autopilotProject.threadChannelId!)!;
 
   assert.ok(rootChannel.sent.some((message) => /已触发当前项目立即执行 1 次 Autopilot/.test(message.content)));
-  await waitFor(() => autopilotThread.sent.some((message) => /Autopilot 已启动/.test(message.content)), 15_000);
-  await waitFor(() => autopilotThread.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 15_000);
+  await waitFor(() => autopilotThread.sent.some((message) => /Autopilot 已启动/.test(message.content)), 20_000);
+  await waitFor(() => autopilotThread.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 25_000);
   assert.ok(store.getAutopilotProject(rootChannel.id)?.lastRunAt);
+  assert.ok(autopilotThread.sent.some((message) => /看板变化：/.test(message.content)));
+  assert.ok(autopilotThread.sent.some((message) => /新增 DONE · 补齐会话恢复相关测试/.test(message.content)));
+
+  const boardJson = JSON.parse(await readFile(path.join(workspace, '.codex', 'autopilot', 'board.json'), 'utf8'));
+  assert.equal(boardJson.items.filter((item: { status: string }) => item.status === 'done').length, 1);
+  assert.equal(boardJson.items.filter((item: { status: string }) => item.status === 'ready').length, 2);
+  const boardMarkdown = await readFile(path.join(workspace, 'docs', 'AUTOPILOT_BOARD.md'), 'utf8');
+  assert.match(boardMarkdown, /补齐会话恢复相关测试/);
 
   await dispatch(bridge, createUserMessage(rootChannel, '!autopilot project status', { userId: 'admin-user' }));
   assert.ok(rootChannel.sent.some((message) => /下次运行：20\d\d-\d\d-\d\dT/.test(message.content)));
@@ -310,15 +318,17 @@ test('autopilot respects a single-slot concurrency setting and posts timestamped
   await (bridge as any).runAutopilotTick();
 
   assert.ok(!threadB.sent.some((message) => /Autopilot 已启动/.test(message.content)));
-  await waitFor(() => threadA.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 15_000);
+  await waitFor(() => threadA.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 25_000);
   assert.ok(threadA.sent.some((message) => /\[\d{2}:\d{2}\]/.test(message.content)));
   await waitFor(() => threadA.sent.some((message) => /Codex 实时进度/.test(message.content)), 15_000);
   await waitFor(() => threadA.sent.some((message) => /当前命令：/.test(message.content)), 15_000);
   await waitFor(() => threadA.sent.some((message) => /请求：优先补测试和稳定性，不要做大功能/.test(message.content)), 15_000);
+  assert.ok(threadA.sent.some((message) => /看板变化：/.test(message.content)));
+  assert.ok(threadA.sent.some((message) => /任务看板：Ready 2 · Doing 0 · Blocked 0 · Done 1 · Deferred 1/.test(message.content)));
 
   await (bridge as any).runAutopilotTick();
-  await waitFor(() => threadB.sent.some((message) => /Autopilot 已启动/.test(message.content)), 15_000);
-  await waitFor(() => threadB.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 15_000);
+  await waitFor(() => threadB.sent.some((message) => /Autopilot 已启动/.test(message.content)), 20_000);
+  await waitFor(() => threadB.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 25_000);
   await cleanupDir(rootDir);
 });
 
@@ -352,11 +362,11 @@ test('autopilot uses configurable parallelism and does not block or get blocked 
       && ['starting', 'running'].includes(conversation.status))), 15_000);
 
   await (bridge as any).runAutopilotTick();
-  await waitFor(() => threadA.sent.some((message) => /Autopilot 已启动/.test(message.content)), 15_000);
-  await waitFor(() => threadB.sent.some((message) => /Autopilot 已启动/.test(message.content)), 15_000);
+  await waitFor(() => threadA.sent.some((message) => /Autopilot 已启动/.test(message.content)), 20_000);
+  await waitFor(() => threadB.sent.some((message) => /Autopilot 已启动/.test(message.content)), 20_000);
   await waitFor(() => rootChannelA.sent.some((message) => /ok: \[slow\] manual root task/.test(message.content)), 15_000);
-  await waitFor(() => threadA.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 15_000);
-  await waitFor(() => threadB.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 15_000);
+  await waitFor(() => threadA.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 25_000);
+  await waitFor(() => threadB.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 25_000);
   assert.equal(store.getAutopilotService('guild-1')?.parallelism, 2);
   await cleanupDir(rootDir);
 });

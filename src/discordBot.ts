@@ -1,4 +1,8 @@
+import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { promisify } from 'node:util';
 
 import {
   Client,
@@ -9,15 +13,22 @@ import {
 } from 'discord.js';
 
 import {
+  areAutopilotBoardsEquivalent,
+  AUTOPILOT_BOARD_RELATIVE_PATH,
   boardItemsFromReport,
   buildAutopilotFallbackSummary,
   buildAutopilotPrompt,
   DEFAULT_AUTOPILOT_BRIEF,
+  diffAutopilotBoards,
+  formatAutopilotBoardChanges,
   getAutopilotDefaultIntervalMs,
+  getAutopilotBoardCtlPath,
+  getAutopilotBoardJsonPath,
   normalizeAutopilotParallelism,
   getAutopilotSkillDir,
   getAutopilotThreadName,
   getAutopilotTickMs,
+  normalizeAutopilotBoardDocument,
   parseAutopilotReport,
 } from './autopilot.js';
 import type { AppConfig } from './config.js';
@@ -102,6 +113,7 @@ const MIN_RUNTIME_VIEW_REFRESH_INTERVAL_MS = 1_200;
 const AUTOPILOT_THREAD_AUTO_ARCHIVE_MINUTES: ThreadAutoArchiveDuration = 1440;
 const AUTOPILOT_REQUESTED_BY = 'Autopilot';
 const AUTOPILOT_REQUESTED_BY_ID = 'autopilot';
+const execFileAsync = promisify(execFile);
 
 interface PendingRuntimeViewRefresh {
   channel: SendableChannel;
@@ -155,6 +167,7 @@ export class DiscordCodexBridge {
   private readonly pendingRuntimeViewRefreshes = new Map<string, PendingRuntimeViewRefresh>();
   private readonly lastRuntimeViewRefreshAt = new Map<string, number>();
   private readonly activeAutopilotProjects = new Set<string>();
+  private readonly autopilotBoardSnapshots = new Map<string, AutopilotProjectState['board']>();
   private autopilotTicker: NodeJS.Timeout | undefined;
   private autopilotTickInFlight = false;
 
@@ -924,6 +937,78 @@ export class DiscordCodexBridge {
     return serviceEnabled && project.enabled ? 'idle' : 'paused';
   }
 
+  private async runAutopilotBoardCtl(binding: ChannelBinding, args: string[]): Promise<string> {
+    try {
+      const { stdout } = await execFileAsync(process.execPath, [getAutopilotBoardCtlPath(), ...args], {
+        cwd: binding.workspacePath,
+        maxBuffer: 1024 * 1024,
+      });
+      return stdout.trim();
+    } catch (error) {
+      const candidate = error as NodeJS.ErrnoException & { stdout?: string | Buffer; stderr?: string | Buffer };
+      const stderr = typeof candidate.stderr === 'string'
+        ? candidate.stderr.trim()
+        : Buffer.isBuffer(candidate.stderr)
+          ? candidate.stderr.toString('utf8').trim()
+          : '';
+      const detail = stderr || candidate.message || 'unknown boardctl failure';
+      throw new Error(`boardctl 失败（${AUTOPILOT_BOARD_RELATIVE_PATH}）：${detail}`);
+    }
+  }
+
+  private async importAutopilotBoardFromState(
+    binding: ChannelBinding,
+    project: AutopilotProjectState,
+  ): Promise<void> {
+    const importDir = path.join(this.config.dataDir, 'autopilot-board-imports');
+    const importPath = path.join(importDir, `${binding.channelId}-${randomUUID()}.json`);
+    await fs.mkdir(importDir, { recursive: true });
+    await fs.writeFile(importPath, `${JSON.stringify({ items: project.board }, null, 2)}\n`, 'utf8');
+
+    try {
+      await this.runAutopilotBoardCtl(binding, ['import', importPath, '--replace', '--json']);
+    } finally {
+      await fs.rm(importPath, { force: true }).catch(() => undefined);
+    }
+  }
+
+  private async readAutopilotBoardFromWorkspace(binding: ChannelBinding): Promise<AutopilotProjectState['board']> {
+    const raw = await this.runAutopilotBoardCtl(binding, ['export', '--json']);
+    return normalizeAutopilotBoardDocument(JSON.parse(raw)).items;
+  }
+
+  private async syncAutopilotBoardState(
+    binding: ChannelBinding,
+    project: AutopilotProjectState,
+  ): Promise<AutopilotProjectState> {
+    const boardPath = getAutopilotBoardJsonPath(binding.workspacePath);
+
+    try {
+      await fs.access(boardPath);
+    } catch (error) {
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code !== 'ENOENT') {
+        throw error;
+      }
+
+      if (project.board.length > 0) {
+        await this.importAutopilotBoardFromState(binding, project);
+      } else {
+        await this.runAutopilotBoardCtl(binding, ['ensure', '--json']);
+      }
+    }
+
+    const board = await this.readAutopilotBoardFromWorkspace(binding);
+    if (areAutopilotBoardsEquivalent(project.board, board)) {
+      return project;
+    }
+
+    return this.store.upsertAutopilotProject({
+      ...project,
+      board,
+    });
+  }
+
   private async updateAutopilotProjectBrief(
     binding: ChannelBinding,
     project: AutopilotProjectState,
@@ -1039,6 +1124,8 @@ export class DiscordCodexBridge {
     project: AutopilotProjectState,
     activityText: string,
   ): Promise<AutopilotProjectState> {
+    await this.runAutopilotBoardCtl(binding, ['clear', '--json']);
+    this.autopilotBoardSnapshots.delete(binding.channelId);
     const clearedProject = await this.store.clearAutopilotProject(binding.channelId) ?? project;
     const now = new Date().toISOString();
     const nextProject = await this.store.upsertAutopilotProject({
@@ -1205,11 +1292,13 @@ export class DiscordCodexBridge {
         await threadChannel.setArchived(false).catch(() => undefined);
       }
 
-      const goal = this.pickAutopilotGoal(project);
-      const kickoff = await threadChannel.send(formatAutopilotKickoff(binding, project));
+      const syncedProject = await this.syncAutopilotBoardState(binding, project);
+      const goal = this.pickAutopilotGoal(syncedProject);
+      this.autopilotBoardSnapshots.set(binding.channelId, syncedProject.board);
+      const kickoff = await threadChannel.send(formatAutopilotKickoff(binding, syncedProject));
       const now = new Date().toISOString();
       const nextProject = await this.store.upsertAutopilotProject({
-        ...project,
+        ...syncedProject,
         status: 'running',
         currentGoal: goal,
         currentRunStartedAt: now,
@@ -1229,11 +1318,12 @@ export class DiscordCodexBridge {
       return nextProject;
     } catch (error) {
       this.activeAutopilotProjects.delete(binding.channelId);
+      this.autopilotBoardSnapshots.delete(binding.channelId);
       throw error;
     }
   }
 
-  private pickAutopilotGoal(project: AutopilotProjectState): string {
+  private pickAutopilotGoal(project: AutopilotProjectState): string | undefined {
     const doing = project.board.find((item) => item.status === 'doing');
     if (doing) {
       return doing.title;
@@ -1244,7 +1334,7 @@ export class DiscordCodexBridge {
       return ready.title;
     }
 
-    return '根据当前 Prompt 选择 1 个低风险、可验证的改进任务';
+    return undefined;
   }
 
   private async finishAutopilotTask(
@@ -1260,26 +1350,49 @@ export class DiscordCodexBridge {
 
     const report = parseAutopilotReport(result.agentMessages);
     const now = new Date().toISOString();
-    const nextProject: AutopilotProjectState = {
-      ...project,
-      status: this.getAutopilotProjectStatus(project, undefined, false),
-      board: report
+    const boardBefore = this.autopilotBoardSnapshots.get(task.bindingChannelId) ?? project.board;
+    this.autopilotBoardSnapshots.delete(task.bindingChannelId);
+    let syncedProject = project;
+    let nextBoard = project.board;
+    let boardSyncError: string | undefined;
+
+    try {
+      syncedProject = await this.syncAutopilotBoardState(binding, project);
+      nextBoard = syncedProject.board;
+    } catch (error) {
+      boardSyncError = truncate(error instanceof Error ? error.message : String(error), 180);
+      nextBoard = report
         ? boardItemsFromReport(report, project.board)
-        : this.buildFallbackAutopilotBoard(project, result.success),
+        : this.buildFallbackAutopilotBoard(project, result.success);
+    }
+
+    const boardChanges = diffAutopilotBoards(boardBefore, nextBoard);
+    const baseSummary = report?.summary || buildAutopilotFallbackSummary(project.currentGoal, result.agentMessages.at(-1));
+    const lastSummary = boardSyncError
+      ? `${baseSummary}（看板同步失败：${boardSyncError}）`
+      : baseSummary;
+    const nextProject: AutopilotProjectState = {
+      ...syncedProject,
+      status: this.getAutopilotProjectStatus(syncedProject, undefined, false),
+      board: nextBoard,
       lastRunAt: now,
       lastResultStatus: result.success ? 'success' : 'failed',
       lastGoal: report?.goal || project.currentGoal || project.lastGoal,
-      lastSummary: report?.summary || buildAutopilotFallbackSummary(project.currentGoal, result.agentMessages.at(-1)),
+      lastSummary,
       nextSuggestedWork: report?.next || project.nextSuggestedWork,
       currentGoal: undefined,
       currentRunStartedAt: undefined,
       lastActivityAt: now,
-      lastActivityText: result.success ? 'Autopilot 本轮完成' : 'Autopilot 本轮失败',
+      lastActivityText: boardSyncError
+        ? (result.success ? 'Autopilot 本轮完成（看板同步异常）' : 'Autopilot 本轮失败（看板同步异常）')
+        : result.success
+          ? 'Autopilot 本轮完成'
+          : 'Autopilot 本轮失败',
     };
 
     const savedProject = await this.store.upsertAutopilotProject(nextProject);
     await this.refreshAutopilotEntryCard(binding, savedProject);
-    await channel.send(formatAutopilotRunSummary(binding, savedProject));
+    await channel.send(formatAutopilotRunSummary(binding, savedProject, boardChanges, boardSyncError));
   }
 
   private buildFallbackAutopilotBoard(project: AutopilotProjectState, success: boolean): AutopilotProjectState['board'] {
@@ -1307,10 +1420,21 @@ export class DiscordCodexBridge {
       return;
     }
 
+    this.autopilotBoardSnapshots.delete(binding.channelId);
     const now = new Date().toISOString();
+    let syncedProject = project;
+    let nextBoard = this.buildFallbackAutopilotBoard(project, false);
+
+    try {
+      syncedProject = await this.syncAutopilotBoardState(binding, project);
+      nextBoard = syncedProject.board;
+    } catch (error) {
+      this.logBridgeError(`syncAutopilotBoardOnFailure channel=${binding.channelId}`, error);
+    }
+
     const nextProject = await this.store.upsertAutopilotProject({
-      ...project,
-      status: this.getAutopilotProjectStatus(project, undefined, false),
+      ...syncedProject,
+      status: this.getAutopilotProjectStatus(syncedProject, undefined, false),
       lastRunAt: now,
       lastResultStatus: 'failed',
       lastSummary: errorMessage,
@@ -1318,7 +1442,7 @@ export class DiscordCodexBridge {
       currentRunStartedAt: undefined,
       lastActivityAt: now,
       lastActivityText: 'Autopilot 运行异常中断',
-      board: this.buildFallbackAutopilotBoard(project, false),
+      board: nextBoard,
     });
 
     await this.refreshAutopilotEntryCard(binding, nextProject);
@@ -1344,6 +1468,7 @@ export class DiscordCodexBridge {
       project = await this.store.upsertAutopilotProject({
         bindingChannelId: binding.channelId,
         guildId: binding.guildId,
+        workspacePath: binding.workspacePath,
         enabled: false,
         intervalMs: getAutopilotDefaultIntervalMs(),
         brief: DEFAULT_AUTOPILOT_BRIEF,
@@ -1351,22 +1476,40 @@ export class DiscordCodexBridge {
         board: [],
         status: 'paused',
       });
+    } else if (project.workspacePath && project.workspacePath !== binding.workspacePath) {
+      project = await this.store.upsertAutopilotProject({
+        ...project,
+        workspacePath: binding.workspacePath,
+        board: [],
+        lastGoal: undefined,
+        lastSummary: undefined,
+        nextSuggestedWork: undefined,
+        currentGoal: undefined,
+        currentRunStartedAt: undefined,
+        lastActivityAt: new Date().toISOString(),
+        lastActivityText: '检测到项目目录变更，已重置看板同步到新目录',
+        status: this.getAutopilotProjectStatus({ ...project, board: [] }),
+      });
     } else if (!Number.isFinite(project.intervalMs) || project.intervalMs <= 0) {
       project = await this.store.upsertAutopilotProject({
         ...project,
+        workspacePath: project.workspacePath ?? binding.workspacePath,
         enabled: project.enabled ?? false,
         intervalMs: getAutopilotDefaultIntervalMs(),
         status: this.getAutopilotProjectStatus(project),
       });
     } else {
       const nextStatus = this.getAutopilotProjectStatus(project, service.enabled);
-      if (project.status !== nextStatus) {
+      if (project.status !== nextStatus || project.workspacePath !== binding.workspacePath) {
         project = await this.store.upsertAutopilotProject({
           ...project,
+          workspacePath: binding.workspacePath,
           status: nextStatus,
         });
       }
     }
+
+    project = await this.syncAutopilotBoardState(binding, project);
 
     const rootChannel = await this.fetchChannel(binding.channelId);
     if (!rootChannel) {

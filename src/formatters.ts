@@ -1,3 +1,4 @@
+import type { AutopilotBoardChange } from './autopilot.js';
 import type {
   ActiveRunState,
   AutopilotProjectState,
@@ -11,7 +12,7 @@ import type {
   PromptTask,
 } from './types.js';
 
-import { normalizeAutopilotParallelism, summarizeAutopilotBoard, stampAutopilotLine } from './autopilot.js';
+import { formatAutopilotBoardChanges, normalizeAutopilotParallelism, summarizeAutopilotBoard, stampAutopilotLine } from './autopilot.js';
 import { filterDiagnosticStderr } from './codexDiagnostics.js';
 import { formatClockTimestamp, formatDurationMs, sanitizeInlineCode, shortId, tailLines, truncate } from './utils.js';
 
@@ -150,6 +151,7 @@ export function formatAutopilotHelp(prefix: string): string {
     `- \`${prefix}autopilot project prompt 优先补测试和稳定性，不要做大功能\``,
     '',
     '自然语言方向也可以直接发在项目的 Autopilot 线程里，不一定要用命令。',
+    '看板规则：Autopilot 通过项目目录里的 `.codex/autopilot/board.json` 和 `docs/AUTOPILOT_BOARD.md` 持久化看板；线程总结只同步变化项。',
     '调度规则：只有服务级和项目级都开启时，项目才会按配置周期自动运行。',
     '并行规则：服务级并行数可随时调整；已运行中的 Autopilot 不会被中断，新配置立即影响后续调度。',
     '隔离规则：主频道和普通线程里的手动 Codex 会话，与 Autopilot 调度彼此独立，不互相占用运行槽。',
@@ -610,6 +612,8 @@ export function formatAutopilotKickoff(
 export function formatAutopilotRunSummary(
   binding: ChannelBinding,
   project: AutopilotProjectState,
+  boardChanges: AutopilotBoardChange[] = [],
+  boardSyncError?: string,
 ): string {
   const lines = [
     stampAutopilotLine(`Autopilot 本轮结束：**${binding.projectName}**`),
@@ -625,7 +629,14 @@ export function formatAutopilotRunSummary(
     lines.push(`下一步建议：${project.nextSuggestedWork}`);
   }
 
+  lines.push('看板变化：');
+  lines.push(...formatAutopilotBoardChanges(boardChanges));
   lines.push(`任务看板：${summarizeAutopilotBoard(project.board)}`);
+
+  if (boardSyncError) {
+    lines.push(`看板同步：${boardSyncError}`);
+  }
+
   return lines.join('\n');
 }
 

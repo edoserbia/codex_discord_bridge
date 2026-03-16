@@ -10,7 +10,7 @@
 
 - **频道映射项目**：一个 Discord 主频道绑定一个本地项目目录
 - **线程式会话**：主频道下每个线程自动继承绑定，但拥有独立 Codex 会话
-- **Autopilot 自动迭代**：支持服务级和项目级双层开关、项目周期配置、自然语言方向、状态查询和实时线程进度
+- **Autopilot 自动迭代**：支持服务级和项目级双层开关、项目周期配置、自然语言方向、状态查询、skill 管理的任务看板，以及实时线程进度
 - **实时进度**：持续更新“Codex 实时进度”消息，展示分析摘要、计划状态、时间线、当前命令、输出预览和 stderr
 - **运行中引导**：支持 `!guide <内容>`，先处理中途引导，再继续原任务
 - **附件透传**：图片附件自动透传给 `codex -i`，普通文件自动下载到本地供 Codex 读取
@@ -130,6 +130,7 @@ npm run macos:uninstall-service -- --mode daemon
 
 - 主频道里的 `Autopilot 入口` 置顶卡片
 - 一个 `Autopilot · api` 项目线程
+- 项目目录里的 `.codex/autopilot/board.json` 和 `docs/AUTOPILOT_BOARD.md`
 
 ### 2. 开启服务级 Autopilot
 
@@ -184,6 +185,7 @@ npm run macos:uninstall-service -- --mode daemon
 - 服务级 Autopilot 默认并行度为 `5`
 - 可以随时执行 `!autopilot server concurrency <N>` 调整
 - 需要立即触发当前项目时，可执行 `!autopilot project run`
+- Autopilot 的任务看板真实落在项目目录里；bridge 只读取并在 Discord 里同步变化，不会在服务重启时重置
 
 完整说明见 [docs/AUTOPILOT.md](docs/AUTOPILOT.md)。
 
