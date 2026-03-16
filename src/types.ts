@@ -116,6 +116,7 @@ export interface CommandRecord {
 }
 
 export interface PlanItem {
+  id?: string | undefined;
   text: string;
   completed: boolean;
 }
