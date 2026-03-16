@@ -1,6 +1,10 @@
 #!/usr/bin/env node
+import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 
 function parseArgs(argv) {
   const images = [];
@@ -299,6 +303,35 @@ if (scenario === 'plan-status') {
 }
 
 if (scenario === 'autopilot') {
+  const boardctlPath = prompt.match(/看板脚本：\n([^\n]+)\n/)?.[1]?.trim();
+  if (boardctlPath) {
+    const runBoardCtl = async (...argv) => {
+      const { stdout } = await execFileAsync(process.execPath, [boardctlPath, ...argv], {
+        cwd: process.cwd(),
+      });
+      return stdout.trim();
+    };
+    const ensureItem = async (status, title, notes) => {
+      const raw = await runBoardCtl('list', '--json');
+      const items = JSON.parse(raw);
+      const existing = items.find((item) => item.title === title);
+      if (existing) {
+        return existing;
+      }
+      const args = ['add', status, title, '--json'];
+      if (notes) {
+        args.push('--notes', notes);
+      }
+      return JSON.parse(await runBoardCtl(...args));
+    };
+    await runBoardCtl('ensure', '--json');
+    const primaryTask = await ensureItem('ready', '补齐会话恢复相关测试');
+    await runBoardCtl('move', primaryTask.id, 'doing', '--json');
+    await runBoardCtl('move', primaryTask.id, 'done', '--notes', '已补齐 fake autopilot 验证路径', '--json');
+    await ensureItem('ready', '补充绑定重置相关测试');
+    await ensureItem('ready', '补充 web reset 覆盖');
+    await ensureItem('deferred', '大范围重构会话状态模型');
+  }
   event({
     type: 'item.completed',
     item: {
