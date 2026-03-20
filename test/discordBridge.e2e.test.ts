@@ -411,6 +411,75 @@ test('bridge updates plan checkmarks live when todo items complete', { concurren
   await cleanupDir(rootDir);
 });
 
+test('bridge keeps final plan checkmarks when the todo list finishes right before turn completion', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-plan-fast-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-plan-fast', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannel, '[plan-fast] show the final checkmarks'));
+
+  await waitFor(() => rootChannel.sent.some((message) => /Codex 实时进度/.test(message.content)), 15_000);
+  const progressMessage = rootChannel.sent.find((message) => /Codex 实时进度/.test(message.content));
+  assert.ok(progressMessage);
+
+  await waitFor(() => findSent(rootChannel, /ok: \[plan-fast\] show the final checkmarks/), 15_000);
+  assert.match(progressMessage!.content, /- ✓ Inspect files/);
+  assert.match(progressMessage!.content, /- ✓ Patch code/);
+  assert.match(progressMessage!.content, /- ✓ Run tests/);
+  await cleanupDir(rootDir);
+});
+
+test('bridge keeps final plan checkmarks when completion lands inside the refresh throttle window', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-plan-race-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-plan-race', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannel, '[plan-race] show the final checkmarks'));
+
+  await waitFor(
+    () => rootChannel.sent.some((message) => /Codex 实时进度/.test(message.content) && /- □ Patch code/.test(message.content)),
+    15_000,
+  );
+  const progressMessage = rootChannel.sent.find((message) => /Codex 实时进度/.test(message.content));
+  assert.ok(progressMessage);
+
+  await waitFor(() => findSent(rootChannel, /ok: \[plan-race\] show the final checkmarks/), 15_000);
+  assert.match(progressMessage!.content, /- ✓ Inspect files/);
+  assert.match(progressMessage!.content, /- ✓ Patch code/);
+  assert.match(progressMessage!.content, /- ✓ Run tests/);
+  await cleanupDir(rootDir);
+});
+
+test('bridge shows subagent activity in live progress updates', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-subagent-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-subagent', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+  await dispatch(bridge, createUserMessage(rootChannel, '[subagent] coordinate a helper'));
+
+  await waitFor(
+    () => rootChannel.sent.some((message) => /Codex 实时进度/.test(message.content) && /子代理：/.test(message.content)),
+    20_000,
+  );
+  const progressMessage = rootChannel.sent.find((message) => /Codex 实时进度/.test(message.content) && /子代理：/.test(message.content));
+  assert.ok(progressMessage);
+  await waitFor(() => /等待子代理/.test(progressMessage!.content), 20_000);
+  assert.match(progressMessage!.content, /拉起子代理/);
+  assert.match(progressMessage!.content, /等待子代理/);
+  assert.match(progressMessage!.content, /Investigate the login flow/);
+  await waitFor(() => findSent(rootChannel, /subagent ok; helper agent coordinated successfully/), 20_000);
+  await cleanupDir(rootDir);
+});
+
 test('bridge survives Discord send failures without crashing the process', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-discord-socket-');
   const workspace = await createWorkspace(rootDir);

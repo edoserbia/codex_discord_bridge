@@ -121,6 +121,32 @@ export interface PlanItem {
   completed: boolean;
 }
 
+export type CollabToolName = 'spawn_agent' | 'send_input' | 'wait' | 'close_agent';
+export type CollabToolStatus = 'in_progress' | 'completed' | 'failed';
+export type CollabAgentStatus =
+  | 'pending_init'
+  | 'running'
+  | 'interrupted'
+  | 'completed'
+  | 'errored'
+  | 'shutdown'
+  | 'not_found';
+
+export interface CollabAgentState {
+  status: CollabAgentStatus;
+  message?: string | null | undefined;
+}
+
+export interface CollabToolCall {
+  id: string;
+  tool: CollabToolName;
+  senderThreadId: string;
+  receiverThreadIds: string[];
+  prompt?: string | undefined;
+  agentsStates: Record<string, CollabAgentState>;
+  status: CollabToolStatus;
+}
+
 export type RunStatus = 'idle' | 'queued' | 'starting' | 'running' | 'completed' | 'failed' | 'cancelled';
 export type CancellationReason = 'user_cancel' | 'guidance' | 'binding_reset' | 'unbind';
 
@@ -135,6 +161,7 @@ export interface ActiveRunState {
   agentMessages: string[];
   reasoningSummaries: string[];
   planItems: PlanItem[];
+  collabToolCalls: CollabToolCall[];
   timeline: string[];
   stderr: string[];
   usedResume: boolean;

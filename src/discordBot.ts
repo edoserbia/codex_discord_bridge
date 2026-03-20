@@ -40,6 +40,7 @@ import type {
   AutopilotServiceState,
   ChannelRuntime,
   ChannelBinding,
+  CollabToolCall,
   CodexRunResult,
   ConversationSessionState,
   DashboardBinding,
@@ -1769,6 +1770,7 @@ export class DiscordCodexBridge {
       agentMessages: [],
       reasoningSummaries: [],
       planItems: [],
+      collabToolCalls: [],
       timeline: ['⏳ 已收到请求，准备启动 Codex'],
       stderr: [],
       usedResume: false,
@@ -1855,6 +1857,18 @@ export class DiscordCodexBridge {
         const completed = items.filter((item) => item.completed).length;
         runtime.activeRun.latestActivity = `计划进度 ${completed}/${items.length}`;
         this.pushRunTimeline(runtime, `📋 计划进度 ${completed}/${items.length}`);
+        const nextSession = this.store.getSession(conversationId) ?? currentSession;
+        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
+      },
+      onCollabToolChanged: async (item) => {
+        if (!runtime.activeRun) {
+          return;
+        }
+
+        this.touchActiveRun(runtime.activeRun);
+        this.upsertCollabToolCall(runtime.activeRun, item);
+        runtime.activeRun.latestActivity = describeCollabToolCall(item);
+        this.pushRunTimeline(runtime, `🤝 ${truncate(describeCollabToolCall(item, true), 140)}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
         await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       },
@@ -2120,6 +2134,21 @@ export class DiscordCodexBridge {
     }
 
     activeRun.updatedAt = new Date().toISOString();
+  }
+
+  private upsertCollabToolCall(activeRun: ActiveRunState, item: CollabToolCall): void {
+    const nextItem = structuredClone(item);
+    const index = activeRun.collabToolCalls.findIndex((candidate) => candidate.id === nextItem.id);
+
+    if (index >= 0) {
+      activeRun.collabToolCalls[index] = nextItem;
+    } else {
+      activeRun.collabToolCalls.push(nextItem);
+    }
+
+    if (activeRun.collabToolCalls.length > 8) {
+      activeRun.collabToolCalls.splice(0, activeRun.collabToolCalls.length - 8);
+    }
   }
 
   private describeRetry(kind: ReturnType<typeof diagnoseCodexFailure>['kind'], attempt: number): {
@@ -2457,6 +2486,73 @@ export class DiscordCodexBridge {
   private asSendableChannel(channel: Message['channel']): SendableChannel {
     return channel as unknown as SendableChannel;
   }
+}
+
+function describeCollabToolCall(item: CollabToolCall, includePrompt = false): string {
+  const receiverCount = Math.max(item.receiverThreadIds.length, Object.keys(item.agentsStates).length);
+  const promptSuffix = includePrompt && item.prompt ? `：${item.prompt}` : '';
+
+  switch (item.tool) {
+    case 'spawn_agent':
+      switch (item.status) {
+        case 'in_progress':
+          return `正在拉起子代理${promptSuffix}`;
+        case 'completed':
+          return `已拉起 ${Math.max(1, receiverCount)} 个子代理`;
+        case 'failed':
+          return '拉起子代理失败';
+      }
+      break;
+    case 'send_input':
+      switch (item.status) {
+        case 'in_progress':
+          return `正在向子代理发送指令${promptSuffix}`;
+        case 'completed':
+          return `已向 ${Math.max(1, receiverCount)} 个子代理发送指令`;
+        case 'failed':
+          return '向子代理发送指令失败';
+      }
+      break;
+    case 'wait':
+      switch (item.status) {
+        case 'in_progress':
+          return `正在等待 ${Math.max(1, receiverCount)} 个子代理`;
+        case 'completed':
+          return `等待子代理结束：${summarizeCollabAgentStates(item)}`;
+        case 'failed':
+          return `等待子代理失败：${summarizeCollabAgentStates(item)}`;
+      }
+      break;
+    case 'close_agent':
+      switch (item.status) {
+        case 'in_progress':
+          return `正在关闭 ${Math.max(1, receiverCount)} 个子代理`;
+        case 'completed':
+          return `已关闭 ${Math.max(1, receiverCount)} 个子代理`;
+        case 'failed':
+          return '关闭子代理失败';
+      }
+      break;
+  }
+
+  return '子代理协作已更新';
+}
+
+function summarizeCollabAgentStates(item: CollabToolCall): string {
+  const counts = new Map<string, number>();
+
+  for (const state of Object.values(item.agentsStates)) {
+    counts.set(state.status, (counts.get(state.status) ?? 0) + 1);
+  }
+
+  if (counts.size === 0) {
+    return '无状态';
+  }
+
+  return [...counts.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([status, count]) => `${status} ${count}`)
+    .join(' · ');
 }
 
 function isSendableChannel(channel: unknown): channel is SendableChannel {

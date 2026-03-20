@@ -139,6 +139,94 @@ test('runner preserves plan text across todo updates that only change status fie
   await cleanupDir(rootDir);
 });
 
+test('runner enables multi_agent by default for bridge-launched Codex runs', async () => {
+  const rootDir = await makeTempDir('codex-runner-multi-agent-default-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-codex-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+
+  const runner = new CodexRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+
+  try {
+    const result = await runner.start(binding, { prompt: 'hello subagents', imagePaths: [], extraAddDirs: [] }, undefined).done;
+    assert.equal(result.success, true);
+
+    const logFiles = await readdir(logDir);
+    const payload = JSON.parse(await readFile(path.join(logDir, logFiles.sort().at(-1)!), 'utf8')) as {
+      args: { configs: string[] };
+    };
+
+    assert.ok(payload.args.configs.includes('features.multi_agent=true'));
+  } finally {
+    delete process.env.FAKE_CODEX_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
+test('runner respects explicit multi_agent overrides instead of forcing them on', async () => {
+  const rootDir = await makeTempDir('codex-runner-multi-agent-override-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-codex-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+
+  const runner = new CodexRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+  binding.codex.extraConfig = ['features.multi_agent=false'];
+
+  try {
+    const result = await runner.start(binding, { prompt: 'hello no subagents', imagePaths: [], extraAddDirs: [] }, undefined).done;
+    assert.equal(result.success, true);
+
+    const logFiles = await readdir(logDir);
+    const payload = JSON.parse(await readFile(path.join(logDir, logFiles.sort().at(-1)!), 'utf8')) as {
+      args: { configs: string[] };
+    };
+
+    assert.ok(payload.args.configs.includes('features.multi_agent=false'));
+    assert.ok(!payload.args.configs.includes('features.multi_agent=true'));
+  } finally {
+    delete process.env.FAKE_CODEX_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
+test('runner surfaces collab tool call updates for subagent activity', async () => {
+  const rootDir = await makeTempDir('codex-runner-subagent-');
+  const workspace = await createWorkspace(rootDir);
+  const runner = new CodexRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+  const collabSnapshots: Array<{
+    id: string;
+    tool: string;
+    status: string;
+    receiverThreadIds: string[];
+    prompt?: string;
+    agentsStates: Record<string, { status: string; message?: string | null }>;
+  }> = [];
+
+  const result = await runner.start(binding, { prompt: '[subagent] inspect', imagePaths: [], extraAddDirs: [] }, undefined, {
+    onCollabToolChanged: async (item) => {
+      collabSnapshots.push(JSON.parse(JSON.stringify(item)) as {
+        id: string;
+        tool: string;
+        status: string;
+        receiverThreadIds: string[];
+        prompt?: string;
+        agentsStates: Record<string, { status: string; message?: string | null }>;
+      });
+    },
+  }).done;
+
+  assert.equal(result.success, true);
+  assert.ok(collabSnapshots.some((item) => item.tool === 'spawn_agent' && item.status === 'in_progress'));
+  assert.ok(collabSnapshots.some((item) => item.tool === 'spawn_agent' && item.status === 'completed'));
+  assert.ok(collabSnapshots.some((item) => item.tool === 'wait' && item.status === 'completed'));
+  assert.equal(collabSnapshots.find((item) => item.tool === 'wait' && item.status === 'completed')?.agentsStates['sub-thread-1']?.status, 'completed');
+  assert.match(collabSnapshots.find((item) => item.tool === 'send_input')?.prompt ?? '', /auth redirects/);
+  await cleanupDir(rootDir);
+});
+
 test('runner handles resume and command events', async () => {
   const rootDir = await makeTempDir('codex-runner-resume-');
   const workspace = await createWorkspace(rootDir);

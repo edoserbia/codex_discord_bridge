@@ -1,6 +1,7 @@
 import type { AutopilotBoardChange } from './autopilot.js';
 import type {
   ActiveRunState,
+  CollabToolCall,
   AutopilotProjectState,
   AutopilotServiceState,
   ChannelBinding,
@@ -71,6 +72,17 @@ function appendPlanLines(lines: string[], planItems: PlanItem[], maxItems = 6): 
   }
 }
 
+function appendCollabLines(lines: string[], collabToolCalls: CollabToolCall[], maxItems = 4): void {
+  if (collabToolCalls.length === 0) {
+    return;
+  }
+
+  lines.push('子代理：');
+  for (const item of collabToolCalls.slice(-maxItems)) {
+    lines.push(`- ${truncate(formatCollabToolCallSummary(item), 150)}`);
+  }
+}
+
 function appendTimelineLines(lines: string[], entries: string[], maxItems = 5): void {
   if (entries.length === 0) {
     return;
@@ -104,6 +116,73 @@ function shouldRenderTaskContext(activeRun: ActiveRunState): boolean {
   return activeRun.status !== 'starting' || Boolean(activeRun.codexThreadId);
 }
 
+function formatCollabToolCallSummary(item: CollabToolCall): string {
+  const parts = [
+    formatCollabToolStatusLabel(item.status),
+    formatCollabToolLabel(item.tool),
+  ];
+  const receiverCount = Math.max(item.receiverThreadIds.length, Object.keys(item.agentsStates).length);
+  if (receiverCount > 0) {
+    parts.push(`${receiverCount} 个目标`);
+  }
+
+  const agentStateSummary = summarizeCollabAgentStates(item);
+  if (agentStateSummary) {
+    parts.push(agentStateSummary);
+  }
+
+  if (item.prompt) {
+    parts.push(`提示：${truncate(item.prompt, 80)}`);
+  }
+
+  return parts.join(' · ');
+}
+
+function formatCollabToolLabel(tool: CollabToolCall['tool']): string {
+  switch (tool) {
+    case 'spawn_agent':
+      return '拉起子代理';
+    case 'send_input':
+      return '发送指令';
+    case 'wait':
+      return '等待子代理';
+    case 'close_agent':
+      return '关闭子代理';
+    default:
+      return tool;
+  }
+}
+
+function formatCollabToolStatusLabel(status: CollabToolCall['status']): string {
+  switch (status) {
+    case 'in_progress':
+      return '进行中';
+    case 'completed':
+      return '已完成';
+    case 'failed':
+      return '失败';
+    default:
+      return status;
+  }
+}
+
+function summarizeCollabAgentStates(item: CollabToolCall): string | undefined {
+  const counts = new Map<string, number>();
+
+  for (const state of Object.values(item.agentsStates)) {
+    counts.set(state.status, (counts.get(state.status) ?? 0) + 1);
+  }
+
+  if (counts.size === 0) {
+    return undefined;
+  }
+
+  return [...counts.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([status, count]) => `${status} ${count}`)
+    .join(' · ');
+}
+
 export function formatHelp(prefix: string): string {
   return [
     '🤖 **Codex Discord Bridge 帮助**',
@@ -121,6 +200,7 @@ export function formatHelp(prefix: string): string {
     '绑定成功后，主频道和其下 Discord 线程里的普通消息都会直接作为 Codex prompt 发送。',
     '绑定后还会自动创建一个 Autopilot 项目线程；可在主频道或线程里用 `!autopilot` 查看自动迭代用法。',
     '现在会在频道里持续更新实时进度、命令执行和计划状态。',
+    'Subagent 支持已默认开启；如果你还希望 Codex 把 AGENTS.md 的层级说明显式透传给子代理，可在绑定时追加 `--config features.child_agents_md=true`。',
     '如果当前任务正在运行，可用 `!guide <内容>` 插入中途引导，bridge 会中断当前步骤，先处理引导，再按同一会话继续原任务。',
     '图片附件会自动透传到 `codex -i`，普通文件会下载到本地附件目录供 Codex 读取。',
     '',
@@ -332,6 +412,7 @@ export function formatStatus(
     }
 
     appendPlanLines(lines, runtime.activeRun.planItems, 5);
+    appendCollabLines(lines, runtime.activeRun.collabToolCalls, 4);
 
     const latestReasoning = runtime.activeRun.reasoningSummaries.at(-1);
     if (latestReasoning) {
@@ -388,6 +469,7 @@ export function formatProgressMessage(binding: ChannelBinding, runtime: ChannelR
   }
 
   appendPlanLines(lines, activeRun.planItems, 8);
+  appendCollabLines(lines, activeRun.collabToolCalls, 4);
 
   if (activeRun.reasoningSummaries.length > 0) {
     lines.push('分析摘要：');
