@@ -109,7 +109,10 @@ const scenario = (() => {
   if (prompt.includes('[command]')) return 'command';
   if (prompt.includes('[plan]')) return 'plan';
   if (prompt.includes('[plan-live]')) return 'plan-live';
+  if (prompt.includes('[plan-fast]')) return 'plan-fast';
+  if (prompt.includes('[plan-race]')) return 'plan-race';
   if (prompt.includes('[plan-status]')) return 'plan-status';
+  if (prompt.includes('[subagent]')) return 'subagent';
   if (prompt.includes('[attachments]')) return 'attachments';
   if (prompt.includes('AUTOPILOT_REPORT')) return 'autopilot';
   return 'simple';
@@ -331,6 +334,202 @@ if (scenario === 'plan-live') {
   });
 }
 
+if (scenario === 'plan-fast') {
+  event({
+    type: 'item.started',
+    item: {
+      id: 'todo_fast_1',
+      type: 'todo_list',
+      items: [
+        { id: 'fast-1', text: 'Inspect files', status: 'completed' },
+        { id: 'fast-2', text: 'Patch code', status: 'in_progress' },
+        { id: 'fast-3', text: 'Run tests', status: 'pending' },
+      ],
+    },
+  });
+  await sleep(50);
+  event({
+    type: 'item.updated',
+    item: {
+      id: 'todo_fast_1',
+      type: 'todo_list',
+      items: [
+        { id: 'fast-1', state: 'completed' },
+        { id: 'fast-2', title: 'Patch code', state: 'completed' },
+        { id: 'fast-3', content: { value: 'Run tests' }, state: 'completed' },
+      ],
+    },
+  });
+}
+
+if (scenario === 'plan-race') {
+  event({
+    type: 'item.started',
+    item: {
+      id: 'todo_race_1',
+      type: 'todo_list',
+      items: [
+        { id: 'race-1', text: 'Inspect files', status: 'completed' },
+        { id: 'race-2', text: 'Patch code', status: 'in_progress' },
+        { id: 'race-3', text: 'Run tests', status: 'pending' },
+      ],
+    },
+  });
+  await sleep(450);
+  event({
+    type: 'item.updated',
+    item: {
+      id: 'todo_race_1',
+      type: 'todo_list',
+      items: [
+        { id: 'race-1', state: 'completed' },
+        { id: 'race-2', title: 'Patch code', state: 'completed' },
+        { id: 'race-3', content: { value: 'Run tests' }, state: 'completed' },
+      ],
+    },
+  });
+}
+
+if (scenario === 'subagent') {
+  event({
+    type: 'item.started',
+    item: {
+      id: 'todo_subagent_1',
+      type: 'todo_list',
+      items: [
+        { id: 'sub-1', text: 'Inspect the request', completed: true },
+        { id: 'sub-2', text: 'Coordinate one helper agent', completed: false },
+        { id: 'sub-3', text: 'Summarize the outcome', completed: false },
+      ],
+    },
+  });
+
+  event({
+    type: 'item.started',
+    item: {
+      id: 'collab_1',
+      type: 'collab_tool_call',
+      tool: 'spawn_agent',
+      sender_thread_id: threadId,
+      receiver_thread_ids: [],
+      prompt: 'Investigate the login flow and list the risky edge cases.',
+      agents_states: {},
+      status: 'in_progress',
+    },
+  });
+
+  await sleep(80);
+  event({
+    type: 'item.completed',
+    item: {
+      id: 'collab_1',
+      type: 'collab_tool_call',
+      tool: 'spawn_agent',
+      sender_thread_id: threadId,
+      receiver_thread_ids: ['sub-thread-1'],
+      prompt: 'Investigate the login flow and list the risky edge cases.',
+      agents_states: {
+        'sub-thread-1': { status: 'running', message: null },
+      },
+      status: 'completed',
+    },
+  });
+
+  event({
+    type: 'item.started',
+    item: {
+      id: 'collab_2',
+      type: 'collab_tool_call',
+      tool: 'send_input',
+      sender_thread_id: threadId,
+      receiver_thread_ids: ['sub-thread-1'],
+      prompt: 'Focus on auth redirects, token refresh, and empty-button regressions.',
+      agents_states: {
+        'sub-thread-1': { status: 'running', message: null },
+      },
+      status: 'in_progress',
+    },
+  });
+
+  event({
+    type: 'item.completed',
+    item: {
+      id: 'collab_2',
+      type: 'collab_tool_call',
+      tool: 'send_input',
+      sender_thread_id: threadId,
+      receiver_thread_ids: ['sub-thread-1'],
+      prompt: 'Focus on auth redirects, token refresh, and empty-button regressions.',
+      agents_states: {
+        'sub-thread-1': { status: 'running', message: null },
+      },
+      status: 'completed',
+    },
+  });
+
+  event({
+    type: 'item.started',
+    item: {
+      id: 'collab_3',
+      type: 'collab_tool_call',
+      tool: 'wait',
+      sender_thread_id: threadId,
+      receiver_thread_ids: ['sub-thread-1'],
+      prompt: null,
+      agents_states: {
+        'sub-thread-1': { status: 'running', message: null },
+      },
+      status: 'in_progress',
+    },
+  });
+
+  await sleep(1_350);
+  event({
+    type: 'item.completed',
+    item: {
+      id: 'collab_3',
+      type: 'collab_tool_call',
+      tool: 'wait',
+      sender_thread_id: threadId,
+      receiver_thread_ids: ['sub-thread-1'],
+      prompt: null,
+      agents_states: {
+        'sub-thread-1': { status: 'completed', message: 'Found two auth redirect edge cases and one empty-button regression.' },
+      },
+      status: 'completed',
+    },
+  });
+
+  event({
+    type: 'item.completed',
+    item: {
+      id: 'collab_4',
+      type: 'collab_tool_call',
+      tool: 'close_agent',
+      sender_thread_id: threadId,
+      receiver_thread_ids: ['sub-thread-1'],
+      prompt: null,
+      agents_states: {
+        'sub-thread-1': { status: 'shutdown', message: null },
+      },
+      status: 'completed',
+    },
+  });
+
+  event({
+    type: 'item.updated',
+    item: {
+      id: 'todo_subagent_1',
+      type: 'todo_list',
+      items: [
+        { id: 'sub-1', state: 'completed' },
+        { id: 'sub-2', title: 'Coordinate one helper agent', state: 'completed' },
+        { id: 'sub-3', content: { value: 'Summarize the outcome' }, state: 'completed' },
+      ],
+    },
+  });
+}
+
 if (scenario === 'autopilot') {
   const boardctlPath = prompt.match(/看板脚本：\n([^\n]+)\n/)?.[1]?.trim();
   if (boardctlPath) {
@@ -440,6 +639,8 @@ const finalText = scenario === 'attachments'
   ? `attachments ok; resumed=${args.mode === 'resume'}; images=${args.images.length}; dirs=${args.addDirs.length}`
   : scenario === 'plan'
     ? `plan ok; resumed=${args.mode === 'resume'}; cwd=${process.cwd()}`
+    : scenario === 'subagent'
+      ? 'subagent ok; helper agent coordinated successfully'
     : scenario === 'autopilot'
       ? [
         'Autopilot finished one low-risk task and validation passed.',

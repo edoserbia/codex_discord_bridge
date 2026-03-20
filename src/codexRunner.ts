@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import readline from 'node:readline';
 
 import type { AppConfig } from './config.js';
-import type { ChannelBinding, CodexRunInput, CodexRunResult, CommandRecord, PlanItem } from './types.js';
+import type { ChannelBinding, CodexRunInput, CodexRunResult, CollabAgentState, CollabAgentStatus, CollabToolCall, CollabToolName, CollabToolStatus, CommandRecord, PlanItem } from './types.js';
 
 import { uniqueStrings } from './utils.js';
 
@@ -12,6 +12,7 @@ export interface CodexRunHooks {
   onActivity?: (activity: string) => void | Promise<void>;
   onReasoning?: (message: string) => void | Promise<void>;
   onTodoListChanged?: (items: PlanItem[]) => void | Promise<void>;
+  onCollabToolChanged?: (item: CollabToolCall) => void | Promise<void>;
   onAgentMessage?: (message: string) => void | Promise<void>;
   onCommandStarted?: (command: string) => void | Promise<void>;
   onCommandCompleted?: (command: string, output: string, exitCode: number | null) => void | Promise<void>;
@@ -116,6 +117,13 @@ export class CodexRunner {
               if (hasRawTodoItems) {
                 planItems = nextPlanItems;
                 await hooks.onTodoListChanged?.(nextPlanItems);
+              }
+            }
+
+            if (item.type === 'collab_tool_call') {
+              const collabToolCall = parseCollabToolCall(item);
+              if (collabToolCall) {
+                await hooks.onCollabToolChanged?.(collabToolCall);
               }
             }
 
@@ -263,6 +271,7 @@ export class CodexRunner {
     existingThreadId: string | undefined,
   ): string[] {
     const globalArgs: string[] = ['-a', binding.codex.approvalPolicy];
+    const configEntries = resolveCodexConfigEntries(binding.codex.extraConfig);
 
     if (binding.codex.search) {
       globalArgs.push('--search');
@@ -279,7 +288,7 @@ export class CodexRunner {
         resumeArgs.push('-m', binding.codex.model);
       }
 
-      for (const configEntry of binding.codex.extraConfig) {
+      for (const configEntry of configEntries) {
         resumeArgs.push('-c', configEntry);
       }
 
@@ -313,7 +322,7 @@ export class CodexRunner {
     execArgs.push('-s', binding.codex.sandboxMode);
     execArgs.push('-C', binding.workspacePath);
 
-    for (const configEntry of binding.codex.extraConfig) {
+    for (const configEntry of configEntries) {
       execArgs.push('-c', configEntry);
     }
 
@@ -358,6 +367,20 @@ function buildCodexChildEnv(workspacePath: string): NodeJS.ProcessEnv {
   }
 
   return env;
+}
+
+function resolveCodexConfigEntries(extraConfig: string[]): string[] {
+  const entries = uniqueStrings(extraConfig.map((value) => value.trim()).filter(Boolean));
+  const hasMultiAgentOverride = entries.some((entry) => {
+    const normalized = entry.replace(/\s+/g, '').toLowerCase();
+    return /^(?:features\.)?(?:multi_agent|collab)=/.test(normalized);
+  });
+
+  if (!hasMultiAgentOverride) {
+    entries.push('features.multi_agent=true');
+  }
+
+  return entries;
 }
 
 function parsePlanItems(rawItems: unknown, existingItems: PlanItem[] = []): PlanItem[] {
@@ -421,6 +444,108 @@ function extractPlanItemText(candidate: Record<string, unknown>): string | undef
       ?? candidate.task
       ?? candidate.description,
   );
+}
+
+function parseCollabToolCall(item: Record<string, unknown>): CollabToolCall | undefined {
+  const id = typeof item.id === 'string' && item.id.trim() ? item.id.trim() : undefined;
+  const tool = normalizeCollabTool(item.tool);
+  const status = normalizeCollabToolStatus(item.status);
+
+  if (!id || !tool || !status) {
+    return undefined;
+  }
+
+  const senderThreadId = typeof item.sender_thread_id === 'string'
+    ? item.sender_thread_id
+    : '';
+  const receiverThreadIds = Array.isArray(item.receiver_thread_ids)
+    ? item.receiver_thread_ids.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    : [];
+  const prompt = typeof item.prompt === 'string' && item.prompt.trim().length > 0
+    ? item.prompt.trim()
+    : undefined;
+
+  return {
+    id,
+    tool,
+    senderThreadId,
+    receiverThreadIds,
+    prompt,
+    agentsStates: parseCollabAgentStates(item.agents_states),
+    status,
+  };
+}
+
+function parseCollabAgentStates(rawStates: unknown): Record<string, CollabAgentState> {
+  if (!rawStates || typeof rawStates !== 'object' || Array.isArray(rawStates)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(rawStates).flatMap(([threadId, rawState]) => {
+      if (!threadId.trim() || !rawState || typeof rawState !== 'object' || Array.isArray(rawState)) {
+        return [];
+      }
+
+      const candidate = rawState as Record<string, unknown>;
+      const status = normalizeCollabAgentStatus(candidate.status);
+      if (!status) {
+        return [];
+      }
+
+      const message = typeof candidate.message === 'string'
+        ? candidate.message
+        : candidate.message === null
+          ? null
+          : undefined;
+
+      return [[threadId, { status, message } satisfies CollabAgentState]];
+    }),
+  );
+}
+
+function normalizeCollabTool(value: unknown): CollabToolName | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  if (value === 'spawn_agent' || value === 'send_input' || value === 'wait' || value === 'close_agent') {
+    return value;
+  }
+
+  return undefined;
+}
+
+function normalizeCollabToolStatus(value: unknown): CollabToolStatus | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  if (value === 'in_progress' || value === 'completed' || value === 'failed') {
+    return value;
+  }
+
+  return undefined;
+}
+
+function normalizeCollabAgentStatus(value: unknown): CollabAgentStatus | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  if (
+    value === 'pending_init'
+    || value === 'running'
+    || value === 'interrupted'
+    || value === 'completed'
+    || value === 'errored'
+    || value === 'shutdown'
+    || value === 'not_found'
+  ) {
+    return value;
+  }
+
+  return undefined;
 }
 
 function coercePlanText(value: unknown): string | undefined {
