@@ -33,7 +33,7 @@ import {
 } from './autopilot.js';
 import type { AppConfig } from './config.js';
 import type { BindCommandOptions, ParsedCommand } from './commandParser.js';
-import type { CodexRunHooks, CodexRunner, RunningCodexJob } from './codexRunner.js';
+import type { CodexExecutionDriver, CodexRunHooks, RunningCodexJob } from './codexRunner.js';
 import type {
   ActiveRunState,
   AutopilotProjectState,
@@ -41,6 +41,7 @@ import type {
   ChannelRuntime,
   ChannelBinding,
   CollabToolCall,
+  CodexDriverMode,
   CodexRunResult,
   ConversationSessionState,
   DashboardBinding,
@@ -100,6 +101,50 @@ type SendableChannel = {
     fetch: (messageId: string) => Promise<SendableMessage>;
   };
 };
+
+class PendingRunningCodexJob implements RunningCodexJob {
+  private currentJob: RunningCodexJob | undefined;
+  private cancelled = false;
+  private readonly pendingDone = new Promise<CodexRunResult>(() => undefined);
+
+  constructor(private readonly preferredDriverMode: CodexDriverMode) {}
+
+  setJob(job: RunningCodexJob): void {
+    this.currentJob = job;
+    if (this.cancelled) {
+      job.cancel();
+    }
+  }
+
+  clearJob(): void {
+    this.currentJob = undefined;
+  }
+
+  isAttached(): boolean {
+    return this.currentJob !== undefined;
+  }
+
+  get pid(): number | undefined {
+    return this.currentJob?.pid;
+  }
+
+  get driverMode(): CodexDriverMode {
+    return this.currentJob?.driverMode ?? this.preferredDriverMode;
+  }
+
+  get steer(): ((prompt: string) => Promise<void>) | undefined {
+    return this.currentJob?.steer;
+  }
+
+  get done(): Promise<CodexRunResult> {
+    return this.currentJob?.done ?? this.pendingDone;
+  }
+
+  cancel(): void {
+    this.cancelled = true;
+    this.currentJob?.cancel();
+  }
+}
 
 interface ResolvedConversation {
   binding: ChannelBinding;
@@ -175,7 +220,7 @@ export class DiscordCodexBridge {
   constructor(
     private readonly config: AppConfig,
     private readonly store: JsonStateStore,
-    private readonly runner: CodexRunner,
+    private readonly runner: CodexExecutionDriver,
   ) {
     this.client.once('clientReady', () => {
       console.log(`Discord bot connected as ${this.client.user?.tag ?? 'unknown-user'}`);
@@ -198,6 +243,16 @@ export class DiscordCodexBridge {
     await this.client.login(this.config.discordToken);
     await this.reconcileAutopilotResources();
     this.startAutopilotTicker();
+  }
+
+  async stop(): Promise<void> {
+    if (this.autopilotTicker) {
+      clearInterval(this.autopilotTicker);
+      this.autopilotTicker = undefined;
+    }
+
+    await this.runner.stop?.();
+    await this.client.destroy();
   }
 
   listBindings(guildId?: string): ChannelBinding[] {
@@ -318,7 +373,11 @@ export class DiscordCodexBridge {
   }
 
   async resetConversation(conversationId: string, bindingChannelId?: string): Promise<ConversationSessionState> {
-    return this.store.updateSession(conversationId, { codexThreadId: undefined }, bindingChannelId);
+    return this.store.updateSession(conversationId, {
+      codexThreadId: undefined,
+      driver: undefined,
+      fallbackActive: undefined,
+    }, bindingChannelId);
   }
 
   private async resetBindingSessions(bindingChannelId: string): Promise<void> {
@@ -340,6 +399,8 @@ export class DiscordCodexBridge {
 
       await this.store.updateSession(session.conversationId, {
         codexThreadId: undefined,
+        driver: undefined,
+        fallbackActive: undefined,
         lastRunAt: undefined,
         lastPromptBy: undefined,
       }, bindingChannelId);
@@ -444,6 +505,12 @@ export class DiscordCodexBridge {
     for (const chunk of remainingChunks) {
       await (message.channel as SendableChannel).send(chunk);
     }
+  }
+
+  private async sendDriverStatusNotice(channel: SendableChannel, text: string): Promise<void> {
+    await channel.send(`${formatClockTimestamp(new Date())} ${text}`).catch((error) => {
+      this.logBridgeError(`driver-status channel=${channel.id}`, error);
+    });
   }
 
   private startProcessQueue(conversationId: string): void {
@@ -640,7 +707,16 @@ export class DiscordCodexBridge {
     const runtime = this.getRuntime(resolved.conversationId);
     const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
     await this.refreshStatusPanel(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
-    await message.reply(formatStatus(resolved.binding, session, runtime, this.config.commandPrefix, resolved.isThreadConversation));
+    await message.reply(
+      formatStatus(
+        resolved.binding,
+        session,
+        runtime,
+        this.config.commandPrefix,
+        resolved.isThreadConversation,
+        this.config.codexDriverMode ?? 'app-server',
+      ),
+    );
   }
 
   private async handleCancelCommand(message: Message, resolved: ResolvedConversation | undefined): Promise<void> {
@@ -677,8 +753,23 @@ export class DiscordCodexBridge {
       return;
     }
 
+    const runtime = this.getRuntime(resolved.conversationId);
+    let activeJob = this.activeJobs.get(resolved.conversationId);
+
+    if (!activeJob && runtime.activeRun) {
+      activeJob = await this.waitForActiveJob(resolved.conversationId);
+    }
+
+    if (runtime.activeRun) {
+      runtime.activeRun.status = 'cancelled';
+      runtime.activeRun.latestActivity = `已由 ${message.author.username} 重置当前会话`;
+      runtime.activeRun.cancellationReason = 'reset';
+    }
+    runtime.queue = [];
+    activeJob?.cancel();
+
     const session = await this.resetConversation(resolved.conversationId, resolved.bindingChannelId);
-    await this.refreshStatusPanel(resolved.channel, resolved.binding, session, this.getRuntime(resolved.conversationId), resolved.isThreadConversation);
+    await this.refreshStatusPanel(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
     await message.reply('当前会话的 Codex 上下文已重置。下一条消息会开启新会话。');
   }
 
@@ -696,6 +787,24 @@ export class DiscordCodexBridge {
 
     if (!runtime.activeRun) {
       await message.reply('当前没有正在运行的任务。直接发送普通消息即可，或先启动一个任务后再使用 `!guide`。');
+      return;
+    }
+
+    let activeJob = this.activeJobs.get(resolved.conversationId);
+
+    if (!activeJob || this.isPendingDetachedJob(activeJob)) {
+      activeJob = await this.waitForControllableJob(resolved.conversationId);
+    }
+
+    if (activeJob?.steer) {
+      runtime.activeRun.task.guidancePrompt = prompt;
+      runtime.activeRun.latestActivity = `收到 ${message.author.username} 的中途引导，继续当前轮次`;
+      this.pushRunTimeline(runtime, `🧭 收到新的引导：${truncate(prompt, 120)}`);
+      await activeJob.steer(prompt);
+      await message.react('🧭').catch(() => undefined);
+      await message.reply('已将你的新消息作为引导项插入当前工作，Codex 将继续在当前轮次处理中途引导。');
+      const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
+      await this.refreshRuntimeViews(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
       return;
     }
 
@@ -1714,8 +1823,8 @@ export class DiscordCodexBridge {
         const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
         await this.refreshRuntimeViews(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
 
-        if (!activeJob) {
-          activeJob = await this.waitForActiveJob(resolved.conversationId);
+        if (!activeJob || this.isPendingDetachedJob(activeJob)) {
+          activeJob = await this.waitForControllableJob(resolved.conversationId);
         }
 
         if (activeJob) {
@@ -1763,6 +1872,7 @@ export class DiscordCodexBridge {
 
     const nextRun: ActiveRunState = {
       task,
+      driverMode: 'legacy-exec',
       status: 'starting',
       startedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -1778,11 +1888,15 @@ export class DiscordCodexBridge {
       cancellationReason: undefined,
     };
 
+    const preferredDriverMode = this.config.codexDriverMode ?? 'app-server';
+    const pendingJob = new PendingRunningCodexJob(preferredDriverMode);
     runtime.activeRun = nextRun;
+    this.activeJobs.set(conversationId, pendingJob);
 
     const channel = await this.fetchChannel(conversationId);
 
     if (!channel) {
+      this.activeJobs.delete(conversationId);
       runtime.activeRun = undefined;
       runtime.queue = [];
       return;
@@ -1790,10 +1904,13 @@ export class DiscordCodexBridge {
 
     const session = await this.store.ensureSession(task.bindingChannelId, conversationId);
     const isThreadConversation = conversationId !== task.bindingChannelId;
-    nextRun.usedResume = Boolean(session.codexThreadId);
-    nextRun.codexThreadId = session.codexThreadId;
+    const resumableThreadId = !session.driver || session.driver === preferredDriverMode
+      ? session.codexThreadId
+      : undefined;
+    nextRun.usedResume = Boolean(resumableThreadId);
+    nextRun.codexThreadId = resumableThreadId;
 
-    const currentSession = await this.store.updateSession(conversationId, {
+    let currentSession = await this.store.updateSession(conversationId, {
       lastRunAt: nextRun.startedAt,
       lastPromptBy: task.requestedBy,
     }, task.bindingChannelId);
@@ -1806,9 +1923,26 @@ export class DiscordCodexBridge {
         ...(task.attachmentDir ? [task.attachmentDir] : []),
       ],
     };
+    let pendingRecoveryNotice = false;
+    const flushPendingRecoveryNotice = async (): Promise<void> => {
+      if (!pendingRecoveryNotice) {
+        return;
+      }
+
+      pendingRecoveryNotice = false;
+      await this.sendDriverStatusNotice(channel, 'app-server 已恢复，后续请求将继续使用官方线程/轮次语义。');
+    };
     const hooks: CodexRunHooks = {
       onThreadStarted: async (codexThreadId: string) => {
         if (!runtime.activeRun) {
+          return;
+        }
+
+        await flushPendingRecoveryNotice();
+
+        if (runtime.activeRun.cancellationReason === 'binding_reset'
+          || runtime.activeRun.cancellationReason === 'reset'
+          || runtime.activeRun.cancellationReason === 'unbind') {
           return;
         }
 
@@ -1927,6 +2061,27 @@ export class DiscordCodexBridge {
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
         await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       },
+      onFallbackActivated: async (detail) => {
+        if (!runtime.activeRun) {
+          return;
+        }
+
+        this.touchActiveRun(runtime.activeRun);
+        runtime.activeRun.driverMode = detail.to;
+        runtime.activeRun.latestActivity = 'app-server 不可用，已切换到 legacy-exec fallback';
+        this.pushRunTimeline(runtime, `↩️ 已切换到 legacy-exec fallback：${truncate(detail.reason, 120)}`);
+        pendingRecoveryNotice = false;
+        currentSession = await this.store.updateSession(conversationId, {
+          driver: detail.to,
+          fallbackActive: true,
+          codexThreadId: undefined,
+        }, task.bindingChannelId);
+        await this.sendDriverStatusNotice(
+          channel,
+          `app-server 不可用，当前请求已切换到 legacy-exec fallback。\n原因：${truncate(detail.reason, 240)}`,
+        );
+        await this.refreshRuntimeViews(channel, binding, currentSession, runtime, isThreadConversation);
+      },
     };
     let result: CodexRunResult | undefined;
     let attemptsUsed = 0;
@@ -1936,7 +2091,8 @@ export class DiscordCodexBridge {
       while (true) {
         attemptsUsed += 1;
         const attemptSession = this.store.getSession(conversationId) ?? currentSession;
-        const existingThreadId = attemptSession.codexThreadId;
+        const shouldResumeOnPreferredDriver = !attemptSession.driver || attemptSession.driver === preferredDriverMode;
+        const existingThreadId = shouldResumeOnPreferredDriver ? attemptSession.codexThreadId : undefined;
 
         if (attemptsUsed > 1 && runtime.activeRun && pendingRetryKind) {
           const retryDescription = this.describeRetry(pendingRetryKind, attemptsUsed - 1);
@@ -1947,12 +2103,31 @@ export class DiscordCodexBridge {
           this.pushRunTimeline(runtime, retryDescription.timeline);
         }
 
+        if (!shouldResumeOnPreferredDriver && attemptSession.codexThreadId) {
+          currentSession = await this.store.updateSession(conversationId, {
+            codexThreadId: undefined,
+          }, task.bindingChannelId);
+        }
+
+        if (runtime.activeRun?.cancellationReason) {
+          pendingJob.clearJob();
+          result = buildCancelledBeforeStartResult(nextRun.usedResume);
+          break;
+        }
+
         const job = this.runner.start(binding, runInput, existingThreadId, hooks);
-        this.activeJobs.set(conversationId, job);
+        pendingJob.setJob(job);
+        const startedInFallback = preferredDriverMode === 'app-server' && job.driverMode === 'legacy-exec';
+        nextRun.driverMode = job.driverMode;
+        currentSession = await this.store.updateSession(conversationId, {
+          driver: job.driverMode,
+          fallbackActive: startedInFallback,
+        }, task.bindingChannelId);
+        pendingRecoveryNotice = Boolean(attemptSession.fallbackActive) && job.driverMode === 'app-server';
         this.logCodexAttemptStart(binding, task, conversationId, attemptsUsed, job.pid, existingThreadId);
 
         await channel.sendTyping().catch(() => undefined);
-        await this.refreshRuntimeViews(channel, binding, attemptSession, runtime, isThreadConversation);
+        await this.refreshRuntimeViews(channel, binding, currentSession, runtime, isThreadConversation);
 
         result = await job.done;
         const cancellationReason = runtime.activeRun?.cancellationReason;
@@ -1965,6 +2140,7 @@ export class DiscordCodexBridge {
           let nextSession = this.store.getSession(conversationId) ?? attemptSession;
           const retryDescription = this.describeRetry(failureDiagnosis.kind, attemptsUsed);
           const shouldResetThreadBeforeRetry = retryDescription.resetThreadBeforeRetry;
+          pendingJob.clearJob();
 
           if (shouldResetThreadBeforeRetry) {
             if (runtime.activeRun) {
@@ -1987,7 +2163,7 @@ export class DiscordCodexBridge {
 
       const cancellationReason = runtime.activeRun?.cancellationReason;
       const failureDiagnosis = diagnoseCodexFailure(result, cancellationReason);
-      const suppressReply = !result.success && (cancellationReason === 'guidance' || cancellationReason === 'binding_reset' || cancellationReason === 'unbind');
+      const suppressReply = !result.success && (cancellationReason === 'guidance' || cancellationReason === 'binding_reset' || cancellationReason === 'reset' || cancellationReason === 'unbind');
       let nextSession = this.store.getSession(conversationId) ?? currentSession;
 
       if (!result.success && failureDiagnosis.retryable) {
@@ -2265,6 +2441,27 @@ export class DiscordCodexBridge {
     return this.store.getSession(conversationId)?.codexThreadId;
   }
 
+  private isPendingDetachedJob(job: RunningCodexJob | undefined): job is PendingRunningCodexJob {
+    return job instanceof PendingRunningCodexJob && !job.isAttached();
+  }
+
+  private async waitForControllableJob(conversationId: string, timeoutMs = 1_500): Promise<RunningCodexJob | undefined> {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+      const activeJob = this.activeJobs.get(conversationId);
+
+      if (activeJob && !this.isPendingDetachedJob(activeJob)) {
+        return activeJob;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+
+    const activeJob = this.activeJobs.get(conversationId);
+    return this.isPendingDetachedJob(activeJob) ? undefined : activeJob;
+  }
+
   private async waitForActiveJob(conversationId: string, timeoutMs = 1_500): Promise<RunningCodexJob | undefined> {
     const startedAt = Date.now();
 
@@ -2418,7 +2615,14 @@ export class DiscordCodexBridge {
     runtime: ChannelRuntime,
     isThreadConversation: boolean,
   ): Promise<void> {
-    const content = formatStatus(binding, session, runtime, this.config.commandPrefix, isThreadConversation);
+    const content = formatStatus(
+      binding,
+      session,
+      runtime,
+      this.config.commandPrefix,
+      isThreadConversation,
+      this.config.codexDriverMode ?? 'app-server',
+    );
     const statusMessageId = session.statusMessageId;
 
     if (!statusMessageId) {
@@ -2553,6 +2757,22 @@ function summarizeCollabAgentStates(item: CollabToolCall): string {
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([status, count]) => `${status} ${count}`)
     .join(' · ');
+}
+
+function buildCancelledBeforeStartResult(usedResume: boolean): CodexRunResult {
+  return {
+    success: false,
+    exitCode: null,
+    signal: null,
+    codexThreadId: undefined,
+    usedResume,
+    turnCompleted: false,
+    agentMessages: [],
+    reasoning: [],
+    planItems: [],
+    stderr: ['Codex process cancelled before start.'],
+    commands: [],
+  };
 }
 
 function isSendableChannel(channel: unknown): channel is SendableChannel {

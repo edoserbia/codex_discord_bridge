@@ -1,8 +1,9 @@
 import path from 'node:path';
 
 import type { AppConfig } from '../../src/config.js';
+import type { CodexExecutionDriver } from '../../src/codexRunner.js';
 
-import { CodexRunner } from '../../src/codexRunner.js';
+import { createCodexExecutionDriver } from '../../src/createCodexExecutionDriver.js';
 import { DiscordCodexBridge } from '../../src/discordBot.js';
 import { JsonStateStore } from '../../src/store.js';
 
@@ -18,13 +19,14 @@ class FakeChannelRegistry extends Map<string, FakeChannel> {
 export async function createBridgeTestRig(options: {
   rootDir: string;
   codexCommand?: string;
+  driverMode?: 'legacy-exec' | 'app-server';
   webEnabled?: boolean;
   webPort?: number;
   webAuthToken?: string;
 }): Promise<{
   config: AppConfig;
   store: JsonStateStore;
-  runner: CodexRunner;
+  runner: CodexExecutionDriver;
   bridge: DiscordCodexBridge;
   channels: Map<string, FakeChannel>;
 }> {
@@ -33,6 +35,7 @@ export async function createBridgeTestRig(options: {
     commandPrefix: '!',
     dataDir: path.join(options.rootDir, 'data'),
     codexCommand: options.codexCommand ?? 'codex',
+    codexDriverMode: options.driverMode ?? 'legacy-exec',
     allowedWorkspaceRoots: [options.rootDir],
     adminUserIds: new Set(['admin-user']),
     defaultCodex: {
@@ -54,7 +57,7 @@ export async function createBridgeTestRig(options: {
   const store = new JsonStateStore(path.join(config.dataDir, 'state.json'));
   await store.load();
 
-  const runner = new CodexRunner(config);
+  const runner = createCodexExecutionDriver(config);
   const bridge = new DiscordCodexBridge(config, store, runner);
   const channels = new FakeChannelRegistry();
 

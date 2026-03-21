@@ -68,6 +68,8 @@ export interface ConversationSessionState {
   conversationId: string;
   bindingChannelId: string;
   codexThreadId?: string | undefined;
+  driver?: CodexDriverMode | undefined;
+  fallbackActive?: boolean | undefined;
   statusMessageId?: string | undefined;
   lastRunAt?: string | undefined;
   lastPromptBy?: string | undefined;
@@ -148,10 +150,11 @@ export interface CollabToolCall {
 }
 
 export type RunStatus = 'idle' | 'queued' | 'starting' | 'running' | 'completed' | 'failed' | 'cancelled';
-export type CancellationReason = 'user_cancel' | 'guidance' | 'binding_reset' | 'unbind';
+export type CancellationReason = 'user_cancel' | 'guidance' | 'binding_reset' | 'reset' | 'unbind';
 
 export interface ActiveRunState {
   task: PromptTask;
+  driverMode: CodexDriverMode;
   status: RunStatus;
   startedAt: string;
   updatedAt: string;
@@ -196,6 +199,47 @@ export interface CodexRunResult {
   planItems: PlanItem[];
   stderr: string[];
   commands: CommandRecord[];
+}
+
+export type CodexDriverMode = 'legacy-exec' | 'app-server';
+
+export type AppServerPlanStatus = 'pending' | 'in_progress' | 'completed';
+
+export interface AppServerPlanStep {
+  step: string;
+  status: AppServerPlanStatus;
+}
+
+export type AppServerTurnEvent =
+  | { type: 'turn.started'; threadId: string; turnId: string }
+  | { type: 'turn.completed'; threadId: string; turnId: string }
+  | { type: 'turn.failed'; threadId: string; turnId: string }
+  | { type: 'turn.interrupted'; threadId: string; turnId: string }
+  | { type: 'turn.steered'; threadId: string; turnId: string; prompt: string }
+  | { type: 'plan.updated'; threadId: string; turnId: string; plan: AppServerPlanStep[] }
+  | { type: 'item.started'; threadId: string; turnId: string; item: Record<string, unknown> }
+  | { type: 'item.completed'; threadId: string; turnId: string; item: Record<string, unknown> }
+  | { type: 'command.output.delta'; threadId: string; turnId: string; itemId: string; delta: string }
+  | { type: 'agent.message.delta'; threadId: string; turnId: string; itemId: string; delta: string }
+  | { type: 'reasoning.summary.delta'; threadId: string; turnId: string; itemId: string; delta: string };
+
+export interface AppServerTurnInput {
+  prompt: string;
+  imagePaths: string[];
+  extraAddDirs: string[];
+  onEvent?: (event: AppServerTurnEvent) => void | Promise<void>;
+}
+
+export interface AppServerTurnResult {
+  success: boolean;
+  threadId: string;
+  turnId: string;
+  interrupted: boolean;
+}
+
+export interface RunningAppServerTurn {
+  turnId: string;
+  done: Promise<AppServerTurnResult>;
 }
 
 export interface DashboardConversation {
