@@ -8,10 +8,11 @@
 | [Debug Discord queue stall with Codex Server backend] | `debug-discord-queue-stall/` | Completed | 2026-03-21 |
 
 ## Current Focus
-`harden-app-server-discord-parity/` - Extend the app-server-first bridge with sticky driver visibility, subagent naming, LAN web access, tokenized web URLs, and regression coverage without regressing guide/plan behavior.
+`debug-stalled-progress-stream/` - Completed: restored Discord progress responsiveness, preserved streamed draft visibility, and verified the live service rollout.
 
 ## Completed Tasks
 
 | Task | Directory | Completed |
 |------|-----------|-----------|
+| Debug stalled progress stream and slow character-by-character activity updates | `debug-stalled-progress-stream/` | 2026-03-21 |
 | Debug Discord queue stall with Codex Server backend | `debug-discord-queue-stall/` | 2026-03-21 |

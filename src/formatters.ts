@@ -502,7 +502,14 @@ export function formatProgressMessage(
     }
   }
 
-  appendTimelineLines(lines, activeRun.timeline, 6);
+  if (activeRun.agentMessages.length > 0) {
+    lines.push('回复草稿：');
+    for (const message of activeRun.agentMessages.slice(-2)) {
+      lines.push(`- ${truncate(message, 180)}`);
+    }
+  }
+
+  appendTimelineLines(lines, activeRun.timeline, 8);
 
   if (activeRun.currentCommand) {
     lines.push(`当前命令：\`${truncate(sanitizeInlineCode(activeRun.currentCommand), 180)}\``);
