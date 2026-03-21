@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, realpath } from 'node:fs/promises';
 
 import type { AppConfig } from '../src/config.js';
 import type { ChannelBinding } from '../src/types.js';
@@ -11,6 +11,8 @@ import { CodexAppServerClient } from '../src/codexAppServerClient.js';
 import { cleanupDir, createWorkspace, makeTempDir, waitFor } from './helpers/testUtils.js';
 
 const fakeAppServerCommand = path.resolve('test/fixtures/fake-codex-app-server.mjs');
+const hangingAppServerCommand = path.resolve('test/fixtures/fake-codex-app-server-initialize-hang.mjs');
+const fakeWsAppServerCommand = path.resolve('test/fixtures/fake-codex-app-server-ws.mjs');
 
 function makeConfig(rootDir: string, codexCommand = fakeAppServerCommand): AppConfig {
   return {
@@ -261,16 +263,61 @@ test('app-server client forwards per-thread config and writable roots to the off
     assert.ok(threadStart);
     assert.ok(turnStart);
     assert.equal(threadStart!.params.model, 'gpt-5-codex');
+    assert.equal(threadStart!.params.approvalPolicy, 'never');
     assert.equal(threadStart!.params.config.profile, 'reviewer');
     assert.equal(threadStart!.params.config.web_search, 'live');
     assert.equal(threadStart!.params.config.features.multi_agent, false);
     assert.equal(threadStart!.params.config.tools.view_image, true);
     assert.equal(turnStart!.params.cwd, workspace);
+    assert.equal(turnStart!.params.approvalPolicy, 'never');
     assert.equal(turnStart!.params.sandboxPolicy.type, 'workspaceWrite');
     assert.deepEqual(
       [...turnStart!.params.sandboxPolicy.writableRoots].sort(),
       [extraDir, scratchDir, workspace].sort(),
     );
+  } finally {
+    delete process.env.FAKE_CODEX_APP_SERVER_LOG_DIR;
+    await client.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('app-server client forwards local full-access mode and search using the same binding options', async () => {
+  const rootDir = await makeTempDir('codex-app-server-client-danger-full-access-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'logs');
+  const binding = makeBinding(workspace);
+  binding.codex.sandboxMode = 'danger-full-access';
+  binding.codex.approvalPolicy = 'never';
+  binding.codex.search = true;
+  const client = new CodexAppServerClient(makeConfig(rootDir));
+  process.env.FAKE_CODEX_APP_SERVER_LOG_DIR = logDir;
+
+  try {
+    const threadId = await client.ensureThread(binding, undefined);
+    const turn = await client.startTurn(binding, threadId, {
+      prompt: 'verify local full-access defaults',
+      imagePaths: [],
+      extraAddDirs: [],
+    });
+
+    await turn.done;
+
+    const files = await readdir(logDir);
+    const payloads = await Promise.all(files.map(async (fileName) => JSON.parse(await readFile(path.join(logDir, fileName), 'utf8')) as {
+      method: string;
+      params: Record<string, any>;
+    }));
+    const threadStart = payloads.find((payload) => payload.method === 'thread/start');
+    const turnStart = payloads.find((payload) => payload.method === 'turn/start');
+
+    assert.ok(threadStart);
+    assert.ok(turnStart);
+    assert.equal(threadStart!.params.approvalPolicy, 'never');
+    assert.equal(threadStart!.params.sandbox, 'danger-full-access');
+    assert.equal(threadStart!.params.config.web_search, 'live');
+    assert.equal(turnStart!.params.approvalPolicy, 'never');
+    assert.equal(turnStart!.params.sandboxPolicy.type, 'dangerFullAccess');
   } finally {
     delete process.env.FAKE_CODEX_APP_SERVER_LOG_DIR;
     await client.stop();
@@ -304,6 +351,107 @@ test('app-server client serializes concurrent startup through a single initializ
   } finally {
     delete process.env.FAKE_CODEX_APP_SERVER_LOG_DIR;
     delete process.env.FAKE_CODEX_APP_SERVER_INITIALIZE_DELAY_MS;
+    await client.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('app-server client starts the child process from the bound workspace context', async () => {
+  const rootDir = await makeTempDir('codex-app-server-client-startup-context-');
+  const workspace = await createWorkspace(rootDir);
+  const realWorkspace = await realpath(workspace);
+  const binding = makeBinding(workspace);
+  const logDir = path.join(rootDir, 'logs');
+  const client = new CodexAppServerClient(makeConfig(rootDir));
+  process.env.FAKE_CODEX_APP_SERVER_LOG_DIR = logDir;
+
+  try {
+    await client.ensureThread(binding, undefined);
+
+    const files = await readdir(logDir);
+    const payloads = await Promise.all(files.map(async (fileName) => JSON.parse(await readFile(path.join(logDir, fileName), 'utf8')) as {
+      method: string;
+      cwd?: string;
+      env?: {
+        PWD?: string;
+      };
+    }));
+    const startup = payloads.find((payload) => payload.method === '$startup');
+
+    assert.ok(startup);
+    assert.equal(startup.cwd, realWorkspace);
+    assert.equal(startup.env?.PWD, workspace);
+  } finally {
+    delete process.env.FAKE_CODEX_APP_SERVER_LOG_DIR;
+    await client.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('app-server client rejects initialize hangs instead of staying pending forever', async () => {
+  const rootDir = await makeTempDir('codex-app-server-client-initialize-timeout-');
+  const workspace = await createWorkspace(rootDir);
+  const binding = makeBinding(workspace);
+  const config = makeConfig(rootDir, hangingAppServerCommand) as AppConfig & {
+    codexAppServerStartupTimeoutMs?: number;
+  };
+  config.codexAppServerStartupTimeoutMs = 200;
+  const client = new CodexAppServerClient(config as AppConfig);
+  const timeoutSentinel = Symbol.for('timeout');
+
+  try {
+    const result = await Promise.race([
+      client.ensureThread(binding, undefined).then(
+        () => Symbol.for('resolved'),
+        (error) => error,
+      ),
+      new Promise<symbol>((resolve) => {
+        setTimeout(() => resolve(timeoutSentinel), 1_500);
+      }),
+    ]);
+
+    assert.notEqual(result, timeoutSentinel);
+    assert.notEqual(result, Symbol.for('resolved'));
+    assert.ok(result instanceof Error);
+    assert.match(result.message, /initialize|timeout|timed out/i);
+  } finally {
+    await client.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('app-server client can use websocket transport when configured', async () => {
+  const rootDir = await makeTempDir('codex-app-server-client-ws-transport-');
+  const workspace = await createWorkspace(rootDir);
+  const binding = makeBinding(workspace);
+  const config = makeConfig(rootDir, fakeWsAppServerCommand) as AppConfig & {
+    codexAppServerTransport?: 'ws';
+    codexAppServerStartupTimeoutMs?: number;
+  };
+  config.codexAppServerTransport = 'ws';
+  config.codexAppServerStartupTimeoutMs = 500;
+  const client = new CodexAppServerClient(config as AppConfig);
+  const events: string[] = [];
+
+  try {
+    await client.start();
+    const threadId = await client.ensureThread(binding, undefined);
+    const turn = await client.startTurn(binding, threadId, {
+      prompt: '[app-plan] inspect over ws',
+      imagePaths: [],
+      extraAddDirs: [],
+      onEvent: async (event) => {
+        events.push(event.type);
+      },
+    });
+
+    const result = await turn.done;
+    assert.equal(result.success, true);
+    assert.equal(result.threadId, threadId);
+    assert.ok(events.includes('turn.started'));
+    assert.ok(events.includes('plan.updated'));
+    assert.ok(events.includes('turn.completed'));
+  } finally {
     await client.stop();
     await cleanupDir(rootDir);
   }

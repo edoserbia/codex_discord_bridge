@@ -2,6 +2,8 @@ export type SandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access'
 
 export type ApprovalPolicy = 'untrusted' | 'on-failure' | 'on-request' | 'never';
 
+export type AppServerTransport = 'auto' | 'stdio' | 'ws';
+
 export interface BindingCodexOptions {
   model?: string | undefined;
   profile?: string | undefined;
@@ -137,6 +139,8 @@ export type CollabAgentStatus =
 export interface CollabAgentState {
   status: CollabAgentStatus;
   message?: string | null | undefined;
+  nickname?: string | null | undefined;
+  role?: string | null | undefined;
 }
 
 export interface CollabToolCall {

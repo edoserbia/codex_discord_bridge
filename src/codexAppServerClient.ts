@@ -1,8 +1,10 @@
 import { once } from 'node:events';
 import { spawn } from 'node:child_process';
+import net from 'node:net';
 
 import type { AppConfig } from './config.js';
 import type {
+  AppServerTransport,
   AppServerPlanStep,
   AppServerTurnEvent,
   AppServerTurnInput,
@@ -17,6 +19,7 @@ import { uniqueStrings } from './utils.js';
 interface PendingRequest {
   resolve: (value: unknown) => void;
   reject: (error: unknown) => void;
+  timeout?: NodeJS.Timeout | undefined;
 }
 
 interface ActiveTurnState {
@@ -34,11 +37,23 @@ interface BufferedTurnEvent {
   terminalResult?: AppServerTurnResult | undefined;
 }
 
+type AppServerWebSocket = {
+  readyState: number;
+  send: (data: string) => void;
+  close: (code?: number, reason?: string) => void;
+  onopen: ((event: unknown) => void) | null;
+  onmessage: ((event: { data: unknown }) => void) | null;
+  onerror: ((event: unknown) => void) | null;
+  onclose: ((event: unknown) => void) | null;
+};
+
 export class CodexAppServerClient {
   private child: ReturnType<typeof spawn> | undefined;
   private readonly pendingRequests = new Map<number, PendingRequest>();
   private readonly activeTurns = new Map<string, ActiveTurnState>();
   private readonly bufferedTurnEvents = new Map<string, BufferedTurnEvent[]>();
+  private socket: AppServerWebSocket | undefined;
+  private transportMode: Exclude<AppServerTransport, 'auto'> | undefined;
   private nextRequestId = 1;
   private stdoutBuffer = Buffer.alloc(0);
   private started = false;
@@ -48,7 +63,7 @@ export class CodexAppServerClient {
 
   constructor(private readonly config: AppConfig) {}
 
-  async start(): Promise<void> {
+  async start(startupWorkspacePath = process.cwd()): Promise<void> {
     if (this.started) {
       return;
     }
@@ -59,81 +74,51 @@ export class CodexAppServerClient {
     }
 
     this.driverFailure = undefined;
-    const startup = (async () => {
-      const { command, argsPrefix } = resolveCommandInvocation(this.config.codexCommand);
-      const child = spawn(command, [...argsPrefix, 'app-server', '--listen', 'stdio://'], {
-        cwd: process.cwd(),
-        env: buildCodexChildEnv(process.cwd()),
-        stdio: ['pipe', 'pipe', 'pipe'],
-        detached: process.platform !== 'win32',
-      });
+    this.messageChain = Promise.resolve();
+    this.transportMode = resolveAppServerTransport(this.config.codexAppServerTransport, this.config.codexCommand);
 
-      child.stdout.on('data', (chunk: Buffer) => {
-        this.stdoutBuffer = Buffer.concat([this.stdoutBuffer, chunk]);
-        this.processStdoutBuffer();
-      });
+    const startup = this.startTransport(startupWorkspacePath);
+    this.startPromise = startup;
 
-      child.stderr.on('data', () => {
-        // The initial client test contract does not assert stderr handling yet.
-      });
-
-      child.on('error', (error) => {
-        this.failDriver(error);
-      });
-
-      child.on('exit', (code, signal) => {
-        const message = code !== null
-          ? `app-server exited with code ${code}`
-          : `app-server terminated by ${signal ?? 'unknown signal'}`;
-        this.failDriver(new Error(message));
-      });
-
-      this.child = child;
-      this.messageChain = Promise.resolve();
-
-      try {
-        await this.request('initialize', {
-          clientInfo: {
-            name: 'codex-discord-bridge',
-            version: '0.3.3',
-          },
-          capabilities: {
-            experimentalApi: true,
-          },
-        });
-        this.started = true;
-      } catch (error) {
-        this.failDriver(error);
-        throw error;
-      }
-    })();
-
-    this.startPromise = startup.finally(() => {
-      if (this.startPromise === guardedStartup) {
+    try {
+      await startup;
+      this.started = true;
+    } catch (error) {
+      this.failDriver(error);
+      throw error;
+    } finally {
+      if (this.startPromise === startup) {
         this.startPromise = undefined;
       }
-    });
-
-    const guardedStartup = this.startPromise;
-    await guardedStartup;
+    }
   }
 
   async stop(): Promise<void> {
     const child = this.child;
+    const socket = this.socket;
     this.child = undefined;
+    this.socket = undefined;
+    this.transportMode = undefined;
     this.started = false;
     this.stdoutBuffer = Buffer.alloc(0);
+    this.driverFailure = undefined;
 
-    if (!child) {
-      return;
+    if (socket) {
+      try {
+        socket.close();
+      } catch {
+        // ignore close errors during shutdown
+      }
     }
 
-    terminateChild(child);
-    await once(child, 'exit').catch(() => undefined);
+    if (child) {
+      terminateChild(child);
+      await once(child, 'exit').catch(() => undefined);
+    }
   }
 
   async ensureThread(binding: ChannelBinding, existingThreadId: string | undefined): Promise<string> {
-    await this.start();
+    await this.start(binding.workspacePath);
 
     const sharedParams = {
       cwd: binding.workspacePath,
@@ -160,7 +145,7 @@ export class CodexAppServerClient {
   }
 
   async startTurn(binding: ChannelBinding, threadId: string, input: AppServerTurnInput): Promise<RunningAppServerTurn> {
-    await this.start();
+    await this.start(binding.workspacePath);
 
     const result = await this.request('turn/start', {
       threadId,
@@ -248,6 +233,114 @@ export class CodexAppServerClient {
     });
   }
 
+  private async startTransport(startupWorkspacePath: string): Promise<void> {
+    const { command, argsPrefix } = resolveCommandInvocation(this.config.codexCommand);
+    const startupTimeoutMs = this.getStartupTimeoutMs();
+
+    if (this.transportMode === 'ws') {
+      const port = await reserveLocalPort();
+      const listenUrl = `ws://127.0.0.1:${port}`;
+      const child = this.spawnAppServer(command, argsPrefix, listenUrl, startupWorkspacePath);
+      this.child = child;
+      await this.connectWebSocket(listenUrl, startupTimeoutMs);
+    } else {
+      const child = this.spawnAppServer(command, argsPrefix, 'stdio://', startupWorkspacePath);
+      child.stdout?.on('data', (chunk: Buffer) => {
+        this.stdoutBuffer = Buffer.concat([this.stdoutBuffer, chunk]);
+        this.processStdoutBuffer();
+      });
+      this.child = child;
+    }
+
+    await this.request('initialize', {
+      clientInfo: {
+        name: 'codex-discord-bridge',
+        version: '0.3.3',
+      },
+      capabilities: {
+        experimentalApi: true,
+      },
+    }, startupTimeoutMs);
+
+    this.sendNotification('initialized');
+  }
+
+  private spawnAppServer(
+    command: string,
+    argsPrefix: string[],
+    listenUrl: string,
+    startupWorkspacePath: string,
+  ): ReturnType<typeof spawn> {
+    const child = spawn(command, [...argsPrefix, 'app-server', '--listen', listenUrl], {
+      cwd: startupWorkspacePath,
+      env: buildCodexChildEnv(startupWorkspacePath),
+      stdio: ['pipe', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
+    });
+
+    child.stderr.on('data', () => {
+      // The initial client test contract does not assert stderr handling yet.
+    });
+
+    child.on('error', (error) => {
+      this.failDriver(error);
+    });
+
+    child.on('exit', (code, signal) => {
+      const message = code !== null
+        ? `app-server exited with code ${code}`
+        : `app-server terminated by ${signal ?? 'unknown signal'}`;
+      this.failDriver(new Error(message));
+    });
+
+    return child;
+  }
+
+  private async connectWebSocket(listenUrl: string, timeoutMs: number): Promise<void> {
+    const WebSocketCtor = globalThis.WebSocket as undefined | (new (url: string) => AppServerWebSocket);
+    if (!WebSocketCtor) {
+      throw new Error('global WebSocket is unavailable in this Node runtime');
+    }
+
+    const deadline = Date.now() + timeoutMs;
+    let lastError: unknown;
+
+    while (Date.now() < deadline) {
+      try {
+        const socket = await openWebSocket(WebSocketCtor, listenUrl, Math.min(1_000, Math.max(100, deadline - Date.now())));
+        this.socket = socket;
+        socket.onmessage = (event) => {
+          const payload = parseWebSocketPayload(event.data);
+          if (!payload) {
+            return;
+          }
+
+          this.messageChain = this.messageChain
+            .then(async () => {
+              await this.handleMessage(payload);
+            })
+            .catch((error) => {
+              this.failDriver(error);
+            });
+        };
+        socket.onerror = () => {
+          this.failDriver(new Error('app-server websocket transport error'));
+        };
+        socket.onclose = () => {
+          this.failDriver(new Error('app-server websocket transport closed'));
+        };
+        return;
+      } catch (error) {
+        lastError = error;
+        await sleep(100);
+      }
+    }
+
+    throw lastError instanceof Error
+      ? new Error(`app-server websocket connect timed out after ${timeoutMs}ms: ${lastError.message}`)
+      : new Error(`app-server websocket connect timed out after ${timeoutMs}ms`);
+  }
+
   private processStdoutBuffer(): void {
     try {
       while (true) {
@@ -294,6 +387,9 @@ export class CodexAppServerClient {
       }
 
       this.pendingRequests.delete(message.id);
+      if (pending.timeout) {
+        clearTimeout(pending.timeout);
+      }
 
       if (message.error) {
         pending.reject(message.error);
@@ -505,14 +601,20 @@ export class CodexAppServerClient {
   private failDriver(error: unknown): void {
     const normalized = error instanceof Error ? error : new Error(String(error));
     const child = this.child;
+    const socket = this.socket;
     this.driverFailure = normalized;
     this.started = false;
     this.startPromise = undefined;
     this.child = undefined;
+    this.socket = undefined;
+    this.transportMode = undefined;
     this.stdoutBuffer = Buffer.alloc(0);
     this.messageChain = Promise.resolve();
 
     for (const pending of this.pendingRequests.values()) {
+      if (pending.timeout) {
+        clearTimeout(pending.timeout);
+      }
       pending.reject(normalized);
     }
     this.pendingRequests.clear();
@@ -522,6 +624,14 @@ export class CodexAppServerClient {
     }
     this.activeTurns.clear();
     this.bufferedTurnEvents.clear();
+
+    if (socket) {
+      try {
+        socket.close();
+      } catch {
+        // ignore close errors while failing transport
+      }
+    }
 
     if (child) {
       terminateChild(child);
@@ -544,12 +654,7 @@ export class CodexAppServerClient {
     }
   }
 
-  private async request(method: string, params: Record<string, unknown>): Promise<any> {
-    const child = this.child;
-    if (!child?.stdin) {
-      throw new Error('app-server child process is not running');
-    }
-
+  private async request(method: string, params: Record<string, unknown>, timeoutMs = this.getRequestTimeoutMs()): Promise<any> {
     const id = this.nextRequestId;
     this.nextRequestId += 1;
 
@@ -560,15 +665,53 @@ export class CodexAppServerClient {
       params,
     };
 
-    const message = JSON.stringify(payload);
-    const framed = `Content-Length: ${Buffer.byteLength(message, 'utf8')}\r\n\r\n${message}`;
-
     const response = new Promise<unknown>((resolve, reject) => {
-      this.pendingRequests.set(id, { resolve, reject });
+      const timeout = timeoutMs > 0
+        ? setTimeout(() => {
+          this.failDriver(new Error(`app-server ${method} timed out after ${timeoutMs}ms`));
+        }, timeoutMs)
+        : undefined;
+      this.pendingRequests.set(id, { resolve, reject, timeout });
     });
 
-    child.stdin.write(framed);
+    this.sendMessage(payload);
     return response;
+  }
+
+  private sendNotification(method: string, params?: Record<string, unknown>): void {
+    const payload = params === undefined
+      ? { jsonrpc: '2.0', method }
+      : { jsonrpc: '2.0', method, params };
+    this.sendMessage(payload);
+  }
+
+  private sendMessage(payload: Record<string, unknown>): void {
+    const message = JSON.stringify(payload);
+
+    if (this.transportMode === 'ws') {
+      const socket = this.socket;
+      if (!socket || socket.readyState !== 1) {
+        throw new Error('app-server websocket transport is not connected');
+      }
+      socket.send(message);
+      return;
+    }
+
+    const child = this.child;
+    if (!child?.stdin) {
+      throw new Error('app-server child process is not running');
+    }
+
+    const framed = `Content-Length: ${Buffer.byteLength(message, 'utf8')}\r\n\r\n${message}`;
+    child.stdin.write(framed);
+  }
+
+  private getStartupTimeoutMs(): number {
+    return Math.max(1, this.config.codexAppServerStartupTimeoutMs ?? 10_000);
+  }
+
+  private getRequestTimeoutMs(): number {
+    return Math.max(1, this.config.codexAppServerRequestTimeoutMs ?? this.getStartupTimeoutMs());
   }
 }
 
@@ -740,6 +883,89 @@ function resolveCommandInvocation(command: string): { command: string; argsPrefi
     command,
     argsPrefix: [],
   };
+}
+
+function resolveAppServerTransport(
+  configuredTransport: AppServerTransport | undefined,
+  command: string,
+): Exclude<AppServerTransport, 'auto'> {
+  if (configuredTransport === 'stdio' || configuredTransport === 'ws') {
+    return configuredTransport;
+  }
+
+  return /\.(?:[cm]?js|ts)$/i.test(command) ? 'stdio' : 'ws';
+}
+
+function parseWebSocketPayload(raw: unknown): Record<string, unknown> | undefined {
+  if (typeof raw === 'string') {
+    return JSON.parse(raw) as Record<string, unknown>;
+  }
+
+  if (raw instanceof ArrayBuffer) {
+    return JSON.parse(Buffer.from(raw).toString('utf8')) as Record<string, unknown>;
+  }
+
+  if (ArrayBuffer.isView(raw)) {
+    return JSON.parse(Buffer.from(raw.buffer, raw.byteOffset, raw.byteLength).toString('utf8')) as Record<string, unknown>;
+  }
+
+  return undefined;
+}
+
+async function openWebSocket(
+  WebSocketCtor: new (url: string) => AppServerWebSocket,
+  listenUrl: string,
+  timeoutMs: number,
+): Promise<AppServerWebSocket> {
+  return await new Promise<AppServerWebSocket>((resolve, reject) => {
+    const socket = new WebSocketCtor(listenUrl);
+    const timer = setTimeout(() => {
+      try {
+        socket.close();
+      } catch {
+        // ignore close errors on timeout
+      }
+      reject(new Error(`websocket connect timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    socket.onopen = () => {
+      clearTimeout(timer);
+      resolve(socket);
+    };
+    socket.onerror = () => {
+      clearTimeout(timer);
+      reject(new Error('websocket connect failed'));
+    };
+  });
+}
+
+async function reserveLocalPort(): Promise<number> {
+  return await new Promise<number>((resolve, reject) => {
+    const server = net.createServer();
+    server.unref();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      if (!address || typeof address === 'string') {
+        server.close(() => reject(new Error('failed to reserve local app-server port')));
+        return;
+      }
+
+      const { port } = address;
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve(port);
+      });
+    });
+  });
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function buildCodexChildEnv(workspacePath: string): NodeJS.ProcessEnv {

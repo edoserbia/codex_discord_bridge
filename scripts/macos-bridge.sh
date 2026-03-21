@@ -53,6 +53,7 @@ Codex Discord Bridge macOS 管理脚本
   ./scripts/macos-bridge.sh restart
   ./scripts/macos-bridge.sh status
   ./scripts/macos-bridge.sh logs
+  ./scripts/macos-bridge.sh web-url
   ./scripts/macos-bridge.sh open
   ./scripts/macos-bridge.sh service-run
   ./scripts/macos-bridge.sh service-status
@@ -69,6 +70,7 @@ Codex Discord Bridge macOS 管理脚本
   restart           重启服务
   status            查看当前运行状态
   logs              实时查看日志
+  web-url           打印带 token 的 Web 面板访问链接
   open              打开本地 Web 管理面板
   service-run       前台运行服务，供 launchd 调用
   service-status    查看 launchd 安装状态
@@ -161,17 +163,18 @@ augment_launch_path() {
 }
 
 is_running() {
-  if [[ ! -f "${PID_FILE}" ]]; then
-    return 1
+  local pid=''
+
+  if [[ -f "${PID_FILE}" ]]; then
+    pid="$(cat "${PID_FILE}")"
+    if [[ -n "${pid}" ]] && kill -0 "${pid}" >/dev/null 2>&1; then
+      return 0
+    fi
   fi
 
-  local pid
-  pid="$(cat "${PID_FILE}")"
-  if [[ -z "${pid}" ]]; then
-    return 1
-  fi
-
-  if kill -0 "${pid}" >/dev/null 2>&1; then
+  pid="$(current_running_pid || true)"
+  if [[ -n "${pid}" ]] && kill -0 "${pid}" >/dev/null 2>&1; then
+    printf '%s\n' "${pid}" > "${PID_FILE}"
     return 0
   fi
 
@@ -340,16 +343,16 @@ const path = process.env.ENV_FILE_PATH;
 const source = fs.readFileSync(path, 'utf8');
 let lines = source.split(/\r?\n/);
 const openclawProxy = process.env.OPENCLAW_PROXY || '';
-const defaults = new Map([
+  const defaults = new Map([
   ['COMMAND_PREFIX', '!'],
   ['DATA_DIR', './data'],
   ['CODEX_COMMAND', 'codex'],
   ['DEFAULT_CODEX_SANDBOX', 'danger-full-access'],
   ['DEFAULT_CODEX_APPROVAL', 'never'],
-  ['DEFAULT_CODEX_SEARCH', 'false'],
+  ['DEFAULT_CODEX_SEARCH', 'true'],
   ['DEFAULT_CODEX_SKIP_GIT_REPO_CHECK', 'true'],
   ['WEB_ENABLED', 'true'],
-  ['WEB_BIND', '127.0.0.1'],
+  ['WEB_BIND', '0.0.0.0'],
   ['WEB_PORT', '3769'],
   ['ALLOWED_WORKSPACE_ROOTS', process.env.DEFAULT_ALLOWED_ROOTS || ''],
 ]);
@@ -834,6 +837,34 @@ has_multiple_installed_service_modes() {
 service_is_bootstrapped() {
   local mode="$1"
   launchctl print "$(service_target_for_mode "${mode}")" >/dev/null 2>&1
+}
+
+service_bootstrapped_pid() {
+  local mode="$1"
+  launchctl print "$(service_target_for_mode "${mode}")" 2>/dev/null | awk '/^[[:space:]]*pid = / { print $3; exit }'
+}
+
+current_running_pid() {
+  local pid installed_mode
+
+  if [[ -f "${PID_FILE}" ]]; then
+    pid="$(cat "${PID_FILE}")"
+    if [[ -n "${pid}" ]] && kill -0 "${pid}" >/dev/null 2>&1; then
+      printf '%s\n' "${pid}"
+      return 0
+    fi
+  fi
+
+  installed_mode="$(detect_installed_service_mode || true)"
+  if [[ -n "${installed_mode}" ]]; then
+    pid="$(service_bootstrapped_pid "${installed_mode}" || true)"
+    if [[ -n "${pid}" ]] && kill -0 "${pid}" >/dev/null 2>&1; then
+      printf '%s\n' "${pid}"
+      return 0
+    fi
+  fi
+
+  return 1
 }
 
 rerun_with_sudo() {
@@ -1382,7 +1413,7 @@ run_service_status() {
   fi
 
   if is_running; then
-    pid="$(cat "${PID_FILE}")"
+    pid="$(current_running_pid || true)"
     print_info "进程状态：运行中，PID=${pid}"
   else
     print_warn '进程状态：未运行'
@@ -1393,12 +1424,13 @@ run_service_status() {
 }
 
 run_status() {
-  local web_port installed_mode
+  local web_port installed_mode pid
   web_port="$(read_env_value 'WEB_PORT' || true)"
   installed_mode="$(detect_installed_service_mode || true)"
 
   if is_running; then
-    print_info "服务运行中，PID=$(cat "${PID_FILE}")"
+    pid="$(current_running_pid || true)"
+    print_info "服务运行中，PID=${pid}"
     print_info "Web 面板：http://127.0.0.1:${web_port:-3769}"
     print_info "日志文件：${LOG_FILE}"
   else
@@ -1421,17 +1453,74 @@ run_logs() {
   tail -n 80 -f "${LOG_FILE}"
 }
 
-run_open() {
-  local web_port web_auth_token url encoded_token
+run_web_url() {
+  local web_port web_bind web_auth_token
   web_port="$(read_env_value 'WEB_PORT' || true)"
+  web_bind="$(read_env_value 'WEB_BIND' || true)"
   web_auth_token="$(read_env_value 'WEB_AUTH_TOKEN' || true)"
-  url="http://127.0.0.1:${web_port:-3769}"
 
-  if [[ -n "${web_auth_token}" ]]; then
-    encoded_token="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1] || ""))' "${web_auth_token}")"
-    url="${url}/?token=${encoded_token}"
+  WEB_PORT_VALUE="${web_port:-3769}" \
+  WEB_BIND_VALUE="${web_bind:-0.0.0.0}" \
+  WEB_AUTH_TOKEN_VALUE="${web_auth_token}" \
+  node <<'NODE'
+const os = require('node:os');
+
+const port = Number(process.env.WEB_PORT_VALUE || '3769');
+const bind = String(process.env.WEB_BIND_VALUE || '0.0.0.0').trim() || '0.0.0.0';
+const token = String(process.env.WEB_AUTH_TOKEN_VALUE || '');
+const seen = new Set();
+
+function appendToken(origin) {
+  return token ? `${origin}/?token=${encodeURIComponent(token)}` : origin;
+}
+
+function push(label, host) {
+  if (!host || seen.has(host)) {
+    return;
+  }
+  seen.add(host);
+  console.log(`${label} ${appendToken(`http://${host}:${port}`)}`);
+}
+
+function isWildcard(host) {
+  return host === '0.0.0.0' || host === '::';
+}
+
+function normalizeHost(host) {
+  if (!host || host === 'localhost' || host === '::1') {
+    return '127.0.0.1';
+  }
+  if (host.startsWith('::ffff:')) {
+    return host.slice('::ffff:'.length);
+  }
+  return host;
+}
+
+const normalizedBind = normalizeHost(bind);
+if (isWildcard(normalizedBind)) {
+  push('本机', '127.0.0.1');
+  for (const entries of Object.values(os.networkInterfaces())) {
+    for (const entry of entries || []) {
+      if ((entry.family === 'IPv4' || entry.family === 4) && !entry.internal && /^\d{1,3}(?:\.\d{1,3}){3}$/.test(entry.address) && entry.address !== '127.0.0.1') {
+        push('局域网', entry.address);
+      }
+    }
+  }
+} else if (normalizedBind === '127.0.0.1') {
+  push('本机', '127.0.0.1');
+} else {
+  push('局域网', normalizedBind);
+}
+NODE
+}
+
+run_open() {
+  local url
+  url="$(run_web_url | awk 'NR==1 {print $2}')"
+  if [[ -z "${url}" ]]; then
+    print_error '无法生成 Web 面板访问链接。'
+    exit 1
   fi
-
   open "${url}"
 }
 
@@ -1563,6 +1652,9 @@ main() {
       ;;
     logs)
       run_logs
+      ;;
+    web-url)
+      run_web_url
       ;;
     open)
       run_open

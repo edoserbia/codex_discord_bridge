@@ -1,10 +1,12 @@
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
 
 import type { AppConfig } from './config.js';
 import type { BindCommandOptions } from './commandParser.js';
 
 import { DiscordCodexBridge } from './discordBot.js';
 import { formatDashboardHtml } from './formatters.js';
+import { buildWebAccessUrls } from './webAccess.js';
 
 const AUTH_COOKIE_NAME = 'codex_bridge_auth';
 
@@ -53,17 +55,11 @@ export class AdminWebServer {
   }
 
   getOrigin(): string {
-    if (!this.server) {
-      return `http://${this.config.web.bind}:${this.config.web.port}`;
-    }
+    return this.getOriginCandidates()[0]?.origin ?? `http://127.0.0.1:${this.config.web.port}`;
+  }
 
-    const address = this.server.address();
-
-    if (!address || typeof address === 'string') {
-      return `http://${this.config.web.bind}:${this.config.web.port}`;
-    }
-
-    return `http://${address.address}:${address.port}`;
+  getAccessUrls(): ReturnType<typeof buildWebAccessUrls> {
+    return buildWebAccessUrls(this.config.web, this.getServerAddress());
   }
 
   private async handleRequest(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -213,6 +209,30 @@ export class AdminWebServer {
     return `${AUTH_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`;
   }
 
+  private getOriginCandidates(): Array<{ origin: string }> {
+    return buildWebAccessUrls({
+      ...this.config.web,
+      authToken: undefined,
+    }, this.getServerAddress());
+  }
+
+  private getServerAddress(): AddressInfo | undefined {
+    if (!this.server) {
+      return {
+        address: this.config.web.bind,
+        family: 'IPv4',
+        port: this.config.web.port,
+      } as AddressInfo;
+    }
+
+    const address = this.server.address();
+    if (!address || typeof address === 'string') {
+      return undefined;
+    }
+
+    return address;
+  }
+
   private async readJsonBody(request: IncomingMessage): Promise<unknown> {
     const chunks: Buffer[] = [];
 
@@ -234,3 +254,5 @@ export class AdminWebServer {
     response.end(body);
   }
 }
+
+export { buildWebAccessUrls };

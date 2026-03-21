@@ -10,6 +10,8 @@ const activeTurns = new Map();
 const logDir = process.env.FAKE_CODEX_APP_SERVER_LOG_DIR;
 const initializeDelayMs = Number.parseInt(process.env.FAKE_CODEX_APP_SERVER_INITIALIZE_DELAY_MS ?? '0', 10) || 0;
 
+void logStartup();
+
 process.stdin.on('data', (chunk) => {
   buffer = Buffer.concat([buffer, chunk]);
   processBuffer();
@@ -137,7 +139,7 @@ async function handleAsync(message) {
         });
       }
 
-      if (prompt.includes('[app-rich]')) {
+      if (prompt.includes('[app-rich]') || prompt.includes('[app-rich-stream]')) {
         notify('item/reasoning/summaryTextDelta', {
           threadId,
           turnId,
@@ -172,10 +174,12 @@ async function handleAsync(message) {
             status: 'in_progress',
             senderThreadId: threadId,
             receiverThreadIds: ['agent-thread-1'],
+            newAgentNickname: 'auth-scout',
             agentsStates: {
               'agent-thread-1': {
                 status: 'running',
                 message: 'Investigate the login flow',
+                agentNickname: 'auth-scout',
               },
             },
             prompt: 'Investigate the login flow',
@@ -191,10 +195,12 @@ async function handleAsync(message) {
             status: 'completed',
             senderThreadId: threadId,
             receiverThreadIds: ['agent-thread-1'],
+            newAgentNickname: 'auth-scout',
             agentsStates: {
               'agent-thread-1': {
                 status: 'completed',
                 message: 'helper finished',
+                agentNickname: 'auth-scout',
               },
             },
             prompt: 'Investigate the login flow',
@@ -222,12 +228,23 @@ async function handleAsync(message) {
         itemId: `cmd-${turnId}`,
         delta: '/bin/zsh -lc "pwd"\n',
       });
-      notify('item/agentMessage/delta', {
-        threadId,
-        turnId,
-        itemId: `msg-${turnId}`,
-        delta: `app-server ok: ${prompt}`,
-      });
+      if (prompt.includes('[app-rich-stream]')) {
+        for (const delta of ['app-server ', 'stream ok: ', prompt]) {
+          notify('item/agentMessage/delta', {
+            threadId,
+            turnId,
+            itemId: `msg-${turnId}`,
+            delta,
+          });
+        }
+      } else {
+        notify('item/agentMessage/delta', {
+          threadId,
+          turnId,
+          itemId: `msg-${turnId}`,
+          delta: `app-server ok: ${prompt}`,
+        });
+      }
 
       const timeout = setTimeout(() => {
         if (!activeTurns.has(turnId)) {
@@ -296,6 +313,22 @@ async function logRequest(message) {
   await fs.writeFile(filePath, `${JSON.stringify({
     method: message.method,
     params: message.params ?? null,
+  }, null, 2)}\n`, 'utf8');
+}
+
+async function logStartup() {
+  if (!logDir) {
+    return;
+  }
+
+  await fs.mkdir(logDir, { recursive: true });
+  const filePath = path.join(logDir, `${Date.now()}-${Math.random().toString(16).slice(2)}-startup.json`);
+  await fs.writeFile(filePath, `${JSON.stringify({
+    method: '$startup',
+    cwd: process.cwd(),
+    env: {
+      PWD: process.env.PWD,
+    },
   }, null, 2)}\n`, 'utf8');
 }
 

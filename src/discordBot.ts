@@ -71,9 +71,11 @@ import {
   formatQueue,
   formatStatus,
   formatSuccessReply,
+  formatWebAccessLinks,
 } from './formatters.js';
 import { JsonStateStore } from './store.js';
 import { cloneCodexOptions, formatClockTimestamp, formatDurationMs, isWithinAllowedRoots, normalizeAllowedRoots, resolveExistingDirectory, splitIntoDiscordChunks, summarizeReasoningText, truncate, uniqueStrings } from './utils.js';
+import { buildWebAccessUrls } from './webAccess.js';
 
 type SendableMessage = {
   id: string;
@@ -631,6 +633,9 @@ export class DiscordCodexBridge {
       case 'status':
         await this.handleStatusCommand(message, resolved);
         return;
+      case 'web':
+        await this.handleWebCommand(message);
+        return;
       case 'cancel':
         if (!this.isAdmin(message)) {
           await message.reply('只有管理员才能取消正在运行的任务。');
@@ -717,6 +722,16 @@ export class DiscordCodexBridge {
         this.config.codexDriverMode ?? 'app-server',
       ),
     );
+  }
+
+  private async handleWebCommand(message: Message): Promise<void> {
+    if (!this.config.web.enabled) {
+      await message.reply('当前 Web 面板未启用。');
+      return;
+    }
+
+    const urls = buildWebAccessUrls(this.config.web);
+    await message.reply(formatWebAccessLinks(urls));
   }
 
   private async handleCancelCommand(message: Message, resolved: ResolvedConversation | undefined): Promise<void> {
@@ -1972,10 +1987,8 @@ export class DiscordCodexBridge {
         this.touchActiveRun(runtime.activeRun);
         const summary = summarizeReasoningText(reasoning, 180);
         if (summary) {
-          runtime.activeRun.reasoningSummaries.push(summary);
-          runtime.activeRun.reasoningSummaries = runtime.activeRun.reasoningSummaries.slice(-6);
+          this.upsertStreamingText(runtime.activeRun.reasoningSummaries, summary, 6);
           runtime.activeRun.latestActivity = summary;
-          this.pushRunTimeline(runtime, `🧠 ${summary}`);
         }
 
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
@@ -2012,9 +2025,8 @@ export class DiscordCodexBridge {
         }
 
         this.touchActiveRun(runtime.activeRun);
-        runtime.activeRun.agentMessages.push(agentMessage);
+        this.upsertStreamingText(runtime.activeRun.agentMessages, agentMessage);
         runtime.activeRun.latestActivity = agentMessage;
-        this.pushRunTimeline(runtime, `💬 ${truncate(agentMessage, 140)}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
         await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       },
@@ -2327,6 +2339,24 @@ export class DiscordCodexBridge {
     }
   }
 
+  private upsertStreamingText(target: string[], nextValue: string, maxItems = 12): void {
+    const normalized = nextValue.trim();
+    if (!normalized) {
+      return;
+    }
+
+    const lastValue = target.at(-1);
+    if (lastValue && normalized.startsWith(lastValue)) {
+      target[target.length - 1] = normalized;
+    } else if (lastValue !== normalized) {
+      target.push(normalized);
+    }
+
+    if (target.length > maxItems) {
+      target.splice(0, target.length - maxItems);
+    }
+  }
+
   private describeRetry(kind: ReturnType<typeof diagnoseCodexFailure>['kind'], attempt: number): {
     latestActivity: string;
     timeline: string;
@@ -2583,7 +2613,12 @@ export class DiscordCodexBridge {
       return;
     }
 
-    const content = formatProgressMessage(binding, runtime, this.config.commandPrefix);
+    const content = formatProgressMessage(
+      binding,
+      runtime,
+      this.config.commandPrefix,
+      this.config.codexDriverMode ?? 'app-server',
+    );
     const progressMessageId = activeRun.progressMessageId;
 
     if (!progressMessageId) {
@@ -2743,6 +2778,17 @@ function describeCollabToolCall(item: CollabToolCall, includePrompt = false): st
 }
 
 function summarizeCollabAgentStates(item: CollabToolCall): string {
+  const namedStates = Object.values(item.agentsStates)
+    .map((state) => {
+      const nickname = state.nickname?.trim();
+      return nickname ? `${nickname} ${state.status}` : undefined;
+    })
+    .filter((value): value is string => Boolean(value));
+
+  if (namedStates.length > 0) {
+    return namedStates.join(' · ');
+  }
+
   const counts = new Map<string, number>();
 
   for (const state of Object.values(item.agentsStates)) {
