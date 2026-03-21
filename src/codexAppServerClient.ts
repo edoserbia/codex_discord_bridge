@@ -365,28 +365,10 @@ export class CodexAppServerClient {
   private processStdoutBuffer(): void {
     try {
       while (true) {
-        const headerEnd = this.stdoutBuffer.indexOf('\r\n\r\n');
-        if (headerEnd < 0) {
+        const message = this.readNextStdoutMessage();
+        if (!message) {
           return;
         }
-
-        const headerText = this.stdoutBuffer.slice(0, headerEnd).toString('utf8');
-        const lengthMatch = headerText.match(/content-length:\s*(\d+)/i);
-        if (!lengthMatch) {
-          throw new Error('app-server response missing Content-Length header');
-        }
-
-        const contentLength = Number.parseInt(lengthMatch[1]!, 10);
-        const messageStart = headerEnd + 4;
-        const messageEnd = messageStart + contentLength;
-
-        if (this.stdoutBuffer.length < messageEnd) {
-          return;
-        }
-
-        const payload = this.stdoutBuffer.slice(messageStart, messageEnd).toString('utf8');
-        this.stdoutBuffer = this.stdoutBuffer.slice(messageEnd);
-        const message = JSON.parse(payload) as Record<string, unknown>;
         this.messageChain = this.messageChain
           .then(async () => {
             await this.handleMessage(message);
@@ -397,6 +379,62 @@ export class CodexAppServerClient {
       }
     } catch (error) {
       this.failDriver(error);
+    }
+  }
+
+  private readNextStdoutMessage(): Record<string, unknown> | undefined {
+    const framed = this.readContentLengthStdoutMessage();
+    if (framed) {
+      return framed;
+    }
+
+    return this.readNdjsonStdoutMessage();
+  }
+
+  private readContentLengthStdoutMessage(): Record<string, unknown> | undefined {
+    const prefix = this.stdoutBuffer.subarray(0, 15).toString('utf8').toLowerCase();
+    if (!prefix.startsWith('content-length')) {
+      return undefined;
+    }
+
+    const headerEnd = this.stdoutBuffer.indexOf('\r\n\r\n');
+    if (headerEnd < 0) {
+      return undefined;
+    }
+
+    const headerText = this.stdoutBuffer.slice(0, headerEnd).toString('utf8');
+    const lengthMatch = headerText.match(/content-length:\s*(\d+)/i);
+    if (!lengthMatch) {
+      throw new Error('app-server response missing Content-Length header');
+    }
+
+    const contentLength = Number.parseInt(lengthMatch[1]!, 10);
+    const messageStart = headerEnd + 4;
+    const messageEnd = messageStart + contentLength;
+    if (this.stdoutBuffer.length < messageEnd) {
+      return undefined;
+    }
+
+    const payload = this.stdoutBuffer.slice(messageStart, messageEnd).toString('utf8');
+    this.stdoutBuffer = this.stdoutBuffer.slice(messageEnd);
+    return JSON.parse(payload) as Record<string, unknown>;
+  }
+
+  private readNdjsonStdoutMessage(): Record<string, unknown> | undefined {
+    while (true) {
+      const newlineIndex = this.stdoutBuffer.indexOf('\n');
+      if (newlineIndex < 0) {
+        return undefined;
+      }
+
+      const line = this.stdoutBuffer.slice(0, newlineIndex).toString('utf8').replace(/\r$/, '');
+      this.stdoutBuffer = this.stdoutBuffer.slice(newlineIndex + 1);
+
+      if (!line.trim()) {
+        continue;
+      }
+
+      return JSON.parse(line) as Record<string, unknown>;
     }
   }
 
@@ -771,8 +809,7 @@ export class CodexAppServerClient {
       throw new Error('app-server child process is not running');
     }
 
-    const framed = `Content-Length: ${Buffer.byteLength(message, 'utf8')}\r\n\r\n${message}`;
-    child.stdin.write(framed);
+    child.stdin.write(`${message}\n`);
   }
 
   private getStartupTimeoutMs(): number {
