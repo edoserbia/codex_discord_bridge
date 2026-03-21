@@ -6,7 +6,7 @@ import path from 'node:path';
 
 import { config as dotenvConfig } from 'dotenv';
 
-import type { ApprovalPolicy, BindingCodexOptions, SandboxMode } from './types.js';
+import type { ApprovalPolicy, BindingCodexOptions, CodexDriverMode, SandboxMode } from './types.js';
 
 const DEFAULT_SECRETS_FILE = path.join(os.homedir(), '.codex-tunning', 'secrets.env');
 
@@ -22,6 +22,7 @@ export interface AppConfig {
   commandPrefix: string;
   dataDir: string;
   codexCommand: string;
+  codexDriverMode?: CodexDriverMode | undefined;
   allowedWorkspaceRoots: string[];
   adminUserIds: Set<string>;
   defaultCodex: BindingCodexOptions;
@@ -92,6 +93,14 @@ function parseApprovalPolicy(value: string | undefined, fallback: ApprovalPolicy
   return fallback;
 }
 
+function parseCodexDriverMode(value: string | undefined, fallback: CodexDriverMode): CodexDriverMode {
+  if (value === 'legacy-exec' || value === 'app-server') {
+    return value;
+  }
+
+  return fallback;
+}
+
 export function loadConfig(): AppConfig {
   loadExternalSecretEnv();
 
@@ -108,6 +117,7 @@ export function loadConfig(): AppConfig {
     commandPrefix: process.env.COMMAND_PREFIX?.trim() || '!',
     dataDir: path.resolve(process.env.DATA_DIR ?? './data'),
     codexCommand: process.env.CODEX_COMMAND?.trim() || 'codex',
+    codexDriverMode: parseCodexDriverMode(process.env.CODEX_DRIVER_MODE?.trim(), 'app-server'),
     allowedWorkspaceRoots: parseList(process.env.ALLOWED_WORKSPACE_ROOTS).map((item) => path.resolve(item)),
     adminUserIds: new Set(parseList(process.env.DISCORD_ADMIN_USER_IDS)),
     defaultCodex: {

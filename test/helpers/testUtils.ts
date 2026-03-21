@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,12 +8,21 @@ export async function makeTempDir(prefix: string): Promise<string> {
 }
 
 export async function cleanupDir(targetPath: string): Promise<void> {
-  await rm(targetPath, { recursive: true, force: true });
+  await rm(targetPath, {
+    recursive: true,
+    force: true,
+    maxRetries: 10,
+    retryDelay: 50,
+  });
 }
 
-export async function createWorkspace(rootDir: string): Promise<string> {
+export async function createWorkspace(rootDir: string, options: { git?: boolean } = {}): Promise<string> {
   const workspace = path.join(rootDir, 'workspace');
   await mkdir(workspace, { recursive: true });
+  if (options.git ?? true) {
+    await mkdir(path.join(workspace, '.git'), { recursive: true });
+    await writeFile(path.join(workspace, '.git', 'HEAD'), 'ref: refs/heads/main\n', 'utf8');
+  }
   return workspace;
 }
 

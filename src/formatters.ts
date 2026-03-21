@@ -380,12 +380,14 @@ export function formatStatus(
   runtime: ChannelRuntime,
   prefix: string,
   isThreadConversation: boolean,
+  preferredDriver: 'legacy-exec' | 'app-server' = 'legacy-exec',
 ): string {
   const lines = [
     '🤖 **Codex Bridge 状态面板**',
     `项目：**${binding.projectName}**`,
     `目录：\`${binding.workspacePath}\``,
     `执行模式：sandbox=\`${binding.codex.sandboxMode}\` · approval=\`${binding.codex.approvalPolicy}\` · search=${binding.codex.search ? 'on' : 'off'}`,
+    `驱动：${session.driver ?? preferredDriver}${session.fallbackActive ? '（fallback）' : ''}`,
     `会话类型：${isThreadConversation ? 'Discord 线程会话' : '频道主会话'}`,
     `状态：${formatActiveStatus(runtime)}`,
     `Codex 会话：${session.codexThreadId ? `\`${shortId(session.codexThreadId)}\`` : '未建立'}`,

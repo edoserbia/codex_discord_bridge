@@ -3,12 +3,17 @@ import { spawn } from 'node:child_process';
 import readline from 'node:readline';
 
 import type { AppConfig } from './config.js';
-import type { ChannelBinding, CodexRunInput, CodexRunResult, CollabAgentState, CollabAgentStatus, CollabToolCall, CollabToolName, CollabToolStatus, CommandRecord, PlanItem } from './types.js';
+import type { ChannelBinding, CodexDriverMode, CodexRunInput, CodexRunResult, CollabAgentState, CollabAgentStatus, CollabToolCall, CollabToolName, CollabToolStatus, CommandRecord, PlanItem } from './types.js';
 
 import { uniqueStrings } from './utils.js';
 
 export interface CodexRunHooks {
   onThreadStarted?: (threadId: string) => void | Promise<void>;
+  onFallbackActivated?: ((detail: {
+    from: CodexDriverMode;
+    to: CodexDriverMode;
+    reason: string;
+  }) => void | Promise<void>) | undefined;
   onActivity?: (activity: string) => void | Promise<void>;
   onReasoning?: (message: string) => void | Promise<void>;
   onTodoListChanged?: (items: PlanItem[]) => void | Promise<void>;
@@ -22,11 +27,23 @@ export interface CodexRunHooks {
 
 export interface RunningCodexJob {
   pid: number | undefined;
+  driverMode: CodexDriverMode;
   cancel: () => void;
+  steer?: ((prompt: string) => Promise<void>) | undefined;
   done: Promise<CodexRunResult>;
 }
 
-export class CodexRunner {
+export interface CodexExecutionDriver {
+  start: (
+    binding: ChannelBinding,
+    input: CodexRunInput,
+    existingThreadId: string | undefined,
+    hooks?: CodexRunHooks,
+  ) => RunningCodexJob;
+  stop?: (() => Promise<void>) | undefined;
+}
+
+export class CodexRunner implements CodexExecutionDriver {
   constructor(private readonly config: AppConfig) {}
 
   start(binding: ChannelBinding, input: CodexRunInput, existingThreadId: string | undefined, hooks: CodexRunHooks = {}): RunningCodexJob {
@@ -256,6 +273,7 @@ export class CodexRunner {
 
     return {
       pid: child.pid,
+      driverMode: 'legacy-exec',
       cancel: () => {
         cancelRequested = true;
         terminateChild(child);
@@ -369,7 +387,7 @@ function buildCodexChildEnv(workspacePath: string): NodeJS.ProcessEnv {
   return env;
 }
 
-function resolveCodexConfigEntries(extraConfig: string[]): string[] {
+export function resolveCodexConfigEntries(extraConfig: string[]): string[] {
   const entries = uniqueStrings(extraConfig.map((value) => value.trim()).filter(Boolean));
   const hasMultiAgentOverride = entries.some((entry) => {
     const normalized = entry.replace(/\s+/g, '').toLowerCase();
@@ -446,7 +464,7 @@ function extractPlanItemText(candidate: Record<string, unknown>): string | undef
   );
 }
 
-function parseCollabToolCall(item: Record<string, unknown>): CollabToolCall | undefined {
+export function parseCollabToolCall(item: Record<string, unknown>): CollabToolCall | undefined {
   const id = typeof item.id === 'string' && item.id.trim() ? item.id.trim() : undefined;
   const tool = normalizeCollabTool(item.tool);
   const status = normalizeCollabToolStatus(item.status);
@@ -457,10 +475,16 @@ function parseCollabToolCall(item: Record<string, unknown>): CollabToolCall | un
 
   const senderThreadId = typeof item.sender_thread_id === 'string'
     ? item.sender_thread_id
+    : typeof item.senderThreadId === 'string'
+      ? item.senderThreadId
     : '';
-  const receiverThreadIds = Array.isArray(item.receiver_thread_ids)
-    ? item.receiver_thread_ids.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-    : [];
+  const rawReceiverThreadIds = Array.isArray(item.receiver_thread_ids)
+    ? item.receiver_thread_ids
+    : Array.isArray(item.receiverThreadIds)
+      ? item.receiverThreadIds
+      : [];
+  const receiverThreadIds = rawReceiverThreadIds
+    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
   const prompt = typeof item.prompt === 'string' && item.prompt.trim().length > 0
     ? item.prompt.trim()
     : undefined;
@@ -471,7 +495,7 @@ function parseCollabToolCall(item: Record<string, unknown>): CollabToolCall | un
     senderThreadId,
     receiverThreadIds,
     prompt,
-    agentsStates: parseCollabAgentStates(item.agents_states),
+    agentsStates: parseCollabAgentStates(item.agents_states ?? item.agentsStates),
     status,
   };
 }
@@ -523,6 +547,24 @@ function normalizeCollabToolStatus(value: unknown): CollabToolStatus | undefined
 
   if (value === 'in_progress' || value === 'completed' || value === 'failed') {
     return value;
+  }
+
+  return undefined;
+}
+
+export function extractReasoningText(item: Record<string, unknown>): string | undefined {
+  const summary = Array.isArray(item.summary)
+    ? item.summary.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    : [];
+  if (summary.length > 0) {
+    return summary.join('\n').trim();
+  }
+
+  const content = Array.isArray(item.content)
+    ? item.content.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    : [];
+  if (content.length > 0) {
+    return content.join('\n').trim();
   }
 
   return undefined;

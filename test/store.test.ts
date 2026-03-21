@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import { writeFile } from 'node:fs/promises';
 
 import { JsonStateStore } from '../src/store.js';
 
@@ -76,6 +77,37 @@ test('store persists bindings and sessions and cascades deletes', async () => {
   assert.equal(store.listAutopilotProjects('guild-1').length, 0);
   assert.equal(store.getAutopilotService('guild-1')?.enabled, true);
   assert.equal(store.getAutopilotService('guild-1')?.parallelism, 2);
+
+  await cleanupDir(rootDir);
+});
+
+test('store migrates legacy persisted sessions without driver metadata', async () => {
+  const rootDir = await makeTempDir('codex-bridge-store-migrate-');
+  const statePath = path.join(rootDir, 'state.json');
+  await writeFile(statePath, JSON.stringify({
+    bindings: {},
+    sessions: {
+      'channel-legacy': {
+        conversationId: 'channel-legacy',
+        bindingChannelId: 'channel-legacy',
+        codexThreadId: 'legacy-thread-1',
+        updatedAt: '2026-03-21T00:00:00.000Z',
+      },
+      'channel-empty': {
+        conversationId: 'channel-empty',
+        bindingChannelId: 'channel-empty',
+        updatedAt: '2026-03-21T00:00:00.000Z',
+      },
+    },
+    autopilotServices: {},
+    autopilotProjects: {},
+  }, null, 2));
+
+  const store = new JsonStateStore(statePath);
+  await store.load();
+
+  assert.equal(store.getSession('channel-legacy')?.driver, 'legacy-exec');
+  assert.equal(store.getSession('channel-empty')?.driver, undefined);
 
   await cleanupDir(rootDir);
 });

@@ -1,7 +1,7 @@
 import path from 'node:path';
 
+import { createCodexExecutionDriver } from './createCodexExecutionDriver.js';
 import { loadConfig } from './config.js';
-import { CodexRunner } from './codexRunner.js';
 import { DiscordCodexBridge } from './discordBot.js';
 import { JsonStateStore } from './store.js';
 import { AdminWebServer } from './webServer.js';
@@ -21,7 +21,7 @@ async function main(): Promise<void> {
 
   console.log(`Loaded ${store.listBindings().length} persisted channel binding(s).`);
 
-  const runner = new CodexRunner(config);
+  const runner = createCodexExecutionDriver(config);
   const bridge = new DiscordCodexBridge(config, store, runner);
   const webServer = new AdminWebServer(config, bridge);
 

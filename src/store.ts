@@ -30,7 +30,15 @@ export class JsonStateStore {
       const defaultIntervalMs = getAutopilotDefaultIntervalMs();
       this.state = {
         bindings: parsed.bindings ?? {},
-        sessions: parsed.sessions ?? {},
+        sessions: Object.fromEntries(
+          Object.entries(parsed.sessions ?? {}).map(([conversationId, session]) => [
+            conversationId,
+            {
+              ...session,
+              driver: session.driver ?? (session.codexThreadId ? 'legacy-exec' : undefined),
+            } satisfies ConversationSessionState,
+          ]),
+        ),
         autopilotServices: Object.fromEntries(
           Object.entries(parsed.autopilotServices ?? {}).map(([guildId, service]) => [
             guildId,
@@ -150,12 +158,12 @@ export class JsonStateStore {
 
     for (const [key, value] of Object.entries(patch) as Array<[
       keyof Omit<ConversationSessionState, 'conversationId' | 'bindingChannelId' | 'updatedAt'>,
-      string | undefined,
+      ConversationSessionState[keyof Omit<ConversationSessionState, 'conversationId' | 'bindingChannelId' | 'updatedAt'>] | undefined,
     ]>) {
       if (value === undefined) {
         delete next[key];
       } else {
-        next[key] = value;
+        next[key] = value as never;
       }
     }
 
