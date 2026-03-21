@@ -4,6 +4,7 @@
 
 | Task | Directory | Status | Started |
 |------|-----------|--------|---------|
+| [Debug real Codex app-server stdio initialize timeout against codex-cli 0.116.0] | `debug-real-app-server-stdio-protocol/` | Phase 4/4 | 2026-03-21 |
 | [Add persistent interrupted-task recovery with visible Discord recovery flow] | `persistent-run-recovery/` | Phase 5/5 | 2026-03-21 |
 | [Fix app-server full-permission config compatibility for codex-cli 0.116.0] | `fix-app-server-permissions-compat/` | Phase 4/4 | 2026-03-21 |
 | [Debug patent_platform app-server websocket transport closed failure] | `debug-patent-platform-ws-close/` | Completed | 2026-03-21 |
@@ -11,7 +12,7 @@
 | [Debug Discord queue stall with Codex Server backend] | `debug-discord-queue-stall/` | Completed | 2026-03-21 |
 
 ## Current Focus
-`fix-app-server-permissions-compat/` - Keep global full permissions while removing the obsolete Codex permission profile that breaks app-server startup on codex-cli 0.116.0, and document the compatible config.
+`debug-real-app-server-stdio-protocol/` - Fix the real `codex app-server --listen stdio://` transport mismatch so the bridge no longer falls back to legacy-exec on codex-cli 0.116.0.
 
 ## Completed Tasks
 

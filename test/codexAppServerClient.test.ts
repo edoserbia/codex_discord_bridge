@@ -356,6 +356,25 @@ test('app-server client serializes concurrent startup through a single initializ
   }
 });
 
+test('app-server client supports the real stdio newline-delimited JSON transport', async () => {
+  const rootDir = await makeTempDir('codex-app-server-client-ndjson-stdio-');
+  const workspace = await createWorkspace(rootDir);
+  const binding = makeBinding(workspace);
+  const client = new CodexAppServerClient(makeConfig(rootDir));
+  process.env.FAKE_CODEX_APP_SERVER_STDIN_PROTOCOL = 'ndjson';
+  process.env.FAKE_CODEX_APP_SERVER_STDOUT_PROTOCOL = 'ndjson';
+
+  try {
+    const threadId = await client.ensureThread(binding, undefined);
+    assert.ok(threadId);
+  } finally {
+    delete process.env.FAKE_CODEX_APP_SERVER_STDIN_PROTOCOL;
+    delete process.env.FAKE_CODEX_APP_SERVER_STDOUT_PROTOCOL;
+    await client.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('app-server client starts the child process from the bound workspace context', async () => {
   const rootDir = await makeTempDir('codex-app-server-client-startup-context-');
   const workspace = await createWorkspace(rootDir);

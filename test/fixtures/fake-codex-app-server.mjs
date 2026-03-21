@@ -9,6 +9,8 @@ const threads = new Map();
 const activeTurns = new Map();
 const logDir = process.env.FAKE_CODEX_APP_SERVER_LOG_DIR;
 const initializeDelayMs = Number.parseInt(process.env.FAKE_CODEX_APP_SERVER_INITIALIZE_DELAY_MS ?? '0', 10) || 0;
+const stdinProtocol = process.env.FAKE_CODEX_APP_SERVER_STDIN_PROTOCOL ?? 'auto';
+const stdoutProtocol = process.env.FAKE_CODEX_APP_SERVER_STDOUT_PROTOCOL ?? 'content-length';
 
 void logStartup();
 
@@ -19,28 +21,80 @@ process.stdin.on('data', (chunk) => {
 
 function processBuffer() {
   while (true) {
-    const headerEnd = buffer.indexOf('\r\n\r\n');
-    if (headerEnd < 0) {
-      return;
+    const framed = readContentLengthMessage();
+    if (framed) {
+      handle(framed);
+      continue;
     }
 
-    const headerText = buffer.slice(0, headerEnd).toString('utf8');
-    const lengthMatch = headerText.match(/content-length:\s*(\d+)/i);
-    if (!lengthMatch) {
-      throw new Error('missing content-length header');
+    const ndjson = readNdjsonMessage();
+    if (ndjson) {
+      handle(ndjson);
+      continue;
     }
 
-    const contentLength = Number.parseInt(lengthMatch[1], 10);
-    const messageStart = headerEnd + 4;
-    const messageEnd = messageStart + contentLength;
-    if (buffer.length < messageEnd) {
-      return;
-    }
-
-    const payload = buffer.slice(messageStart, messageEnd).toString('utf8');
-    buffer = buffer.slice(messageEnd);
-    handle(JSON.parse(payload));
+    return;
   }
+}
+
+function readContentLengthMessage() {
+  if (stdinProtocol === 'ndjson') {
+    return undefined;
+  }
+
+  if (stdinProtocol === 'auto' && !buffer.subarray(0, 15).toString('utf8').toLowerCase().startsWith('content-length')) {
+    return undefined;
+  }
+
+  const headerEnd = buffer.indexOf('\r\n\r\n');
+  if (headerEnd < 0) {
+    return undefined;
+  }
+
+  const headerText = buffer.slice(0, headerEnd).toString('utf8');
+  const lengthMatch = headerText.match(/content-length:\s*(\d+)/i);
+  if (!lengthMatch) {
+    throw new Error('missing content-length header');
+  }
+
+  const contentLength = Number.parseInt(lengthMatch[1], 10);
+  const messageStart = headerEnd + 4;
+  const messageEnd = messageStart + contentLength;
+  if (buffer.length < messageEnd) {
+    return undefined;
+  }
+
+  const payload = buffer.slice(messageStart, messageEnd).toString('utf8');
+  buffer = buffer.slice(messageEnd);
+  return JSON.parse(payload);
+}
+
+function readNdjsonMessage() {
+  if (stdinProtocol === 'content-length') {
+    return undefined;
+  }
+
+  const newlineIndex = buffer.indexOf('\n');
+  if (newlineIndex < 0) {
+    return undefined;
+  }
+
+  const line = buffer.slice(0, newlineIndex).toString('utf8').replace(/\r$/, '');
+  if (!line.trim()) {
+    buffer = buffer.slice(newlineIndex + 1);
+    return undefined;
+  }
+
+  if (stdinProtocol === 'auto' && !line.trimStart().startsWith('{')) {
+    return undefined;
+  }
+
+  if (!line.trimStart().startsWith('{')) {
+    throw new Error(`expected ndjson payload, received: ${line}`);
+  }
+
+  buffer = buffer.slice(newlineIndex + 1);
+  return JSON.parse(line);
 }
 
 function handle(message) {
@@ -361,5 +415,10 @@ function notify(method, params) {
 
 function write(payload) {
   const message = JSON.stringify(payload);
+  if (stdoutProtocol === 'ndjson') {
+    process.stdout.write(`${message}\n`);
+    return;
+  }
+
   process.stdout.write(`Content-Length: ${Buffer.byteLength(message, 'utf8')}\r\n\r\n${message}`);
 }
