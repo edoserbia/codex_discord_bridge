@@ -41,9 +41,36 @@
 - macOS
 - Node.js `>= 20.11`
 - 已安装并登录的 `codex` CLI
+  - 已验证版本：`codex-cli 0.116.0`
 - 一个可用的 Discord Bot
 - Bot 已加入目标 Discord 服务器
 - Bot 已启用 **Message Content Intent**
+
+## Codex CLI 兼容性
+
+当前 bridge 已按本机 `codex-cli 0.116.0` 验证。
+
+如果你希望在整个系统里保持 **全权限**，当前版本应使用 Codex 顶层配置：
+
+```toml
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
+approval_mode = "never"
+```
+
+这会保留全局高权限，不会把访问范围限制在当前项目目录。
+
+注意：在 `codex-cli 0.116.0` 上，不要继续保留旧配置：
+
+```toml
+default_permissions = "full"
+
+[permissions.full]
+open_world_enabled = true
+destructive_enabled = true
+```
+
+这组旧键会让 `codex app-server` 在启动时报告权限配置不兼容，并导致 bridge 回退到 `legacy-exec`。保留你原有的模型、provider、搜索等配置即可，只需要删掉这段过期权限 profile。
 
 ## Quick Start
 

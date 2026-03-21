@@ -5,6 +5,7 @@ import readline from 'node:readline';
 import type { AppConfig } from './config.js';
 import type { ChannelBinding, CodexDriverMode, CodexRunInput, CodexRunResult, CollabAgentState, CollabAgentStatus, CollabToolCall, CollabToolName, CollabToolStatus, CommandRecord, PlanItem } from './types.js';
 
+import { normalizeCodexDiagnosticLine } from './codexDiagnostics.js';
 import { uniqueStrings } from './utils.js';
 
 export interface CodexRunHooks {
@@ -69,7 +70,7 @@ export class CodexRunner implements CodexExecutionDriver {
     let stderrChain = Promise.resolve();
 
     const appendDiagnosticLine = (line: string): void => {
-      const normalized = line.trim();
+      const normalized = normalizeCodexDiagnosticLine(line);
 
       if (!normalized || stderr.at(-1) === normalized) {
         return;

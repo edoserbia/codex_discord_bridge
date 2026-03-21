@@ -637,8 +637,27 @@ Bridge 会中断当前步骤，并在**同一会话**中先处理这条引导，
 
 - 旧 Codex 会话还没被刷新
 - 或者旧版本 bridge 进程继承了桌面版 Codex 的内部环境变量，导致子进程错误进入只读上下文
+- 或者 `~/.codex/config.toml` 里还保留了旧的 `default_permissions = "full"` / `[permissions.full]` 配置，导致 `codex-cli 0.116.0` 的 `app-server` 启动时直接报权限 profile 不兼容
 
 当前版本已经修复第二类问题，但旧进程必须重启后才会生效。
+
+如果是第三类问题，请保留顶层全权限配置：
+
+```toml
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
+approval_mode = "never"
+```
+
+并删除旧的：
+
+```toml
+default_permissions = "full"
+
+[permissions.full]
+open_world_enabled = true
+destructive_enabled = true
+```
 
 如果 Discord 客户端里仍显示离线，重点检查：
 

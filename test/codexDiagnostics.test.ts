@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { diagnoseCodexFailure, filterDiagnosticStderr, isIgnorableCodexStderrLine, shouldRetryUnexpectedCodexExit } from '../src/codexDiagnostics.js';
+import {
+  diagnoseCodexFailure,
+  filterDiagnosticStderr,
+  isIgnorableCodexStderrLine,
+  normalizeCodexDiagnosticLine,
+  shouldRetryUnexpectedCodexExit,
+} from '../src/codexDiagnostics.js';
 
 test('diagnostics filters known non-fatal codex temp-dir warning', () => {
   assert.equal(
@@ -120,4 +126,15 @@ test('diagnostics retries zero-exit incomplete turns when no diagnostic signal e
 
   assert.equal(diagnosis.retryable, true);
   assert.equal(diagnosis.kind, 'unexpected-empty-exit');
+});
+
+test('diagnostics rewrites obsolete full-permission profile errors into actionable guidance', () => {
+  const normalized = normalizeCodexDiagnosticLine(
+    '\u001b[31mERROR\u001b[0m Permissions profile `full` does not define any recognized filesystem entries for this version of Codex. Filesystem access will remain restricted. Upgrade Codex if this profile expects filesystem permissions.',
+  );
+
+  assert.match(normalized, /default_permissions="full"/);
+  assert.match(normalized, /\[permissions\.full\]/);
+  assert.match(normalized, /sandbox_mode="danger-full-access"/);
+  assert.doesNotMatch(normalized, /\u001b\[/);
 });

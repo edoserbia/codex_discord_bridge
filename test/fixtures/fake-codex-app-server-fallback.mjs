@@ -12,12 +12,13 @@ const legacyFixture = path.join(__dirname, 'fake-codex.mjs');
 const appServerFixture = path.join(__dirname, 'fake-codex-app-server.mjs');
 const args = process.argv.slice(2);
 const stateFile = process.env.FAKE_CODEX_APP_SERVER_FALLBACK_STATE_FILE ?? path.join(process.cwd(), '.fake-app-server-fallback-state');
+const fallbackStderr = process.env.FAKE_CODEX_APP_SERVER_FALLBACK_STDERR ?? 'simulated app-server startup failure';
 
 if (args[0] === 'app-server') {
   const shouldFail = await shouldFailAppServerOnce(stateFile);
 
   if (shouldFail) {
-    console.error('simulated app-server startup failure');
+    console.error(fallbackStderr);
     process.exit(1);
   }
 

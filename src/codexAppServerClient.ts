@@ -13,7 +13,7 @@ import type {
   RunningAppServerTurn,
 } from './types.js';
 
-import { isIgnorableCodexStderrLine } from './codexDiagnostics.js';
+import { isIgnorableCodexStderrLine, normalizeCodexDiagnosticLine } from './codexDiagnostics.js';
 import { resolveCodexConfigEntries } from './codexRunner.js';
 import { uniqueStrings } from './utils.js';
 
@@ -670,7 +670,7 @@ export class CodexAppServerClient {
     this.childStderrBuffer = lines.pop() ?? '';
 
     for (const rawLine of lines) {
-      const line = rawLine.trim();
+      const line = normalizeCodexDiagnosticLine(rawLine);
 
       if (!line || isIgnorableCodexStderrLine(line)) {
         continue;
@@ -693,10 +693,14 @@ export class CodexAppServerClient {
       this.appendChildStderrChunk('\n');
     }
 
-    const normalized = error instanceof Error ? error : new Error(String(error));
-    const stderrTail = this.recentChildStderr.slice(-3);
+    const baseError = error instanceof Error ? error : new Error(String(error));
+    const normalizedMessage = normalizeCodexDiagnosticLine(baseError.message);
+    const normalized = normalizedMessage === baseError.message ? baseError : new Error(normalizedMessage);
+    const stderrTail = this.recentChildStderr
+      .slice(-3)
+      .filter((line) => line && !normalized.message.includes(line));
 
-    if (stderrTail.length === 0 || stderrTail.some((line) => normalized.message.includes(line))) {
+    if (stderrTail.length === 0) {
       return normalized;
     }
 
