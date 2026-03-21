@@ -26,6 +26,7 @@ export type ParsedCommand =
   | { kind: 'unbind' }
   | { kind: 'projects' }
   | { kind: 'status' }
+  | { kind: 'web' }
   | { kind: 'cancel' }
   | { kind: 'reset' }
   | { kind: 'queue' };
@@ -219,6 +220,8 @@ export function parseCommand(content: string, prefix: string): ParsedCommand {
       return { kind: 'projects' };
     case 'status':
       return { kind: 'status' };
+    case 'web':
+      return { kind: 'web' };
     case 'cancel':
       return { kind: 'cancel' };
     case 'reset':

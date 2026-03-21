@@ -8,14 +8,13 @@ import { extractReasoningText, parseCollabToolCall } from './codexRunner.js';
 interface AppServerCommandBuffer {
   command: string;
   output: string;
+  started: boolean;
 }
 
 export class CodexAppServerRunner implements CodexExecutionDriver {
-  private readonly client: CodexAppServerClient;
+  private readonly clients = new Map<string, CodexAppServerClient>();
 
-  constructor(config: AppConfig) {
-    this.client = new CodexAppServerClient(config);
-  }
+  constructor(private readonly config: AppConfig) {}
 
   start(
     binding: ChannelBinding,
@@ -23,9 +22,11 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
     existingThreadId: string | undefined,
     hooks: CodexRunHooks = {},
   ): RunningCodexJob {
+    const client = this.getClient(binding.workspacePath);
     const usedResume = Boolean(existingThreadId);
     const commands: CommandRecord[] = [];
     const commandBuffers = new Map<string, AppServerCommandBuffer>();
+    const completedCommandItemIds = new Set<string>();
     const agentMessageBuffers = new Map<string, string>();
     const reasoningBuffers = new Map<string, string>();
     const agentMessages: string[] = [];
@@ -99,10 +100,14 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
           await hooks.onTodoListChanged?.(planItems);
           break;
         case 'command.output.delta': {
+          if (completedCommandItemIds.has(event.itemId)) {
+            break;
+          }
+
           let buffer = commandBuffers.get(event.itemId);
           if (!buffer) {
             const command = event.delta.trim() || 'command output';
-            buffer = { command, output: '' };
+            buffer = { command, output: '', started: true };
             commandBuffers.set(event.itemId, buffer);
             await hooks.onCommandStarted?.(command);
           }
@@ -117,10 +122,16 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
               buffer = {
                 command: event.item.command,
                 output: '',
+                started: false,
               };
               commandBuffers.set(String(event.item.id ?? ''), buffer);
             }
-            await hooks.onCommandStarted?.(event.item.command);
+
+            buffer.command = event.item.command;
+            if (!buffer.started) {
+              buffer.started = true;
+              await hooks.onCommandStarted?.(event.item.command);
+            }
           }
 
           if (event.item.type === 'collabAgentToolCall') {
@@ -148,7 +159,9 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
               output,
               exitCode,
             });
-            commandBuffers.delete(String(event.item.id ?? ''));
+            const itemId = String(event.item.id ?? '');
+            commandBuffers.delete(itemId);
+            completedCommandItemIds.add(itemId);
             await hooks.onCommandCompleted?.(event.item.command, output, exitCode);
           }
 
@@ -180,13 +193,13 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
 
     const done = (async (): Promise<CodexRunResult> => {
       try {
-        const threadId = await this.client.ensureThread(binding, existingThreadId);
+        const threadId = await client.ensureThread(binding, existingThreadId);
         codexThreadId = threadId;
         if (threadId !== existingThreadId) {
           await hooks.onThreadStarted?.(threadId);
         }
 
-        const turn = await this.client.startTurn(binding, threadId, {
+        const turn = await client.startTurn(binding, threadId, {
           prompt: input.prompt,
           imagePaths: input.imagePaths,
           extraAddDirs: input.extraAddDirs,
@@ -196,7 +209,7 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
         resolveTurnReady(turnContext);
 
         if (cancelRequested) {
-          await this.client.interruptTurn(threadId, turn.turnId);
+          await client.interruptTurn(threadId, turn.turnId);
         }
 
         const turnResult = await turn.done;
@@ -253,7 +266,7 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
           return;
         }
 
-        void this.client.interruptTurn(turnContext.threadId, turnContext.turnId).catch((error) => {
+        void client.interruptTurn(turnContext.threadId, turnContext.turnId).catch((error) => {
           const message = error instanceof Error ? error.message : String(error);
           appendDiagnosticLine(message);
         });
@@ -268,13 +281,25 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
           return;
         }
 
-        await this.client.steerTurn(activeTurn.threadId, activeTurn.turnId, prompt);
+        await client.steerTurn(activeTurn.threadId, activeTurn.turnId, prompt);
       },
       done,
     };
   }
 
   async stop(): Promise<void> {
-    await this.client.stop();
+    await Promise.all([...this.clients.values()].map(async (client) => client.stop()));
+    this.clients.clear();
+  }
+
+  private getClient(workspacePath: string): CodexAppServerClient {
+    const existing = this.clients.get(workspacePath);
+    if (existing) {
+      return existing;
+    }
+
+    const client = new CodexAppServerClient(this.config);
+    this.clients.set(workspacePath, client);
+    return client;
   }
 }

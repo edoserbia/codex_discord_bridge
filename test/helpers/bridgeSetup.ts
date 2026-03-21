@@ -20,8 +20,10 @@ export async function createBridgeTestRig(options: {
   rootDir: string;
   codexCommand?: string;
   driverMode?: 'legacy-exec' | 'app-server';
+  appServerStartupTimeoutMs?: number;
   webEnabled?: boolean;
   webPort?: number;
+  webBind?: string;
   webAuthToken?: string;
 }): Promise<{
   config: AppConfig;
@@ -30,28 +32,31 @@ export async function createBridgeTestRig(options: {
   bridge: DiscordCodexBridge;
   channels: Map<string, FakeChannel>;
 }> {
-  const config: AppConfig = {
+  const config = {
     discordToken: 'test-token',
     commandPrefix: '!',
     dataDir: path.join(options.rootDir, 'data'),
     codexCommand: options.codexCommand ?? 'codex',
     codexDriverMode: options.driverMode ?? 'legacy-exec',
+    codexAppServerStartupTimeoutMs: options.appServerStartupTimeoutMs,
     allowedWorkspaceRoots: [options.rootDir],
     adminUserIds: new Set(['admin-user']),
     defaultCodex: {
-      sandboxMode: 'workspace-write',
+      sandboxMode: 'danger-full-access',
       approvalPolicy: 'never',
-      search: false,
+      search: true,
       skipGitRepoCheck: true,
       addDirs: [],
       extraConfig: [],
     },
     web: {
       enabled: options.webEnabled ?? false,
-      bind: '127.0.0.1',
+      bind: options.webBind ?? '127.0.0.1',
       port: options.webPort ?? 0,
       authToken: options.webAuthToken,
     },
+  } as AppConfig & {
+    codexAppServerStartupTimeoutMs?: number;
   };
 
   const store = new JsonStateStore(path.join(config.dataDir, 'state.json'));
@@ -64,5 +69,5 @@ export async function createBridgeTestRig(options: {
   (bridge as any).client.channels.fetch = async (channelId: string) => channels.get(channelId) ?? null;
   (bridge as any).client.login = async () => 'logged-in';
 
-  return { config, store, runner, bridge, channels };
+  return { config: config as AppConfig, store, runner, bridge, channels };
 }

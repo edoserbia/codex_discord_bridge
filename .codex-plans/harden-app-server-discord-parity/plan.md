@@ -4,7 +4,7 @@
 Keep Codex app-server as the preferred bridge backend while improving Discord-visible parity, sticky mode visibility, subagent visibility, and token-protected LAN web access without regressing guide or live plan behavior.
 
 ## Current Phase
-Phase 3
+Phase 5
 
 ## Phases
 
@@ -21,21 +21,21 @@ Phase 3
 - **Status:** completed
 
 ### Phase 3: TDD Implementation
-- [ ] Add failing tests
-- [ ] Implement minimal fixes
-- [ ] Validate incrementally
-- **Status:** in_progress
+- [x] Add failing tests
+- [x] Implement minimal fixes
+- [x] Validate incrementally
+- **Status:** completed
 
 ### Phase 4: Verification and Deployment
-- [ ] Run targeted and full verification
-- [ ] Restart the local service
-- [ ] Confirm runtime behavior
-- **Status:** pending
+- [x] Run targeted and full verification
+- [x] Restart the local service
+- [x] Confirm runtime behavior
+- **Status:** completed
 
 ### Phase 5: Delivery
 - [ ] Commit and push the final changes
 - [ ] Report outcomes and any remaining limits
-- **Status:** pending
+- **Status:** in_progress
 
 ## Decisions Made
 | Decision | Rationale |
@@ -47,6 +47,7 @@ Phase 3
 | Add a bridge command for tokenized web links instead of relying only on shell scripts | The user wants the link directly from Discord and via `!` commands |
 | Prefer LAN-accessible web defaults while keeping token auth | Satisfies the user's access requirement without removing protection |
 | Keep subagent lifecycle control aligned with official Codex behavior where possible | No stable local evidence yet of a public CLI config for forced subagent reuse/TTL; bridge should avoid fabricating incompatible protocol knobs |
+| Fix launchd status detection to fall back to `launchctl print` pid data | Prevents false “未运行” reports after the service is already listening |
 
 ## Errors Encountered
 | Error | Attempt | Resolution |

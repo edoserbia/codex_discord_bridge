@@ -427,9 +427,10 @@ if (scenario === 'subagent') {
       tool: 'spawn_agent',
       sender_thread_id: threadId,
       receiver_thread_ids: ['sub-thread-1'],
+      new_agent_nickname: 'auth-scout',
       prompt: 'Investigate the login flow and list the risky edge cases.',
       agents_states: {
-        'sub-thread-1': { status: 'running', message: null },
+        'sub-thread-1': { status: 'running', message: null, agent_nickname: 'auth-scout' },
       },
       status: 'completed',
     },
@@ -443,9 +444,10 @@ if (scenario === 'subagent') {
       tool: 'send_input',
       sender_thread_id: threadId,
       receiver_thread_ids: ['sub-thread-1'],
+      receiver_agent_nickname: 'auth-scout',
       prompt: 'Focus on auth redirects, token refresh, and empty-button regressions.',
       agents_states: {
-        'sub-thread-1': { status: 'running', message: null },
+        'sub-thread-1': { status: 'running', message: null, agent_nickname: 'auth-scout' },
       },
       status: 'in_progress',
     },
@@ -459,9 +461,10 @@ if (scenario === 'subagent') {
       tool: 'send_input',
       sender_thread_id: threadId,
       receiver_thread_ids: ['sub-thread-1'],
+      receiver_agent_nickname: 'auth-scout',
       prompt: 'Focus on auth redirects, token refresh, and empty-button regressions.',
       agents_states: {
-        'sub-thread-1': { status: 'running', message: null },
+        'sub-thread-1': { status: 'running', message: null, agent_nickname: 'auth-scout' },
       },
       status: 'completed',
     },
@@ -477,7 +480,7 @@ if (scenario === 'subagent') {
       receiver_thread_ids: ['sub-thread-1'],
       prompt: null,
       agents_states: {
-        'sub-thread-1': { status: 'running', message: null },
+        'sub-thread-1': { status: 'running', message: null, agent_nickname: 'auth-scout' },
       },
       status: 'in_progress',
     },
@@ -494,7 +497,7 @@ if (scenario === 'subagent') {
       receiver_thread_ids: ['sub-thread-1'],
       prompt: null,
       agents_states: {
-        'sub-thread-1': { status: 'completed', message: 'Found two auth redirect edge cases and one empty-button regression.' },
+        'sub-thread-1': { status: 'completed', message: 'Found two auth redirect edge cases and one empty-button regression.', agent_nickname: 'auth-scout' },
       },
       status: 'completed',
     },
@@ -510,7 +513,7 @@ if (scenario === 'subagent') {
       receiver_thread_ids: ['sub-thread-1'],
       prompt: null,
       agents_states: {
-        'sub-thread-1': { status: 'shutdown', message: null },
+        'sub-thread-1': { status: 'shutdown', message: null, agent_nickname: 'auth-scout' },
       },
       status: 'completed',
     },

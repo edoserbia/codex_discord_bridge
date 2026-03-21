@@ -6,7 +6,7 @@ import path from 'node:path';
 
 import { config as dotenvConfig } from 'dotenv';
 
-import type { ApprovalPolicy, BindingCodexOptions, CodexDriverMode, SandboxMode } from './types.js';
+import type { AppServerTransport, ApprovalPolicy, BindingCodexOptions, CodexDriverMode, SandboxMode } from './types.js';
 
 const DEFAULT_SECRETS_FILE = path.join(os.homedir(), '.codex-tunning', 'secrets.env');
 
@@ -23,6 +23,9 @@ export interface AppConfig {
   dataDir: string;
   codexCommand: string;
   codexDriverMode?: CodexDriverMode | undefined;
+  codexAppServerTransport?: AppServerTransport | undefined;
+  codexAppServerStartupTimeoutMs?: number | undefined;
+  codexAppServerRequestTimeoutMs?: number | undefined;
   allowedWorkspaceRoots: string[];
   adminUserIds: Set<string>;
   defaultCodex: BindingCodexOptions;
@@ -101,6 +104,14 @@ function parseCodexDriverMode(value: string | undefined, fallback: CodexDriverMo
   return fallback;
 }
 
+function parseAppServerTransport(value: string | undefined, fallback: AppServerTransport): AppServerTransport {
+  if (value === 'auto' || value === 'stdio' || value === 'ws') {
+    return value;
+  }
+
+  return fallback;
+}
+
 export function loadConfig(): AppConfig {
   loadExternalSecretEnv();
 
@@ -118,6 +129,9 @@ export function loadConfig(): AppConfig {
     dataDir: path.resolve(process.env.DATA_DIR ?? './data'),
     codexCommand: process.env.CODEX_COMMAND?.trim() || 'codex',
     codexDriverMode: parseCodexDriverMode(process.env.CODEX_DRIVER_MODE?.trim(), 'app-server'),
+    codexAppServerTransport: parseAppServerTransport(process.env.CODEX_APP_SERVER_TRANSPORT?.trim(), 'auto'),
+    codexAppServerStartupTimeoutMs: parseInteger(process.env.CODEX_APP_SERVER_STARTUP_TIMEOUT_MS, 10_000),
+    codexAppServerRequestTimeoutMs: parseInteger(process.env.CODEX_APP_SERVER_REQUEST_TIMEOUT_MS, 10_000),
     allowedWorkspaceRoots: parseList(process.env.ALLOWED_WORKSPACE_ROOTS).map((item) => path.resolve(item)),
     adminUserIds: new Set(parseList(process.env.DISCORD_ADMIN_USER_IDS)),
     defaultCodex: {
@@ -125,14 +139,14 @@ export function loadConfig(): AppConfig {
       profile: process.env.DEFAULT_CODEX_PROFILE?.trim() || undefined,
       sandboxMode: parseSandboxMode(process.env.DEFAULT_CODEX_SANDBOX, 'danger-full-access'),
       approvalPolicy: parseApprovalPolicy(process.env.DEFAULT_CODEX_APPROVAL, 'never'),
-      search: parseBoolean(process.env.DEFAULT_CODEX_SEARCH, false),
+      search: parseBoolean(process.env.DEFAULT_CODEX_SEARCH, true),
       skipGitRepoCheck: parseBoolean(process.env.DEFAULT_CODEX_SKIP_GIT_REPO_CHECK, true),
       addDirs: parseList(process.env.DEFAULT_CODEX_ADD_DIRS).map((item) => path.resolve(item)),
       extraConfig: parseList(process.env.DEFAULT_CODEX_CONFIGS),
     },
     web: {
       enabled: parseBoolean(process.env.WEB_ENABLED, true),
-      bind: process.env.WEB_BIND?.trim() || '127.0.0.1',
+      bind: process.env.WEB_BIND?.trim() || '0.0.0.0',
       port: parseInteger(process.env.WEB_PORT, 3769),
       authToken: process.env.WEB_AUTH_TOKEN?.trim() || undefined,
     },

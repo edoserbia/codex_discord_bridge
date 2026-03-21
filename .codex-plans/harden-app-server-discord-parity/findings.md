@@ -21,6 +21,7 @@
 - `AdminWebServer.getOrigin()` currently reflects the bound listen address directly, which produces unusable URLs such as `0.0.0.0` if LAN binding is enabled without extra handling.
 - Token bootstrap already exists via `/?token=...` plus cookie auth, but no Discord command exposes a ready-to-open tokenized URL.
 - No stable public CLI flag or documented local config key for forced subagent reuse/TTL has been confirmed from `codex --help`, `codex app-server --help`, `codex features list`, or local package/source inspection.
+- LaunchAgent runtime can be healthy while `.run/codex-discord-bridge.pid` is missing, which makes the current `service-status` path misreport “未运行” even though `node dist/index.js` is active.
 
 ## Technical Decisions
 | Decision | Rationale |
@@ -31,8 +32,10 @@
 | Add a `!web` command that generates tokenized loopback and LAN URLs | Satisfies the user's direct access requirement without removing auth |
 | Default web bind to `0.0.0.0` while generating display URLs from concrete host candidates | Makes LAN access work without showing unusable listen addresses |
 | Limit 12-hour cleanup to bridge-side cached subagent presentation state unless an official Codex knob is found | Avoids inventing unofficial runtime behavior inside Codex itself |
+| Fall back to `launchctl print ... pid = ...` for launchd status checks | Makes local deployment verification reliable when pidfiles are absent |
 
 ## Issues Encountered
 | Issue | Resolution |
 |-------|------------|
 | Existing verified app-server parity work is still uncommitted in this workspace | Continue from the current state and fold the new hardening pass into the next commits rather than resetting the tree |
+| `service-status` said “未运行” after restart even while the web port was already in use | Verified the live pid via `launchctl print` and `ps`, then fixed the script to derive pid from launchd state |

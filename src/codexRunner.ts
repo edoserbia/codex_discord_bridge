@@ -488,6 +488,8 @@ export function parseCollabToolCall(item: Record<string, unknown>): CollabToolCa
   const prompt = typeof item.prompt === 'string' && item.prompt.trim().length > 0
     ? item.prompt.trim()
     : undefined;
+  const agentNicknames = parseCollabAgentNicknames(item, receiverThreadIds);
+  const agentRoles = parseCollabAgentRoles(item, receiverThreadIds);
 
   return {
     id,
@@ -495,12 +497,16 @@ export function parseCollabToolCall(item: Record<string, unknown>): CollabToolCa
     senderThreadId,
     receiverThreadIds,
     prompt,
-    agentsStates: parseCollabAgentStates(item.agents_states ?? item.agentsStates),
+    agentsStates: parseCollabAgentStates(item.agents_states ?? item.agentsStates, agentNicknames, agentRoles),
     status,
   };
 }
 
-function parseCollabAgentStates(rawStates: unknown): Record<string, CollabAgentState> {
+function parseCollabAgentStates(
+  rawStates: unknown,
+  agentNicknames: Map<string, string>,
+  agentRoles: Map<string, string>,
+): Record<string, CollabAgentState> {
   if (!rawStates || typeof rawStates !== 'object' || Array.isArray(rawStates)) {
     return {};
   }
@@ -522,10 +528,90 @@ function parseCollabAgentStates(rawStates: unknown): Record<string, CollabAgentS
         : candidate.message === null
           ? null
           : undefined;
+      const nickname = coerceOptionalString(
+        candidate.agent_nickname
+          ?? candidate.agentNickname
+          ?? candidate.nickname,
+      ) ?? agentNicknames.get(threadId);
+      const role = coerceOptionalString(
+        candidate.agent_role
+          ?? candidate.agentRole
+          ?? candidate.role,
+      ) ?? agentRoles.get(threadId);
 
-      return [[threadId, { status, message } satisfies CollabAgentState]];
+      return [[threadId, {
+        status,
+        message,
+        nickname,
+        role,
+      } satisfies CollabAgentState]];
     }),
   );
+}
+
+function parseCollabAgentNicknames(item: Record<string, unknown>, receiverThreadIds: string[]): Map<string, string> {
+  const nicknames = new Map<string, string>();
+  assignCollabAgentMap(nicknames, item.receiver_agent_nicknames ?? item.receiverAgentNicknames);
+  assignSingleReceiverValue(
+    nicknames,
+    receiverThreadIds,
+    coerceOptionalString(item.receiver_agent_nickname ?? item.receiverAgentNickname),
+  );
+  assignSingleReceiverValue(
+    nicknames,
+    receiverThreadIds,
+    coerceOptionalString(item.new_agent_nickname ?? item.newAgentNickname),
+  );
+  return nicknames;
+}
+
+function parseCollabAgentRoles(item: Record<string, unknown>, receiverThreadIds: string[]): Map<string, string> {
+  const roles = new Map<string, string>();
+  assignCollabAgentMap(roles, item.receiver_agent_roles ?? item.receiverAgentRoles);
+  assignSingleReceiverValue(
+    roles,
+    receiverThreadIds,
+    coerceOptionalString(item.receiver_agent_role ?? item.receiverAgentRole),
+  );
+  assignSingleReceiverValue(
+    roles,
+    receiverThreadIds,
+    coerceOptionalString(item.new_agent_role ?? item.newAgentRole),
+  );
+  return roles;
+}
+
+function assignCollabAgentMap(target: Map<string, string>, rawValue: unknown): void {
+  if (!rawValue || typeof rawValue !== 'object' || Array.isArray(rawValue)) {
+    return;
+  }
+
+  for (const [threadId, value] of Object.entries(rawValue)) {
+    const normalized = coerceOptionalString(value);
+    if (!threadId.trim() || !normalized) {
+      continue;
+    }
+
+    target.set(threadId, normalized);
+  }
+}
+
+function assignSingleReceiverValue(
+  target: Map<string, string>,
+  receiverThreadIds: string[],
+  value: string | undefined,
+): void {
+  if (!value || receiverThreadIds.length !== 1 || target.has(receiverThreadIds[0]!)) {
+    return;
+  }
+
+  target.set(receiverThreadIds[0]!, value);
+}
+
+function coerceOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : undefined;
 }
 
 function normalizeCollabTool(value: unknown): CollabToolName | undefined {

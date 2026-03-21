@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 
 import { AdminWebServer } from '../src/webServer.js';
+import * as webServerModule from '../src/webServer.js';
 
 import { createBridgeTestRig } from './helpers/bridgeSetup.js';
 import { FakeChannel } from './helpers/fakeDiscord.js';
@@ -118,4 +119,22 @@ test('web server supports bearer auth and browser token bootstrap cookie', { con
     await webServer.stop();
     await cleanupDir(rootDir);
   }
+});
+
+test('web server builds concrete local and lan access urls instead of exposing 0.0.0.0', { concurrency: false }, async () => {
+  const urls = ((webServerModule as any).buildWebAccessUrls?.({
+    bind: '0.0.0.0',
+    port: 3769,
+    authToken: 'secret-token',
+  }, {
+    address: '0.0.0.0',
+    port: 3769,
+  }, {
+    lo0: [{ family: 'IPv4', address: '127.0.0.1', internal: true }],
+    en0: [{ family: 'IPv4', address: '192.168.50.8', internal: false }],
+  }) ?? []) as Array<{ label: string; url: string }>;
+
+  assert.ok(urls.some((entry) => entry.label === '本机' && entry.url === 'http://127.0.0.1:3769/?token=secret-token'));
+  assert.ok(urls.some((entry) => entry.label === '局域网' && entry.url === 'http://192.168.50.8:3769/?token=secret-token'));
+  assert.ok(urls.every((entry) => !entry.url.includes('0.0.0.0')));
 });

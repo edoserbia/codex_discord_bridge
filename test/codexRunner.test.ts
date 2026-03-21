@@ -227,6 +227,37 @@ test('runner surfaces collab tool call updates for subagent activity', async () 
   await cleanupDir(rootDir);
 });
 
+test('runner preserves subagent nicknames when collab events provide them', async () => {
+  const rootDir = await makeTempDir('codex-runner-subagent-nickname-');
+  const workspace = await createWorkspace(rootDir);
+  const runner = new CodexRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+  const collabSnapshots: Array<{
+    tool: string;
+    status: string;
+    receiverThreadIds: string[];
+    agentsStates: Record<string, { status: string; nickname?: string | null; message?: string | null }>;
+  }> = [];
+
+  const result = await runner.start(binding, { prompt: '[subagent] inspect', imagePaths: [], extraAddDirs: [] }, undefined, {
+    onCollabToolChanged: async (item) => {
+      collabSnapshots.push(JSON.parse(JSON.stringify(item)) as {
+        tool: string;
+        status: string;
+        receiverThreadIds: string[];
+        agentsStates: Record<string, { status: string; nickname?: string | null; message?: string | null }>;
+      });
+    },
+  }).done;
+
+  assert.equal(result.success, true);
+  const spawnCompleted = collabSnapshots.find((item) => item.tool === 'spawn_agent' && item.status === 'completed');
+  const waitCompleted = collabSnapshots.find((item) => item.tool === 'wait' && item.status === 'completed');
+  assert.equal(spawnCompleted?.agentsStates['sub-thread-1']?.nickname, 'auth-scout');
+  assert.equal(waitCompleted?.agentsStates['sub-thread-1']?.nickname, 'auth-scout');
+  await cleanupDir(rootDir);
+});
+
 test('runner handles resume and command events', async () => {
   const rootDir = await makeTempDir('codex-runner-resume-');
   const workspace = await createWorkspace(rootDir);

@@ -16,6 +16,7 @@ import type {
 import { formatAutopilotBoardChanges, normalizeAutopilotParallelism, summarizeAutopilotBoard, stampAutopilotLine } from './autopilot.js';
 import { filterDiagnosticStderr } from './codexDiagnostics.js';
 import { formatClockTimestamp, formatDurationMs, sanitizeInlineCode, shortId, tailLines, truncate } from './utils.js';
+import type { WebAccessUrl } from './webAccess.js';
 
 function describeAutopilotProjectState(
   project: AutopilotProjectState,
@@ -167,6 +168,14 @@ function formatCollabToolStatusLabel(status: CollabToolCall['status']): string {
 }
 
 function summarizeCollabAgentStates(item: CollabToolCall): string | undefined {
+  const namedStates = Object.entries(item.agentsStates)
+    .map(([, state]) => formatNamedCollabAgentState(state))
+    .filter((value): value is string => Boolean(value));
+
+  if (namedStates.length > 0) {
+    return namedStates.join(' · ');
+  }
+
   const counts = new Map<string, number>();
 
   for (const state of Object.values(item.agentsStates)) {
@@ -183,6 +192,11 @@ function summarizeCollabAgentStates(item: CollabToolCall): string | undefined {
     .join(' · ');
 }
 
+function formatNamedCollabAgentState(state: CollabToolCall['agentsStates'][string]): string | undefined {
+  const nickname = state.nickname?.trim();
+  return nickname ? `${nickname} ${state.status}` : undefined;
+}
+
 export function formatHelp(prefix: string): string {
   return [
     '🤖 **Codex Discord Bridge 帮助**',
@@ -191,6 +205,7 @@ export function formatHelp(prefix: string): string {
     `- Autopilot 用法：\`${prefix}autopilot\``,
     `- 查看状态：\`${prefix}status\``,
     `- 查看队列：\`${prefix}queue\``,
+    `- Web 链接：\`${prefix}web\``,
     `- 运行中引导：\`${prefix}guide <追加指令>\``,
     `- 取消执行：\`${prefix}cancel\``,
     `- 重置会话：\`${prefix}reset\``,
@@ -205,7 +220,7 @@ export function formatHelp(prefix: string): string {
     '图片附件会自动透传到 `codex -i`，普通文件会下载到本地附件目录供 Codex 读取。',
     '',
     '示例：',
-    `\`${prefix}bind api "/path/to/workspaces/api" --sandbox danger-full-access --approval never --search off\``,
+    `\`${prefix}bind api "/path/to/workspaces/api" --sandbox danger-full-access --approval never --search on\``,
   ].join('\n');
 }
 
@@ -382,12 +397,13 @@ export function formatStatus(
   isThreadConversation: boolean,
   preferredDriver: 'legacy-exec' | 'app-server' = 'legacy-exec',
 ): string {
+  const driverLabel = formatDriverLabel(runtime.activeRun?.driverMode ?? session.driver ?? preferredDriver, session.fallbackActive);
   const lines = [
     '🤖 **Codex Bridge 状态面板**',
     `项目：**${binding.projectName}**`,
     `目录：\`${binding.workspacePath}\``,
     `执行模式：sandbox=\`${binding.codex.sandboxMode}\` · approval=\`${binding.codex.approvalPolicy}\` · search=${binding.codex.search ? 'on' : 'off'}`,
-    `驱动：${session.driver ?? preferredDriver}${session.fallbackActive ? '（fallback）' : ''}`,
+    `驱动：${driverLabel}`,
     `会话类型：${isThreadConversation ? 'Discord 线程会话' : '频道主会话'}`,
     `状态：${formatActiveStatus(runtime)}`,
     `Codex 会话：${session.codexThreadId ? `\`${shortId(session.codexThreadId)}\`` : '未建立'}`,
@@ -448,7 +464,12 @@ export function formatStatus(
   return truncate(lines.join('\n'), 1900);
 }
 
-export function formatProgressMessage(binding: ChannelBinding, runtime: ChannelRuntime, prefix: string): string {
+export function formatProgressMessage(
+  binding: ChannelBinding,
+  runtime: ChannelRuntime,
+  prefix: string,
+  preferredDriver: 'legacy-exec' | 'app-server' = 'app-server',
+): string {
   const activeRun = runtime.activeRun;
 
   if (!activeRun) {
@@ -460,6 +481,7 @@ export function formatProgressMessage(binding: ChannelBinding, runtime: ChannelR
     `项目：**${binding.projectName}**`,
     `请求人：${activeRun.task.requestedBy}`,
     `状态：${formatActiveStatus(runtime)}`,
+    `驱动：${formatDriverLabel(activeRun.driverMode, preferredDriver === 'app-server' && activeRun.driverMode === 'legacy-exec')}`,
     `最近更新：${formatClockTimestamp(activeRun.updatedAt)}`,
     `最新活动：${formatClockTimestamp(activeRun.updatedAt)} ${truncate(activeRun.latestActivity, 180)}`,
   ];
@@ -504,6 +526,22 @@ export function formatProgressMessage(binding: ChannelBinding, runtime: ChannelR
   lines.push('说明：这条消息会持续更新，最终结果仍会单独回复。');
 
   return truncate(lines.join('\n'), 1900);
+}
+
+function formatDriverLabel(driver: 'legacy-exec' | 'app-server', fallbackActive: boolean | undefined): string {
+  return `${driver}${fallbackActive && driver === 'legacy-exec' ? '（fallback）' : ''}`;
+}
+
+export function formatWebAccessLinks(urls: WebAccessUrl[]): string {
+  if (urls.length === 0) {
+    return '🌐 Web 面板当前没有可用访问地址。';
+  }
+
+  return [
+    '🌐 **Web 面板访问链接**',
+    '',
+    ...urls.map((entry) => `- ${entry.label}：${entry.url}`),
+  ].join('\n');
 }
 
 export function formatSuccessReply(binding: ChannelBinding, requestedBy: string, result: CodexRunResult): string {
