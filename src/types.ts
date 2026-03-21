@@ -81,6 +81,7 @@ export interface ConversationSessionState {
 export interface PersistedState {
   bindings: Record<string, ChannelBinding>;
   sessions: Record<string, ConversationSessionState>;
+  runtimes: Record<string, ChannelRuntime>;
   autopilotServices: Record<string, AutopilotServiceState>;
   autopilotProjects: Record<string, AutopilotProjectState>;
 }
@@ -111,6 +112,14 @@ export interface PromptTask {
   attachmentDir?: string | undefined;
   extraAddDirs: string[];
   origin: 'user' | 'autopilot';
+  priority?: 'normal' | 'recovery' | undefined;
+  recovery?: {
+    source: 'retry' | 'restart';
+    strategy: 'retry-original' | 'continue-from-state';
+    reason: string;
+    attempt: number;
+    lastKnownCommand?: string | undefined;
+  } | undefined;
 }
 
 export interface CommandRecord {

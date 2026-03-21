@@ -5,6 +5,7 @@ import { getAutopilotDefaultIntervalMs, normalizeAutopilotParallelism } from './
 import type {
   AutopilotProjectState,
   AutopilotServiceState,
+  ChannelRuntime,
   ChannelBinding,
   ConversationSessionState,
   PersistedState,
@@ -14,6 +15,7 @@ export class JsonStateStore {
   private state: PersistedState = {
     bindings: {},
     sessions: {},
+    runtimes: {},
     autopilotServices: {},
     autopilotProjects: {},
   };
@@ -37,6 +39,16 @@ export class JsonStateStore {
               ...session,
               driver: session.driver ?? (session.codexThreadId ? 'legacy-exec' : undefined),
             } satisfies ConversationSessionState,
+          ]),
+        ),
+        runtimes: Object.fromEntries(
+          Object.entries(parsed.runtimes ?? {}).map(([conversationId, runtime]) => [
+            conversationId,
+            {
+              conversationId,
+              queue: Array.isArray(runtime.queue) ? runtime.queue : [],
+              activeRun: runtime.activeRun ?? undefined,
+            } satisfies ChannelRuntime,
           ]),
         ),
         autopilotServices: Object.fromEntries(
@@ -103,6 +115,7 @@ export class JsonStateStore {
     for (const [conversationId, session] of Object.entries(this.state.sessions)) {
       if (session.bindingChannelId === channelId) {
         delete this.state.sessions[conversationId];
+        delete this.state.runtimes[conversationId];
       }
     }
 
@@ -178,6 +191,36 @@ export class JsonStateStore {
 
   async removeSession(conversationId: string): Promise<void> {
     delete this.state.sessions[conversationId];
+    delete this.state.runtimes[conversationId];
+    await this.save();
+  }
+
+  getRuntimeState(conversationId: string): ChannelRuntime | undefined {
+    const runtime = this.state.runtimes[conversationId];
+    return runtime ? structuredClone(runtime) : undefined;
+  }
+
+  listRuntimeStates(bindingChannelId?: string): ChannelRuntime[] {
+    return Object.entries(this.state.runtimes)
+      .filter(([conversationId, runtime]) => {
+        if (!bindingChannelId) {
+          return true;
+        }
+
+        return this.getRuntimeBindingChannelId(conversationId, runtime) === bindingChannelId;
+      })
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([, runtime]) => structuredClone(runtime));
+  }
+
+  async upsertRuntimeState(runtime: ChannelRuntime): Promise<ChannelRuntime> {
+    this.state.runtimes[runtime.conversationId] = structuredClone(runtime);
+    await this.save();
+    return structuredClone(runtime);
+  }
+
+  async removeRuntimeState(conversationId: string): Promise<void> {
+    delete this.state.runtimes[conversationId];
     await this.save();
   }
 
@@ -271,11 +314,19 @@ export class JsonStateStore {
     };
   }
 
+  private getRuntimeBindingChannelId(conversationId: string, runtime: ChannelRuntime): string | undefined {
+    return runtime.activeRun?.task.bindingChannelId
+      ?? runtime.queue.at(0)?.bindingChannelId
+      ?? this.state.sessions[conversationId]?.bindingChannelId;
+  }
+
   private async save(): Promise<void> {
     const payload = `${JSON.stringify(this.state, null, 2)}\n`;
     const runSave = async (): Promise<void> => {
       const tempFilePath = `${this.stateFilePath}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
+      await fs.mkdir(path.dirname(this.stateFilePath), { recursive: true });
       await fs.writeFile(tempFilePath, payload, 'utf8');
+      await fs.mkdir(path.dirname(this.stateFilePath), { recursive: true });
       await fs.rename(tempFilePath, this.stateFilePath);
     };
 

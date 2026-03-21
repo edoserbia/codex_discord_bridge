@@ -33,6 +33,15 @@ test('parse guide command with free text', () => {
   });
 });
 
+test('parse queue insert command', () => {
+  const parsed = parseCommand('!queue insert 2', '!');
+  assert.deepEqual(parsed, {
+    kind: 'queue',
+    action: 'insert',
+    index: 2,
+  });
+});
+
 test('reject unknown flag', () => {
   assert.throws(() => parseCommand('!bind api /tmp --unknown nope', '!'), /未知参数/);
 });
