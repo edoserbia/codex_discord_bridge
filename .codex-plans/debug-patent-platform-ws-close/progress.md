@@ -30,4 +30,7 @@
 | Initial targeted test imported a non-exported helper | Exported the existing transport resolver so the behavior could be asserted directly |
 
 ### Next Verification Step
-- Restart the local `codex-discord-bridge` service so the live Discord bot uses the fixed app-server transport default and improved diagnostics.
+- Completed:
+  - Restarted the local `codex-discord-bridge` LaunchAgent and verified the new live PID is `71189`.
+  - Confirmed the web panel is listening on `*:3769` and responds on `127.0.0.1:3769` with `401 Unauthorized`, which confirms the service is up and auth-protected.
+  - Confirmed the latest log tail shows the restarted service instance without a new `app-server websocket transport closed` failure on startup.
