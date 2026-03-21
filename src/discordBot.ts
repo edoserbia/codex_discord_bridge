@@ -157,7 +157,7 @@ interface ResolvedConversation {
 }
 
 const MAX_CODEX_ATTEMPTS = 3;
-const MIN_RUNTIME_VIEW_REFRESH_INTERVAL_MS = 1_200;
+const MIN_RUNTIME_VIEW_REFRESH_INTERVAL_MS = 300;
 const AUTOPILOT_THREAD_AUTO_ARCHIVE_MINUTES: ThreadAutoArchiveDuration = 1440;
 const AUTOPILOT_REQUESTED_BY = 'Autopilot';
 const AUTOPILOT_REQUESTED_BY_ID = 'autopilot';
@@ -1965,7 +1965,7 @@ export class DiscordCodexBridge {
         runtime.activeRun.codexThreadId = codexThreadId;
         this.pushRunTimeline(runtime, `🧵 Codex 会话已建立：${codexThreadId.slice(0, 8)}`);
         const nextSession = await this.store.updateSession(conversationId, { codexThreadId }, task.bindingChannelId);
-        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
+        this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onActivity: async (activity: string) => {
         if (!runtime.activeRun) {
@@ -1977,7 +1977,7 @@ export class DiscordCodexBridge {
         runtime.activeRun.latestActivity = activity;
         this.pushRunTimeline(runtime, `🔄 ${activity}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
-        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
+        this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onReasoning: async (reasoning: string) => {
         if (!runtime.activeRun) {
@@ -1988,11 +1988,10 @@ export class DiscordCodexBridge {
         const summary = summarizeReasoningText(reasoning, 180);
         if (summary) {
           this.upsertStreamingText(runtime.activeRun.reasoningSummaries, summary, 6);
-          runtime.activeRun.latestActivity = summary;
         }
 
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
-        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
+        this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onTodoListChanged: async (items) => {
         if (!runtime.activeRun) {
@@ -2005,7 +2004,7 @@ export class DiscordCodexBridge {
         runtime.activeRun.latestActivity = `计划进度 ${completed}/${items.length}`;
         this.pushRunTimeline(runtime, `📋 计划进度 ${completed}/${items.length}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
-        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
+        this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onCollabToolChanged: async (item) => {
         if (!runtime.activeRun) {
@@ -2017,7 +2016,7 @@ export class DiscordCodexBridge {
         runtime.activeRun.latestActivity = describeCollabToolCall(item);
         this.pushRunTimeline(runtime, `🤝 ${truncate(describeCollabToolCall(item, true), 140)}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
-        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
+        this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onAgentMessage: async (agentMessage: string) => {
         if (!runtime.activeRun) {
@@ -2026,9 +2025,9 @@ export class DiscordCodexBridge {
 
         this.touchActiveRun(runtime.activeRun);
         this.upsertStreamingText(runtime.activeRun.agentMessages, agentMessage);
-        runtime.activeRun.latestActivity = agentMessage;
+        runtime.activeRun.latestActivity = '正在生成回答';
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
-        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
+        this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onCommandStarted: async (command: string) => {
         if (!runtime.activeRun) {
@@ -2041,7 +2040,7 @@ export class DiscordCodexBridge {
         runtime.activeRun.latestActivity = '正在执行命令';
         this.pushRunTimeline(runtime, `▶️ ${truncate(command, 120)}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
-        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
+        this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onCommandCompleted: async (command: string, output: string, exitCode: number | null) => {
         if (!runtime.activeRun) {
@@ -2054,7 +2053,7 @@ export class DiscordCodexBridge {
         runtime.activeRun.latestActivity = exitCode === 0 ? '命令执行完成' : '命令执行失败';
         this.pushRunTimeline(runtime, `${exitCode === 0 ? '✅' : '❌'} ${truncate(command, 120)} (${exitCode ?? 'null'})`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
-        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
+        this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onStderr: async (line: string) => {
         if (!runtime.activeRun) {
@@ -2071,7 +2070,7 @@ export class DiscordCodexBridge {
         runtime.activeRun.latestActivity = line;
         this.pushRunTimeline(runtime, `⚠️ ${truncate(line, 140)}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
-        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
+        this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onFallbackActivated: async (detail) => {
         if (!runtime.activeRun) {
@@ -2515,6 +2514,29 @@ export class DiscordCodexBridge {
     runtime: ChannelRuntime,
     isThreadConversation: boolean,
   ): Promise<void> {
+    const flush = this.queueRuntimeViewRefresh(channel, binding, session, runtime, isThreadConversation);
+    await flush;
+  }
+
+  private scheduleRuntimeViewRefresh(
+    channel: SendableChannel,
+    binding: ChannelBinding,
+    session: ConversationSessionState,
+    runtime: ChannelRuntime,
+    isThreadConversation: boolean,
+  ): void {
+    void this.queueRuntimeViewRefresh(channel, binding, session, runtime, isThreadConversation).catch((error) => {
+      this.logBridgeError(`runtimeViewRefresh conversation=${runtime.conversationId}`, error);
+    });
+  }
+
+  private queueRuntimeViewRefresh(
+    channel: SendableChannel,
+    binding: ChannelBinding,
+    session: ConversationSessionState,
+    runtime: ChannelRuntime,
+    isThreadConversation: boolean,
+  ): Promise<void> {
     const conversationId = runtime.conversationId;
     this.pendingRuntimeViewRefreshes.set(conversationId, {
       channel,
@@ -2526,13 +2548,12 @@ export class DiscordCodexBridge {
 
     const existingFlush = this.runtimeViewFlushes.get(conversationId);
     if (existingFlush) {
-      await existingFlush;
-      return;
+      return existingFlush;
     }
 
     const flush = this.flushRuntimeViews(conversationId);
     this.runtimeViewFlushes.set(conversationId, flush);
-    await flush;
+    return flush;
   }
 
   private async flushRuntimeViews(conversationId: string): Promise<void> {

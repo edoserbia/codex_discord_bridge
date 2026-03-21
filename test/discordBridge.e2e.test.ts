@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { FakeChannel, createUserMessage } from './helpers/fakeDiscord.js';
+import { FakeChannel, FakeMessage, createUserMessage } from './helpers/fakeDiscord.js';
 import { createBridgeTestRig } from './helpers/bridgeSetup.js';
 import { cleanupDir, createWorkspace, makeTempDir, startStaticServer, waitFor } from './helpers/testUtils.js';
 
@@ -339,6 +339,39 @@ test('bridge keeps streaming app-server deltas out of the process timeline while
     assert.match(progressMessage!.content, /- \[\d{2}:\d{2}\] 🤝 /);
     assert.match(progressMessage!.content, /- \[\d{2}:\d{2}\] 🔄 本轮已完成/);
   } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge does not let slow Discord progress edits throttle app-server streaming turns', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-app-server-slow-discord-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeAppServerCommand,
+    driverMode: 'app-server',
+  });
+  const rootChannel = new FakeChannel('channel-app-server-slow-discord', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+  const originalEdit = FakeMessage.prototype.edit;
+
+  FakeMessage.prototype.edit = async function slowEdit(this: FakeMessage, content: string): Promise<any> {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    return originalEdit.call(this, content);
+  };
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    const startedAt = Date.now();
+    await dispatch(bridge, createUserMessage(rootChannel, '[app-rich-stream] show step progress'));
+
+    await waitFor(() => rootChannel.sent.some((message) => /🤖 \*\*api\*\*/.test(message.content)
+      && /app-server stream ok: \[app-rich-stream\] show step progress/.test(message.content)), 5_000);
+
+    assert.ok(Date.now() - startedAt < 5_000);
+  } finally {
+    FakeMessage.prototype.edit = originalEdit;
     await (bridge as any).stop?.();
     await cleanupDir(rootDir);
   }
