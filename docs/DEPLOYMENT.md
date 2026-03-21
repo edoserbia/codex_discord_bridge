@@ -263,6 +263,28 @@ cat ~/.codex-tunning/secrets.env
 
 默认会把 `DEFAULT_CODEX_SANDBOX` 设为 `danger-full-access`，让 Discord 中的 Codex 可以直接读写项目文件。
 
+当前文档按本机 `codex-cli 0.116.0` 验证。
+
+如果你希望整个系统保持全权限，`~/.codex/config.toml` 应保留：
+
+```toml
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
+approval_mode = "never"
+```
+
+不要继续保留旧权限 profile：
+
+```toml
+default_permissions = "full"
+
+[permissions.full]
+open_world_enabled = true
+destructive_enabled = true
+```
+
+在 `codex-cli 0.116.0` 上，这组旧键会让 `codex app-server` 启动时报出 `Permissions profile \`full\` does not define any recognized filesystem entries...`，bridge 会因此 fallback 到 `legacy-exec`。删除这段旧 profile 不会降低你当前的全权限设置。
+
 如果你希望收紧权限，可以把 `.env` 中的值改成：
 
 - `workspace-write`

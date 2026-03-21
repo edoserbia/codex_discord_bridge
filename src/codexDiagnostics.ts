@@ -1,8 +1,14 @@
 import type { CancellationReason, CodexRunResult } from './types.js';
 
+const ANSI_ESCAPE_PATTERN = /\u001b\[[0-9;]*m/g;
+
 const IGNORABLE_CODEX_STDERR_PATTERNS = [
   /^WARNING: failed to clean up stale arg0 temp dirs: Permission denied \(os error 13\)$/,
 ];
+
+const OBSOLETE_FULL_PERMISSION_PROFILE_PATTERN = /Permissions profile [`'"]?full[`'"]? does not define any recognized filesystem entries for this version of Codex\. Filesystem access will remain restricted\. Upgrade Codex if this profile expects filesystem permissions\./i;
+
+const OBSOLETE_FULL_PERMISSION_PROFILE_SUMMARY = '~/.codex/config.toml uses obsolete default_permissions="full" and [permissions.full]; remove that stanza and keep sandbox_mode="danger-full-access" plus approval_policy="never" for full access.';
 
 const TRANSIENT_CODEX_FAILURE_PATTERNS = [
   /stream disconnected before completion/i,
@@ -32,8 +38,26 @@ export interface CodexFailureDiagnosis {
   diagnosticLines: string[];
 }
 
+export function normalizeCodexDiagnosticLine(line: string): string {
+  const stripped = line.replace(ANSI_ESCAPE_PATTERN, '');
+  const normalizedWhitespace = stripped.replace(/\s+/g, ' ').trim();
+
+  if (!normalizedWhitespace) {
+    return '';
+  }
+
+  if (OBSOLETE_FULL_PERMISSION_PROFILE_PATTERN.test(normalizedWhitespace)) {
+    return normalizedWhitespace.replace(
+      OBSOLETE_FULL_PERMISSION_PROFILE_PATTERN,
+      OBSOLETE_FULL_PERMISSION_PROFILE_SUMMARY,
+    );
+  }
+
+  return normalizedWhitespace;
+}
+
 export function isIgnorableCodexStderrLine(line: string): boolean {
-  const normalized = line.trim();
+  const normalized = normalizeCodexDiagnosticLine(line);
 
   if (!normalized) {
     return true;
@@ -43,7 +67,9 @@ export function isIgnorableCodexStderrLine(line: string): boolean {
 }
 
 export function filterDiagnosticStderr(lines: string[]): string[] {
-  return lines.filter((line) => !isIgnorableCodexStderrLine(line));
+  return lines
+    .map((line) => normalizeCodexDiagnosticLine(line))
+    .filter((line) => !isIgnorableCodexStderrLine(line));
 }
 
 function looksLikeAbruptIncompleteTurn(result: CodexRunResult): boolean {

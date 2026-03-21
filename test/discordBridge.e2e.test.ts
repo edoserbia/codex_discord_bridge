@@ -462,6 +462,37 @@ test('bridge posts timestamped fallback activation and recovery notices when app
   }
 });
 
+test('bridge surfaces actionable fallback guidance for obsolete full-permission Codex config errors', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-app-server-config-compat-');
+  const workspace = await createWorkspace(rootDir);
+  process.env.FAKE_CODEX_APP_SERVER_FALLBACK_STATE_FILE = path.join(rootDir, 'app-server-fallback-state');
+  process.env.FAKE_CODEX_APP_SERVER_FALLBACK_STDERR = '\u001b[2m2026-03-21T14:45:04.295261Z\u001b[0m \u001b[31mERROR\u001b[0m codex_app_server: Permissions profile `full` does not define any recognized filesystem entries for this version of Codex. Filesystem access will remain restricted. Upgrade Codex if this profile expects filesystem permissions.';
+  const { bridge, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeFallbackCommand,
+    driverMode: 'app-server',
+  });
+  const rootChannel = new FakeChannel('channel-app-server-config-compat', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, 'first prompt'));
+
+    await waitFor(() => rootChannel.sent.some((message) => /default_permissions="full"/.test(message.content)), 15_000);
+
+    const fallbackNotice = rootChannel.sent.find((message) => /default_permissions="full"/.test(message.content));
+    assert.ok(fallbackNotice);
+    assert.match(fallbackNotice.content, /\[permissions\.full\]/);
+    assert.doesNotMatch(fallbackNotice.content, /\u001b\[/);
+  } finally {
+    await (bridge as any).stop?.();
+    delete process.env.FAKE_CODEX_APP_SERVER_FALLBACK_STATE_FILE;
+    delete process.env.FAKE_CODEX_APP_SERVER_FALLBACK_STDERR;
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge progress cards keep the current driver mode visible and render named subagents', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-app-server-progress-driver-');
   const workspace = await createWorkspace(rootDir);

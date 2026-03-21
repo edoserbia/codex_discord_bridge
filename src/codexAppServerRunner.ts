@@ -2,6 +2,7 @@ import type { AppConfig } from './config.js';
 import type { AppServerTurnEvent, ChannelBinding, CodexRunInput, CodexRunResult, CommandRecord, PlanItem } from './types.js';
 import type { CodexExecutionDriver, CodexRunHooks, RunningCodexJob } from './codexRunner.js';
 
+import { normalizeCodexDiagnosticLine } from './codexDiagnostics.js';
 import { CodexAppServerClient } from './codexAppServerClient.js';
 import { extractReasoningText, parseCollabToolCall } from './codexRunner.js';
 
@@ -43,7 +44,7 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
     });
 
     const appendDiagnosticLine = (line: string): void => {
-      const normalized = line.trim();
+      const normalized = normalizeCodexDiagnosticLine(line);
 
       if (!normalized || stderr.at(-1) === normalized) {
         return;
