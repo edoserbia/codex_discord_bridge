@@ -96,14 +96,23 @@ function appendTimelineLines(lines: string[], entries: string[], maxItems = 5): 
 }
 
 function formatTaskSummary(task: PromptTask, maxLength = 90): string {
+  const prefix = task.recovery
+    ? `自动恢复(${task.recovery.strategy === 'continue-from-state' ? '续跑' : '重试'})：`
+    : '';
+
   if (task.guidancePrompt) {
-    return `引导：${truncate(task.guidancePrompt, Math.max(24, Math.floor(maxLength / 2)))} · 原任务：${truncate(task.rootPrompt, Math.max(24, Math.floor(maxLength / 2)))}`;
+    return `${prefix}引导：${truncate(task.guidancePrompt, Math.max(24, Math.floor(maxLength / 2)))} · 原任务：${truncate(task.rootPrompt, Math.max(24, Math.floor(maxLength / 2)))}`;
   }
 
-  return truncate(task.prompt, maxLength);
+  return truncate(`${prefix}${task.prompt}`, maxLength);
 }
 
 function appendTaskContextLines(lines: string[], task: PromptTask, normalLabel: string, maxLength: number): void {
+  if (task.recovery) {
+    lines.push(`恢复模式：${task.recovery.strategy === 'continue-from-state' ? '基于当前工作区继续' : '重新执行原始提示'}`);
+    lines.push(`恢复原因：${truncate(task.recovery.reason, maxLength)}`);
+  }
+
   if (task.guidancePrompt) {
     lines.push(`当前引导：${truncate(task.guidancePrompt, maxLength)}`);
     lines.push(`原任务：${truncate(task.rootPrompt, maxLength)}`);
@@ -205,6 +214,7 @@ export function formatHelp(prefix: string): string {
     `- Autopilot 用法：\`${prefix}autopilot\``,
     `- 查看状态：\`${prefix}status\``,
     `- 查看队列：\`${prefix}queue\``,
+    `- 队列插入：\`${prefix}queue insert <序号>\``,
     `- Web 链接：\`${prefix}web\``,
     `- 运行中引导：\`${prefix}guide <追加指令>\``,
     `- 取消执行：\`${prefix}cancel\``,

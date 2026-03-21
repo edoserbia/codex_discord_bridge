@@ -42,6 +42,7 @@ import type {
   ChannelBinding,
   CollabToolCall,
   CodexDriverMode,
+  CodexRunInput,
   CodexRunResult,
   ConversationSessionState,
   DashboardBinding,
@@ -196,6 +197,112 @@ function buildGuidancePrompt(rootPrompt: string, guidancePrompt: string): string
   ].join('\n');
 }
 
+function getInterruptedTaskPrompt(task: PromptTask): string {
+  if (task.guidancePrompt) {
+    return buildGuidancePrompt(task.rootEffectivePrompt, task.guidancePrompt);
+  }
+
+  return task.recovery ? task.rootEffectivePrompt : task.effectivePrompt;
+}
+
+function buildRecoveryPrompt(activeRun: ActiveRunState, source: 'retry' | 'restart'): string {
+  const completedPlanItems = activeRun.planItems
+    .filter((item) => item.completed)
+    .map((item) => `- ${item.text}`);
+  const lines = [
+    `系统提示：这是同一 Discord 会话中的一次${source === 'restart' ? '自动恢复' : '自动重试恢复'}。`,
+    '上一个执行轮次在 bridge 侧中断或断链，但工作区内容可能已经部分更新。',
+    '请先基于当前工作区状态继续任务，不要从头重复已经完成的步骤；如有必要，先快速核对当前仓库状态再继续。',
+    '如果下面列出的步骤已经完成，直接从后续步骤继续，并在最终答复里简要说明恢复动作。',
+    '',
+    '【上次中断时的任务】',
+    getInterruptedTaskPrompt(activeRun.task),
+  ];
+
+  if (activeRun.latestActivity) {
+    lines.push('', `【上次中断前的最新活动】\n${activeRun.latestActivity}`);
+  }
+
+  if (activeRun.currentCommand) {
+    lines.push('', `【上次中断前的当前命令】\n${activeRun.currentCommand}`);
+  }
+
+  if (activeRun.lastCommandOutput?.trim()) {
+    lines.push('', `【上次中断前的最近命令输出】\n${truncate(activeRun.lastCommandOutput, 1200)}`);
+  }
+
+  if (completedPlanItems.length > 0) {
+    lines.push('', '【已完成的计划项】', ...completedPlanItems.slice(0, 8));
+  }
+
+  if (activeRun.stderr.length > 0) {
+    lines.push('', `【最近诊断信息】\n${truncate(activeRun.stderr.slice(-5).join('\n'), 900)}`);
+  }
+
+  return lines.join('\n');
+}
+
+function shouldContinueRecoveryFromState(activeRun: ActiveRunState): boolean {
+  return Boolean(
+    activeRun.currentCommand
+      || activeRun.lastCommandOutput?.trim()
+      || activeRun.reasoningSummaries.length > 0
+      || activeRun.agentMessages.length > 0
+      || activeRun.collabToolCalls.length > 0
+      || activeRun.planItems.some((item) => item.completed)
+      || activeRun.timeline.some((entry) => /✅|❌|计划进度|子代理|执行命令/.test(entry)),
+  );
+}
+
+function buildRecoveryTask(
+  activeRun: ActiveRunState,
+  source: 'retry' | 'restart',
+  reason: string,
+  attempt: number,
+): PromptTask {
+  const strategy = shouldContinueRecoveryFromState(activeRun) ? 'continue-from-state' : 'retry-original';
+  const baseTask = activeRun.task;
+
+  return {
+    ...baseTask,
+    effectivePrompt: strategy === 'continue-from-state'
+      ? buildRecoveryPrompt(activeRun, source)
+      : baseTask.effectivePrompt,
+    enqueuedAt: new Date().toISOString(),
+    priority: 'recovery',
+    recovery: {
+      source,
+      strategy,
+      reason,
+      attempt,
+      lastKnownCommand: activeRun.currentCommand,
+    },
+  };
+}
+
+function buildRunInputFromTask(task: PromptTask): CodexRunInput {
+  return {
+    prompt: task.effectivePrompt,
+    imagePaths: task.attachments.filter((item) => item.isImage).map((item) => item.localPath),
+    extraAddDirs: [
+      ...task.extraAddDirs,
+      ...(task.attachmentDir ? [task.attachmentDir] : []),
+    ],
+  };
+}
+
+function buildQueuedGuidanceTask(activeTask: PromptTask, queuedTask: PromptTask): PromptTask {
+  return {
+    ...queuedTask,
+    effectivePrompt: buildGuidancePrompt(activeTask.rootEffectivePrompt, queuedTask.effectivePrompt),
+    rootPrompt: activeTask.rootPrompt,
+    rootEffectivePrompt: activeTask.rootEffectivePrompt,
+    guidancePrompt: queuedTask.prompt,
+    priority: 'normal',
+    recovery: undefined,
+  };
+}
+
 export interface BindRequest {
   channelId: string;
   guildId?: string | undefined;
@@ -214,6 +321,7 @@ export class DiscordCodexBridge {
   private readonly runtimeViewFlushes = new Map<string, Promise<void>>();
   private readonly pendingRuntimeViewRefreshes = new Map<string, PendingRuntimeViewRefresh>();
   private readonly lastRuntimeViewRefreshAt = new Map<string, number>();
+  private readonly pendingRuntimeStateSaves = new Map<string, NodeJS.Timeout>();
   private readonly activeAutopilotProjects = new Set<string>();
   private readonly autopilotBoardSnapshots = new Map<string, AutopilotProjectState['board']>();
   private autopilotTicker: NodeJS.Timeout | undefined;
@@ -244,6 +352,7 @@ export class DiscordCodexBridge {
   async start(): Promise<void> {
     await this.client.login(this.config.discordToken);
     await this.reconcileAutopilotResources();
+    await this.recoverPersistedRuntimes();
     this.startAutopilotTicker();
   }
 
@@ -252,6 +361,11 @@ export class DiscordCodexBridge {
       clearInterval(this.autopilotTicker);
       this.autopilotTicker = undefined;
     }
+
+    for (const timer of this.pendingRuntimeStateSaves.values()) {
+      clearTimeout(timer);
+    }
+    this.pendingRuntimeStateSaves.clear();
 
     await this.runner.stop?.();
     await this.client.destroy();
@@ -365,6 +479,7 @@ export class DiscordCodexBridge {
       activeJob?.cancel();
       this.activeJobs.delete(session.conversationId);
       this.runtimes.delete(session.conversationId);
+      await this.store.removeRuntimeState(session.conversationId);
     }
 
     if (autopilotProject?.status === 'running') {
@@ -398,6 +513,7 @@ export class DiscordCodexBridge {
       activeJob?.cancel();
       this.activeJobs.delete(session.conversationId);
       this.runtimes.delete(session.conversationId);
+      await this.store.removeRuntimeState(session.conversationId);
 
       await this.store.updateSession(session.conversationId, {
         codexThreadId: undefined,
@@ -437,11 +553,136 @@ export class DiscordCodexBridge {
     let runtime = this.runtimes.get(conversationId);
 
     if (!runtime) {
-      runtime = { conversationId, queue: [] };
+      runtime = this.store.getRuntimeState(conversationId) ?? { conversationId, queue: [] };
       this.runtimes.set(conversationId, runtime);
     }
 
     return runtime;
+  }
+
+  private scheduleRuntimeStateSave(conversationId: string, immediate = false): void {
+    const existingTimer = this.pendingRuntimeStateSaves.get(conversationId);
+
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+      this.pendingRuntimeStateSaves.delete(conversationId);
+    }
+
+    if (immediate) {
+      void this.persistRuntimeState(conversationId).catch((error) => {
+        this.logBridgeError(`persistRuntimeState conversation=${conversationId}`, error);
+      });
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      this.pendingRuntimeStateSaves.delete(conversationId);
+      void this.persistRuntimeState(conversationId).catch((error) => {
+        this.logBridgeError(`persistRuntimeState conversation=${conversationId}`, error);
+      });
+    }, 50);
+    timer.unref?.();
+    this.pendingRuntimeStateSaves.set(conversationId, timer);
+  }
+
+  private async persistRuntimeState(conversationId: string): Promise<void> {
+    const runtime = this.runtimes.get(conversationId);
+
+    if (!runtime || (!runtime.activeRun && runtime.queue.length === 0)) {
+      await this.store.removeRuntimeState(conversationId);
+      return;
+    }
+
+    await this.store.upsertRuntimeState(structuredClone(runtime));
+  }
+
+  private isRecoverableActiveRun(activeRun: ActiveRunState | undefined): activeRun is ActiveRunState {
+    return Boolean(
+      activeRun
+      && activeRun.status !== 'completed'
+      && activeRun.status !== 'failed'
+      && activeRun.status !== 'cancelled'
+      && !activeRun.cancellationReason,
+    );
+  }
+
+  private describeRecoveryTask(task: PromptTask): string {
+    if (!task.recovery) {
+      return '准备重新执行原始提示';
+    }
+
+    return task.recovery.strategy === 'continue-from-state'
+      ? '继续基于当前工作区状态自动恢复，不重复已完成步骤'
+      : '重新执行原始提示并沿用已有会话上下文';
+  }
+
+  private async announceRecoveryStart(channel: SendableChannel, task: PromptTask): Promise<void> {
+    if (!task.recovery) {
+      return;
+    }
+
+    const phase = task.recovery.source === 'restart'
+      ? '检测到上次任务中断，bridge 正在自动恢复。'
+      : '检测到当前任务中断，bridge 正在自动恢复。';
+    await this.sendDriverStatusNotice(
+      channel,
+      `${phase}\n接下来：${this.describeRecoveryTask(task)}\n恢复原因：${truncate(task.recovery.reason, 240)}`,
+    );
+  }
+
+  private async recoverPersistedRuntimes(): Promise<void> {
+    for (const persisted of this.store.listRuntimeStates()) {
+      const runtime: ChannelRuntime = structuredClone(persisted);
+      const conversationId = runtime.conversationId;
+      const bindingChannelId = runtime.activeRun?.task.bindingChannelId
+        ?? runtime.queue.at(0)?.bindingChannelId
+        ?? this.store.getSession(conversationId)?.bindingChannelId;
+
+      if (!bindingChannelId) {
+        await this.store.removeRuntimeState(conversationId);
+        this.runtimes.delete(conversationId);
+        continue;
+      }
+
+      const binding = this.store.getBinding(bindingChannelId);
+      if (!binding) {
+        await this.store.removeRuntimeState(conversationId);
+        this.runtimes.delete(conversationId);
+        continue;
+      }
+
+      const channel = await this.fetchChannel(conversationId);
+      if (!channel) {
+        this.runtimes.set(conversationId, runtime);
+        continue;
+      }
+
+      const interruptedRun = this.isRecoverableActiveRun(runtime.activeRun) ? runtime.activeRun : undefined;
+      if (interruptedRun) {
+        const recoveryTask = buildRecoveryTask(
+          interruptedRun,
+          'restart',
+          'bridge 重启或断链后恢复中断任务',
+          (interruptedRun.task.recovery?.attempt ?? 0) + 1,
+        );
+        runtime.queue.unshift(recoveryTask);
+      }
+
+      runtime.activeRun = undefined;
+      this.runtimes.set(conversationId, runtime);
+      await this.persistRuntimeState(conversationId);
+
+      if (interruptedRun) {
+        await this.announceRecoveryStart(channel, runtime.queue[0]!);
+      }
+
+      const session = await this.store.ensureSession(binding.channelId, conversationId);
+      await this.refreshRuntimeViews(channel, binding, session, runtime, conversationId !== binding.channelId);
+
+      if (runtime.queue.length > 0) {
+        this.startProcessQueue(conversationId);
+      }
+    }
   }
 
   private async handleIncomingMessage(message: Message): Promise<void> {
@@ -553,6 +794,7 @@ export class DiscordCodexBridge {
 
     runtime.activeRun = undefined;
     this.activeJobs.delete(conversationId);
+    this.scheduleRuntimeStateSave(conversationId, true);
     await removeAttachmentDir(activeRun.task.attachmentDir).catch(() => undefined);
 
     if (binding && activeRun.task.origin === 'autopilot') {
@@ -652,7 +894,15 @@ export class DiscordCodexBridge {
         return;
       case 'queue': {
         const conversationId = resolved?.conversationId ?? message.channelId;
-        await message.reply(formatQueue(this.getRuntime(conversationId)));
+        if (command.action === 'show') {
+          await message.reply(formatQueue(this.getRuntime(conversationId)));
+          return;
+        }
+        if (!this.isAdmin(message)) {
+          await message.reply('只有管理员才能调整队列。');
+          return;
+        }
+        await this.handleQueueInsertCommand(message, resolved, command.index);
         return;
       }
     }
@@ -755,11 +1005,87 @@ export class DiscordCodexBridge {
     runtime.activeRun.status = 'cancelled';
     runtime.activeRun.latestActivity = `已由 ${message.author.username} 请求取消`;
     runtime.activeRun.cancellationReason = 'user_cancel';
+    this.scheduleRuntimeStateSave(resolved.conversationId, true);
     activeJob.cancel();
 
     const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
     await this.refreshStatusPanel(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
     await message.reply('已发送取消信号给当前 Codex 任务。');
+  }
+
+  private async handleQueueInsertCommand(
+    message: Message,
+    resolved: ResolvedConversation | undefined,
+    index: number,
+  ): Promise<void> {
+    if (!resolved) {
+      await message.reply('当前频道未绑定项目。先执行 `!bind`。');
+      return;
+    }
+
+    const runtime = this.getRuntime(resolved.conversationId);
+    if (!runtime.activeRun) {
+      await message.reply('当前没有正在运行的任务，无法插入队列项。');
+      return;
+    }
+    const activeTaskId = runtime.activeRun.task.id;
+
+    const queueIndex = index - 1;
+    if (queueIndex < 0 || queueIndex >= runtime.queue.length) {
+      await message.reply(`队列序号无效。当前等待队列共有 ${runtime.queue.length} 条任务。`);
+      return;
+    }
+
+    const [queuedTask] = runtime.queue.splice(queueIndex, 1);
+    if (!queuedTask) {
+      await message.reply('未找到指定的队列项。');
+      return;
+    }
+
+    const insertedTask = buildQueuedGuidanceTask(runtime.activeRun.task, queuedTask);
+    runtime.queue.unshift(insertedTask);
+    runtime.activeRun.latestActivity = `已将队列中的 #${index} 插入当前工作，准备优先处理`;
+    this.pushRunTimeline(runtime, `🧭 已将队列中的 #${index} 插入当前任务：${truncate(queuedTask.prompt, 120)}`);
+    this.scheduleRuntimeStateSave(resolved.conversationId, true);
+
+    await message.reply(`已将队列中的 #${index} 插入当前工作，正在中断当前步骤并优先处理这条新提示。`);
+
+    const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
+    await this.refreshRuntimeViews(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
+
+    let activeJob = this.activeJobs.get(resolved.conversationId);
+    if (!activeJob || this.isPendingDetachedJob(activeJob)) {
+      activeJob = await this.waitForControllableJob(resolved.conversationId, 1_500, activeTaskId);
+    }
+
+    if (activeJob) {
+      if (runtime.activeRun?.task.id !== activeTaskId) {
+        return;
+      }
+
+      runtime.activeRun.cancellationReason = 'guidance';
+      this.scheduleRuntimeStateSave(resolved.conversationId, true);
+
+      if (!runtime.activeRun.codexThreadId) {
+        await this.waitForConversationThreadId(resolved.conversationId, 1_500, activeTaskId);
+      }
+
+      if (runtime.activeRun?.task.id !== activeTaskId) {
+        return;
+      }
+
+      activeJob.cancel();
+      return;
+    }
+
+    if (runtime.activeRun?.task.id !== activeTaskId) {
+      return;
+    }
+
+    runtime.activeRun.cancellationReason = 'guidance';
+    runtime.activeRun = undefined;
+    this.scheduleRuntimeStateSave(resolved.conversationId, true);
+    this.startProcessQueue(resolved.conversationId);
   }
 
   private async handleResetCommand(message: Message, resolved: ResolvedConversation | undefined): Promise<void> {
@@ -781,6 +1107,7 @@ export class DiscordCodexBridge {
       runtime.activeRun.cancellationReason = 'reset';
     }
     runtime.queue = [];
+    this.scheduleRuntimeStateSave(resolved.conversationId, true);
     activeJob?.cancel();
 
     const session = await this.resetConversation(resolved.conversationId, resolved.bindingChannelId);
@@ -815,6 +1142,7 @@ export class DiscordCodexBridge {
       runtime.activeRun.task.guidancePrompt = prompt;
       runtime.activeRun.latestActivity = `收到 ${message.author.username} 的中途引导，继续当前轮次`;
       this.pushRunTimeline(runtime, `🧭 收到新的引导：${truncate(prompt, 120)}`);
+      this.scheduleRuntimeStateSave(resolved.conversationId, true);
       await activeJob.steer(prompt);
       await message.react('🧭').catch(() => undefined);
       await message.reply('已将你的新消息作为引导项插入当前工作，Codex 将继续在当前轮次处理中途引导。');
@@ -1771,9 +2099,11 @@ export class DiscordCodexBridge {
       attachmentDir: undefined,
       extraAddDirs: options.extraAddDirs,
       origin: options.origin,
+      priority: 'normal',
     };
 
     runtime.queue.push(task);
+    this.scheduleRuntimeStateSave(channel.id, true);
     const session = await this.store.ensureSession(binding.channelId, channel.id);
     await this.safeRefreshStatusPanel(channel, binding, session, runtime, channel.id !== binding.channelId);
     this.startProcessQueue(channel.id);
@@ -1818,19 +2148,22 @@ export class DiscordCodexBridge {
       attachmentDir: downloaded.attachmentDir,
       extraAddDirs: [],
       origin: 'user',
+      priority: 'normal',
     };
 
     runtime.queue.push(task);
+    this.scheduleRuntimeStateSave(resolved.conversationId, true);
 
     if (runtime.activeRun) {
       if (mode === 'guidance') {
         let activeJob = this.activeJobs.get(resolved.conversationId);
+        const activeTaskId = runtime.activeRun.task.id;
 
         runtime.queue.splice(runtime.queue.length - 1, 1);
         runtime.queue.unshift(task);
         runtime.activeRun.latestActivity = `收到 ${message.author.username} 的中途引导，准备继续原任务`;
-        runtime.activeRun.cancellationReason = 'guidance';
         this.pushRunTimeline(runtime, `🧭 收到新的引导：${truncate(prompt, 120)}`);
+        this.scheduleRuntimeStateSave(resolved.conversationId, true);
 
         await message.react('🧭').catch(() => undefined);
         await message.reply('已将你的新消息作为引导项插入当前工作，正在中断当前步骤，先处理中途引导，再继续原任务。');
@@ -1839,16 +2172,30 @@ export class DiscordCodexBridge {
         await this.refreshRuntimeViews(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
 
         if (!activeJob || this.isPendingDetachedJob(activeJob)) {
-          activeJob = await this.waitForControllableJob(resolved.conversationId);
+          activeJob = await this.waitForControllableJob(resolved.conversationId, 1_500, activeTaskId);
         }
 
         if (activeJob) {
-          if (!runtime.activeRun.codexThreadId) {
-            await this.waitForConversationThreadId(resolved.conversationId);
+          if (runtime.activeRun?.task.id !== activeTaskId) {
+            return;
           }
+
+          runtime.activeRun.cancellationReason = 'guidance';
+          this.scheduleRuntimeStateSave(resolved.conversationId, true);
+
+          if (!runtime.activeRun.codexThreadId) {
+            await this.waitForConversationThreadId(resolved.conversationId, 1_500, activeTaskId);
+          }
+
+          if (runtime.activeRun?.task.id !== activeTaskId) {
+            return;
+          }
+
           activeJob.cancel();
-        } else {
+        } else if (runtime.activeRun?.task.id === activeTaskId) {
+          runtime.activeRun.cancellationReason = 'guidance';
           runtime.activeRun = undefined;
+          this.scheduleRuntimeStateSave(resolved.conversationId, true);
           this.startProcessQueue(resolved.conversationId);
         }
         return;
@@ -1882,6 +2229,7 @@ export class DiscordCodexBridge {
 
     if (!binding) {
       runtime.queue = [];
+      this.scheduleRuntimeStateSave(conversationId, true);
       return;
     }
 
@@ -1891,12 +2239,16 @@ export class DiscordCodexBridge {
       status: 'starting',
       startedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      latestActivity: '准备启动 Codex',
+      latestActivity: task.recovery ? '正在准备自动恢复' : '准备启动 Codex',
       agentMessages: [],
       reasoningSummaries: [],
       planItems: [],
       collabToolCalls: [],
-      timeline: ['⏳ 已收到请求，准备启动 Codex'],
+      timeline: [
+        task.recovery
+          ? `♻️ 检测到任务中断，准备自动恢复：${this.describeRecoveryTask(task)}`
+          : '⏳ 已收到请求，准备启动 Codex',
+      ],
       stderr: [],
       usedResume: false,
       codexThreadId: undefined,
@@ -1907,6 +2259,7 @@ export class DiscordCodexBridge {
     const pendingJob = new PendingRunningCodexJob(preferredDriverMode);
     runtime.activeRun = nextRun;
     this.activeJobs.set(conversationId, pendingJob);
+    this.scheduleRuntimeStateSave(conversationId, true);
 
     const channel = await this.fetchChannel(conversationId);
 
@@ -1914,6 +2267,7 @@ export class DiscordCodexBridge {
       this.activeJobs.delete(conversationId);
       runtime.activeRun = undefined;
       runtime.queue = [];
+      this.scheduleRuntimeStateSave(conversationId, true);
       return;
     }
 
@@ -1930,14 +2284,8 @@ export class DiscordCodexBridge {
       lastPromptBy: task.requestedBy,
     }, task.bindingChannelId);
 
-    const runInput = {
-      prompt: task.effectivePrompt,
-      imagePaths: task.attachments.filter((item) => item.isImage).map((item) => item.localPath),
-      extraAddDirs: [
-        ...task.extraAddDirs,
-        ...(task.attachmentDir ? [task.attachmentDir] : []),
-      ],
-    };
+    let currentTask = task;
+    let runInput = buildRunInputFromTask(currentTask);
     let pendingRecoveryNotice = false;
     const flushPendingRecoveryNotice = async (): Promise<void> => {
       if (!pendingRecoveryNotice) {
@@ -1965,6 +2313,7 @@ export class DiscordCodexBridge {
         runtime.activeRun.codexThreadId = codexThreadId;
         this.pushRunTimeline(runtime, `🧵 Codex 会话已建立：${codexThreadId.slice(0, 8)}`);
         const nextSession = await this.store.updateSession(conversationId, { codexThreadId }, task.bindingChannelId);
+        this.scheduleRuntimeStateSave(conversationId);
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onActivity: async (activity: string) => {
@@ -1977,6 +2326,7 @@ export class DiscordCodexBridge {
         runtime.activeRun.latestActivity = activity;
         this.pushRunTimeline(runtime, `🔄 ${activity}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
+        this.scheduleRuntimeStateSave(conversationId);
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onReasoning: async (reasoning: string) => {
@@ -1991,6 +2341,7 @@ export class DiscordCodexBridge {
         }
 
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
+        this.scheduleRuntimeStateSave(conversationId);
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onTodoListChanged: async (items) => {
@@ -2004,6 +2355,7 @@ export class DiscordCodexBridge {
         runtime.activeRun.latestActivity = `计划进度 ${completed}/${items.length}`;
         this.pushRunTimeline(runtime, `📋 计划进度 ${completed}/${items.length}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
+        this.scheduleRuntimeStateSave(conversationId);
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onCollabToolChanged: async (item) => {
@@ -2016,6 +2368,7 @@ export class DiscordCodexBridge {
         runtime.activeRun.latestActivity = describeCollabToolCall(item);
         this.pushRunTimeline(runtime, `🤝 ${truncate(describeCollabToolCall(item, true), 140)}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
+        this.scheduleRuntimeStateSave(conversationId);
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onAgentMessage: async (agentMessage: string) => {
@@ -2027,6 +2380,7 @@ export class DiscordCodexBridge {
         this.upsertStreamingText(runtime.activeRun.agentMessages, agentMessage);
         runtime.activeRun.latestActivity = '正在生成回答';
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
+        this.scheduleRuntimeStateSave(conversationId);
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onCommandStarted: async (command: string) => {
@@ -2040,6 +2394,7 @@ export class DiscordCodexBridge {
         runtime.activeRun.latestActivity = '正在执行命令';
         this.pushRunTimeline(runtime, `▶️ ${truncate(command, 120)}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
+        this.scheduleRuntimeStateSave(conversationId);
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onCommandCompleted: async (command: string, output: string, exitCode: number | null) => {
@@ -2053,6 +2408,7 @@ export class DiscordCodexBridge {
         runtime.activeRun.latestActivity = exitCode === 0 ? '命令执行完成' : '命令执行失败';
         this.pushRunTimeline(runtime, `${exitCode === 0 ? '✅' : '❌'} ${truncate(command, 120)} (${exitCode ?? 'null'})`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
+        this.scheduleRuntimeStateSave(conversationId);
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onStderr: async (line: string) => {
@@ -2070,6 +2426,7 @@ export class DiscordCodexBridge {
         runtime.activeRun.latestActivity = line;
         this.pushRunTimeline(runtime, `⚠️ ${truncate(line, 140)}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
+        this.scheduleRuntimeStateSave(conversationId);
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onFallbackActivated: async (detail) => {
@@ -2087,6 +2444,7 @@ export class DiscordCodexBridge {
           fallbackActive: true,
           codexThreadId: undefined,
         }, task.bindingChannelId);
+        this.scheduleRuntimeStateSave(conversationId, true);
         await this.sendDriverStatusNotice(
           channel,
           `app-server 不可用，当前请求已切换到 legacy-exec fallback。\n原因：${truncate(detail.reason, 240)}`,
@@ -2107,11 +2465,22 @@ export class DiscordCodexBridge {
 
         if (attemptsUsed > 1 && runtime.activeRun && pendingRetryKind) {
           const retryDescription = this.describeRetry(pendingRetryKind, attemptsUsed - 1);
+          currentTask = buildRecoveryTask(
+            runtime.activeRun,
+            'retry',
+            retryDescription.latestActivity,
+            attemptsUsed - 1,
+          );
+          runInput = buildRunInputFromTask(currentTask);
           this.touchActiveRun(runtime.activeRun);
+          runtime.activeRun.task = currentTask;
           runtime.activeRun.status = 'starting';
           runtime.activeRun.latestActivity = retryDescription.latestActivity;
           runtime.activeRun.currentCommand = undefined;
+          runtime.activeRun.lastCommandOutput = undefined;
           this.pushRunTimeline(runtime, retryDescription.timeline);
+          this.scheduleRuntimeStateSave(conversationId, true);
+          await this.announceRecoveryStart(channel, currentTask);
         }
 
         if (!shouldResumeOnPreferredDriver && attemptSession.codexThreadId) {
@@ -2133,9 +2502,9 @@ export class DiscordCodexBridge {
         currentSession = await this.store.updateSession(conversationId, {
           driver: job.driverMode,
           fallbackActive: startedInFallback,
-        }, task.bindingChannelId);
+        }, currentTask.bindingChannelId);
         pendingRecoveryNotice = Boolean(attemptSession.fallbackActive) && job.driverMode === 'app-server';
-        this.logCodexAttemptStart(binding, task, conversationId, attemptsUsed, job.pid, existingThreadId);
+        this.logCodexAttemptStart(binding, currentTask, conversationId, attemptsUsed, job.pid, existingThreadId);
 
         await channel.sendTyping().catch(() => undefined);
         await this.refreshRuntimeViews(channel, binding, currentSession, runtime, isThreadConversation);
@@ -2144,7 +2513,7 @@ export class DiscordCodexBridge {
         const cancellationReason = runtime.activeRun?.cancellationReason;
         const failureDiagnosis = diagnoseCodexFailure(result, cancellationReason);
 
-        this.logCodexAttemptExit(binding, task, conversationId, attemptsUsed, result, failureDiagnosis.retryable, failureDiagnosis.kind);
+        this.logCodexAttemptExit(binding, currentTask, conversationId, attemptsUsed, result, failureDiagnosis.retryable, failureDiagnosis.kind);
 
         if (failureDiagnosis.retryable && attemptsUsed < MAX_CODEX_ATTEMPTS) {
           pendingRetryKind = failureDiagnosis.kind;
@@ -2162,9 +2531,10 @@ export class DiscordCodexBridge {
               runtime.activeRun.latestActivity = retryDescription.latestActivity;
             }
 
-            nextSession = await this.store.updateSession(conversationId, { codexThreadId: undefined }, task.bindingChannelId);
+            nextSession = await this.store.updateSession(conversationId, { codexThreadId: undefined }, currentTask.bindingChannelId);
           }
 
+          this.scheduleRuntimeStateSave(conversationId, true);
           await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
           continue;
         }
@@ -2178,7 +2548,7 @@ export class DiscordCodexBridge {
       let nextSession = this.store.getSession(conversationId) ?? currentSession;
 
       if (!result.success && failureDiagnosis.retryable) {
-        nextSession = await this.store.updateSession(conversationId, { codexThreadId: undefined }, task.bindingChannelId);
+        nextSession = await this.store.updateSession(conversationId, { codexThreadId: undefined }, currentTask.bindingChannelId);
       }
 
       if (runtime.activeRun) {
@@ -2207,29 +2577,31 @@ export class DiscordCodexBridge {
       }
 
       await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
-      if (!suppressReply && task.origin !== 'autopilot') {
+      this.scheduleRuntimeStateSave(conversationId, true);
+      if (!suppressReply && currentTask.origin !== 'autopilot') {
         await this.safeReplyToOriginalMessage(
           channel,
-          task.messageId,
+          currentTask.messageId,
           result.success
-            ? formatSuccessReply(binding, task.requestedBy, result)
-            : formatFailureReply(binding, task.requestedBy, result),
+            ? formatSuccessReply(binding, currentTask.requestedBy, result)
+            : formatFailureReply(binding, currentTask.requestedBy, result),
         );
       }
 
-      if (task.origin === 'autopilot') {
-        this.activeAutopilotProjects.delete(task.bindingChannelId);
-        await this.finishAutopilotTask(binding, task, result, channel);
+      if (currentTask.origin === 'autopilot') {
+        this.activeAutopilotProjects.delete(currentTask.bindingChannelId);
+        await this.finishAutopilotTask(binding, currentTask, result, channel);
       }
     } finally {
       this.activeJobs.delete(conversationId);
       runtime.activeRun = undefined;
-      await removeAttachmentDir(task.attachmentDir).catch(() => undefined);
+      this.scheduleRuntimeStateSave(conversationId, true);
+      await removeAttachmentDir(currentTask.attachmentDir).catch(() => undefined);
       const nextSession = this.store.getSession(conversationId) ?? currentSession;
       await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
 
-      if (task.origin === 'autopilot') {
-        this.activeAutopilotProjects.delete(task.bindingChannelId);
+      if (currentTask.origin === 'autopilot') {
+        this.activeAutopilotProjects.delete(currentTask.bindingChannelId);
       }
 
       if (runtime.queue.length > 0) {
@@ -2453,11 +2825,20 @@ export class DiscordCodexBridge {
     );
   }
 
-  private async waitForConversationThreadId(conversationId: string, timeoutMs = 1_500): Promise<string | undefined> {
+  private async waitForConversationThreadId(
+    conversationId: string,
+    timeoutMs = 1_500,
+    expectedTaskId?: string,
+  ): Promise<string | undefined> {
     const startedAt = Date.now();
 
     while (Date.now() - startedAt < timeoutMs) {
       const runtime = this.runtimes.get(conversationId);
+
+      if (expectedTaskId && runtime?.activeRun?.task.id !== expectedTaskId) {
+        return undefined;
+      }
+
       const threadId = runtime?.activeRun?.codexThreadId ?? this.store.getSession(conversationId)?.codexThreadId;
 
       if (threadId) {
@@ -2474,10 +2855,20 @@ export class DiscordCodexBridge {
     return job instanceof PendingRunningCodexJob && !job.isAttached();
   }
 
-  private async waitForControllableJob(conversationId: string, timeoutMs = 1_500): Promise<RunningCodexJob | undefined> {
+  private async waitForControllableJob(
+    conversationId: string,
+    timeoutMs = 1_500,
+    expectedTaskId?: string,
+  ): Promise<RunningCodexJob | undefined> {
     const startedAt = Date.now();
 
     while (Date.now() - startedAt < timeoutMs) {
+      const runtime = this.runtimes.get(conversationId);
+
+      if (expectedTaskId && runtime?.activeRun?.task.id !== expectedTaskId) {
+        return undefined;
+      }
+
       const activeJob = this.activeJobs.get(conversationId);
 
       if (activeJob && !this.isPendingDetachedJob(activeJob)) {
@@ -2488,6 +2879,12 @@ export class DiscordCodexBridge {
     }
 
     const activeJob = this.activeJobs.get(conversationId);
+    const runtime = this.runtimes.get(conversationId);
+
+    if (expectedTaskId && runtime?.activeRun?.task.id !== expectedTaskId) {
+      return undefined;
+    }
+
     return this.isPendingDetachedJob(activeJob) ? undefined : activeJob;
   }
 

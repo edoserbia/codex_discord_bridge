@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { FakeChannel, FakeMessage, createUserMessage } from './helpers/fakeDiscord.js';
@@ -20,6 +20,14 @@ async function dispatch(bridge: unknown, message: unknown): Promise<void> {
 
 function findSent(channel: FakeChannel, pattern: RegExp): boolean {
   return channel.sent.some((message) => pattern.test(message.content));
+}
+
+async function readStateFile(rootDir: string): Promise<any> {
+  return JSON.parse(await readFile(path.join(rootDir, 'data', 'state.json'), 'utf8'));
+}
+
+async function writeStateFile(rootDir: string, nextState: any): Promise<void> {
+  await writeFile(path.join(rootDir, 'data', 'state.json'), JSON.stringify(nextState, null, 2), 'utf8');
 }
 
 test('bridge binds a root channel and reuses session on follow-up prompts', { concurrency: false }, async () => {
@@ -1225,6 +1233,249 @@ test('bridge falls back to a fresh session after both fresh-start and resumed re
   assert.ok(session?.codexThreadId);
   assert.ok(!rootChannel.sent.some((message) => /执行失败，exitCode=1 signal=null/.test(message.content)));
   await cleanupDir(rootDir);
+});
+
+test('bridge persists active runtime snapshots while a task is running', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-runtime-persist-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-runtime-persist', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[slow] persist this active run'));
+
+    await waitFor(async () => {
+      const state = await readStateFile(rootDir);
+      const runtime = state.runtimes?.[rootChannel.id];
+      return runtime?.activeRun?.task?.prompt === '[slow] persist this active run';
+    }, 15_000);
+
+    await waitFor(() => findSent(rootChannel, /ok: \[slow\] persist this active run/), 15_000);
+  } finally {
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge restores interrupted work on startup, announces recovery, and prioritizes it before queued prompts', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-startup-recovery-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-recovery-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+  const firstRig = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-startup-recovery', 'guild-1');
+  firstRig.channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(firstRig.bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    const originalMessage = createUserMessage(rootChannel, '[command] interrupted first task');
+    const queuedMessage = createUserMessage(rootChannel, 'second queued task');
+
+    await firstRig.store.updateSession(rootChannel.id, {
+      codexThreadId: 'thread-recover-1',
+      driver: 'legacy-exec',
+    }, rootChannel.id);
+
+    const state = await readStateFile(rootDir);
+    state.runtimes = {
+      [rootChannel.id]: {
+        conversationId: rootChannel.id,
+        queue: [
+          {
+            id: 'queued-normal-task',
+            prompt: 'second queued task',
+            effectivePrompt: 'second queued task',
+            rootPrompt: 'second queued task',
+            rootEffectivePrompt: 'second queued task',
+            requestedBy: queuedMessage.author.username,
+            requestedById: queuedMessage.author.id,
+            messageId: queuedMessage.id,
+            enqueuedAt: '2026-03-21T00:00:01.000Z',
+            bindingChannelId: rootChannel.id,
+            conversationId: rootChannel.id,
+            attachments: [],
+            extraAddDirs: [],
+            origin: 'user',
+          },
+        ],
+        activeRun: {
+          task: {
+            id: 'interrupted-active-task',
+            prompt: '[command] interrupted first task',
+            effectivePrompt: '[command] interrupted first task',
+            rootPrompt: '[command] interrupted first task',
+            rootEffectivePrompt: '[command] interrupted first task',
+            requestedBy: originalMessage.author.username,
+            requestedById: originalMessage.author.id,
+            messageId: originalMessage.id,
+            enqueuedAt: '2026-03-21T00:00:00.000Z',
+            bindingChannelId: rootChannel.id,
+            conversationId: rootChannel.id,
+            attachments: [],
+            extraAddDirs: [],
+            origin: 'user',
+          },
+          driverMode: 'legacy-exec',
+          status: 'running',
+          startedAt: '2026-03-21T00:00:00.000Z',
+          updatedAt: '2026-03-21T00:00:02.000Z',
+          latestActivity: '命令执行完成',
+          currentCommand: '/bin/zsh -lc "ls -la"',
+          lastCommandOutput: 'file-a\nfile-b\n',
+          agentMessages: [],
+          reasoningSummaries: ['先检查仓库状态，再继续原始任务。'],
+          planItems: [
+            { text: 'Inspect files', completed: true },
+            { text: 'Continue task', completed: false },
+          ],
+          collabToolCalls: [],
+          timeline: ['[00:00] 已收到请求', '[00:01] ✅ /bin/zsh -lc "ls -la" (0)'],
+          stderr: [],
+          usedResume: true,
+          codexThreadId: 'thread-recover-1',
+        },
+      },
+    };
+    await writeStateFile(rootDir, state);
+
+    const secondRig = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+    secondRig.channels.set(rootChannel.id, rootChannel);
+
+    await secondRig.bridge.start();
+
+    await waitFor(() => findSent(rootChannel, /检测到上次任务中断/), 15_000);
+    await waitFor(() => findSent(rootChannel, /正在自动恢复/), 15_000);
+    await waitFor(() => findSent(rootChannel, /ok: second queued task/), 15_000);
+
+    const logFiles = (await readdir(logDir)).sort();
+    const payloads = await Promise.all(logFiles.map(async (fileName) => JSON.parse(await readFile(path.join(logDir, fileName), 'utf8')) as {
+      prompt: string;
+      args: { mode: string };
+    }));
+
+    assert.ok(payloads.length >= 2);
+    assert.match(payloads[0]!.prompt, /\[command\] interrupted first task/);
+    assert.match(payloads[0]!.prompt, /不要从头重复已经完成的步骤|继续沿用当前会话里已经获得的上下文/);
+    assert.equal(payloads[1]!.prompt, 'second queued task');
+  } finally {
+    delete process.env.FAKE_CODEX_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge cancels an automatically recovered task with !cancel', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-recovery-cancel-');
+  const workspace = await createWorkspace(rootDir);
+  const firstRig = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-recovery-cancel', 'guild-1');
+  firstRig.channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(firstRig.bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    const originalMessage = createUserMessage(rootChannel, '[cancel] interrupted recovery task');
+
+    await firstRig.store.updateSession(rootChannel.id, {
+      codexThreadId: 'thread-recover-cancel',
+      driver: 'legacy-exec',
+    }, rootChannel.id);
+
+    const state = await readStateFile(rootDir);
+    state.runtimes = {
+      [rootChannel.id]: {
+        conversationId: rootChannel.id,
+        queue: [],
+        activeRun: {
+          task: {
+            id: 'recovery-cancel-task',
+            prompt: '[cancel] interrupted recovery task',
+            effectivePrompt: '[cancel] interrupted recovery task',
+            rootPrompt: '[cancel] interrupted recovery task',
+            rootEffectivePrompt: '[cancel] interrupted recovery task',
+            requestedBy: originalMessage.author.username,
+            requestedById: originalMessage.author.id,
+            messageId: originalMessage.id,
+            enqueuedAt: '2026-03-21T00:00:00.000Z',
+            bindingChannelId: rootChannel.id,
+            conversationId: rootChannel.id,
+            attachments: [],
+            extraAddDirs: [],
+            origin: 'user',
+          },
+          driverMode: 'legacy-exec',
+          status: 'running',
+          startedAt: '2026-03-21T00:00:00.000Z',
+          updatedAt: '2026-03-21T00:00:01.000Z',
+          latestActivity: '正在执行命令',
+          currentCommand: '/bin/echo waiting',
+          agentMessages: [],
+          reasoningSummaries: [],
+          planItems: [],
+          collabToolCalls: [],
+          timeline: ['[00:00] 任务中断'],
+          stderr: [],
+          usedResume: true,
+          codexThreadId: 'thread-recover-cancel',
+        },
+      },
+    };
+    await writeStateFile(rootDir, state);
+
+    const secondRig = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+    secondRig.channels.set(rootChannel.id, rootChannel);
+    await secondRig.bridge.start();
+
+    await waitFor(() => (secondRig.bridge as any).getDashboardData().some((entry: any) => entry.conversations.some((c: any) => c.status === 'running' || c.status === 'starting')), 15_000);
+    await dispatch(secondRig.bridge, createUserMessage(rootChannel, '!cancel', { userId: 'admin-user' }));
+
+    await waitFor(() => findSent(rootChannel, /已发送取消信号给当前 Codex 任务/), 15_000);
+    await waitFor(() => findSent(rootChannel, /执行失败/), 15_000);
+    assert.ok(!findSent(rootChannel, /ok: \[cancel\] interrupted recovery task/));
+  } finally {
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge can insert a queued prompt into the active task with !queue insert', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-queue-insert-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-queue-insert-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-queue-insert', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[slow] first task'));
+    await waitFor(() => (bridge as any).getDashboardData().some((entry: any) => entry.conversations.some((c: any) => c.status === 'running' || c.status === 'starting')), 15_000);
+
+    await dispatch(bridge, createUserMessage(rootChannel, 'second task'));
+    await dispatch(bridge, createUserMessage(rootChannel, 'third task'));
+    await waitFor(() => findSent(rootChannel, /已加入队列/), 15_000);
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!queue insert 2', { userId: 'admin-user' }));
+
+    await waitFor(() => findSent(rootChannel, /插入当前工作|当前工作/), 15_000);
+    await waitFor(() => findSent(rootChannel, /ok: second task/), 15_000);
+    await waitFor(async () => {
+      const files = await readdir(logDir).catch(() => []);
+      return files.length >= 3;
+    }, 15_000);
+
+    const payloads = await Promise.all((await readdir(logDir)).sort().map(async (fileName) => JSON.parse(await readFile(path.join(logDir, fileName), 'utf8')) as {
+      prompt: string;
+      args: { mode: string };
+    }));
+
+    assert.ok(payloads.length >= 3);
+    assert.match(payloads[1]!.prompt, /\[slow\] first task/);
+    assert.match(payloads[1]!.prompt, /third task/);
+    assert.equal(payloads[2]!.prompt, 'second task');
+  } finally {
+    delete process.env.FAKE_CODEX_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
 });
 
 test('bridge downloads attachments and forwards image files to codex -i', { concurrency: false }, async () => {

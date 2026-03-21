@@ -29,7 +29,8 @@ export type ParsedCommand =
   | { kind: 'web' }
   | { kind: 'cancel' }
   | { kind: 'reset' }
-  | { kind: 'queue' };
+  | { kind: 'queue'; action: 'show' }
+  | { kind: 'queue'; action: 'insert'; index: number };
 
 function readValue(tokens: string[], flag: string): string {
   const value = tokens.shift();
@@ -65,6 +66,19 @@ function parseAutopilotParallelism(value: string): number {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw new Error('用法：!autopilot server concurrency <正整数>，例如 1、2、4。');
+  }
+
+  return parsed;
+}
+
+function parseQueueIndex(value: string): number {
+  if (!/^\d+$/.test(value)) {
+    throw new Error('用法：!queue insert <队列序号>，例如 1、2、3。');
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error('用法：!queue insert <队列序号>，例如 1、2、3。');
   }
 
   return parsed;
@@ -226,8 +240,23 @@ export function parseCommand(content: string, prefix: string): ParsedCommand {
       return { kind: 'cancel' };
     case 'reset':
       return { kind: 'reset' };
-    case 'queue':
-      return { kind: 'queue' };
+    case 'queue': {
+      const action = tokens.shift()?.toLowerCase();
+
+      if (!action) {
+        return { kind: 'queue', action: 'show' };
+      }
+
+      if (action === 'insert') {
+        return {
+          kind: 'queue',
+          action: 'insert',
+          index: parseQueueIndex(readValue(tokens, '!queue insert')),
+        };
+      }
+
+      throw new Error('用法：!queue 或 !queue insert <队列序号>');
+    }
     case 'autopilot':
       return parseAutopilotCommand(body);
     case 'bind': {
