@@ -13,6 +13,7 @@ import type {
   RunningAppServerTurn,
 } from './types.js';
 
+import { isIgnorableCodexStderrLine } from './codexDiagnostics.js';
 import { resolveCodexConfigEntries } from './codexRunner.js';
 import { uniqueStrings } from './utils.js';
 
@@ -60,6 +61,8 @@ export class CodexAppServerClient {
   private startPromise: Promise<void> | undefined;
   private driverFailure: Error | undefined;
   private messageChain: Promise<void> = Promise.resolve();
+  private childStderrBuffer = '';
+  private recentChildStderr: string[] = [];
 
   constructor(private readonly config: AppConfig) {}
 
@@ -75,6 +78,8 @@ export class CodexAppServerClient {
 
     this.driverFailure = undefined;
     this.messageChain = Promise.resolve();
+    this.childStderrBuffer = '';
+    this.recentChildStderr = [];
     this.transportMode = resolveAppServerTransport(this.config.codexAppServerTransport, this.config.codexCommand);
 
     const startup = this.startTransport(startupWorkspacePath);
@@ -102,6 +107,8 @@ export class CodexAppServerClient {
     this.started = false;
     this.stdoutBuffer = Buffer.alloc(0);
     this.driverFailure = undefined;
+    this.childStderrBuffer = '';
+    this.recentChildStderr = [];
 
     if (socket) {
       try {
@@ -278,8 +285,8 @@ export class CodexAppServerClient {
       detached: process.platform !== 'win32',
     });
 
-    child.stderr.on('data', () => {
-      // The initial client test contract does not assert stderr handling yet.
+    child.stderr.on('data', (chunk: Buffer | string) => {
+      this.appendChildStderrChunk(chunk);
     });
 
     child.on('error', (error) => {
@@ -327,6 +334,20 @@ export class CodexAppServerClient {
           this.failDriver(new Error('app-server websocket transport error'));
         };
         socket.onclose = () => {
+          const child = this.child;
+          const exitCode = child?.exitCode;
+          const signalCode = child?.signalCode;
+
+          if (typeof exitCode === 'number') {
+            this.failDriver(new Error(`app-server exited with code ${exitCode}`));
+            return;
+          }
+
+          if (typeof signalCode === 'string' && signalCode.trim()) {
+            this.failDriver(new Error(`app-server terminated by ${signalCode}`));
+            return;
+          }
+
           this.failDriver(new Error('app-server websocket transport closed'));
         };
         return;
@@ -599,7 +620,7 @@ export class CodexAppServerClient {
   }
 
   private failDriver(error: unknown): void {
-    const normalized = error instanceof Error ? error : new Error(String(error));
+    const normalized = this.normalizeDriverFailure(error);
     const child = this.child;
     const socket = this.socket;
     this.driverFailure = normalized;
@@ -636,6 +657,50 @@ export class CodexAppServerClient {
     if (child) {
       terminateChild(child);
     }
+  }
+
+  private appendChildStderrChunk(chunk: Buffer | string): void {
+    const text = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+    if (!text) {
+      return;
+    }
+
+    const combined = `${this.childStderrBuffer}${text}`;
+    const lines = combined.split(/\r?\n/);
+    this.childStderrBuffer = lines.pop() ?? '';
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+
+      if (!line || isIgnorableCodexStderrLine(line)) {
+        continue;
+      }
+
+      if (this.recentChildStderr.at(-1) === line) {
+        continue;
+      }
+
+      this.recentChildStderr.push(line);
+    }
+
+    if (this.recentChildStderr.length > 20) {
+      this.recentChildStderr.splice(0, this.recentChildStderr.length - 20);
+    }
+  }
+
+  private normalizeDriverFailure(error: unknown): Error {
+    if (this.childStderrBuffer.trim()) {
+      this.appendChildStderrChunk('\n');
+    }
+
+    const normalized = error instanceof Error ? error : new Error(String(error));
+    const stderrTail = this.recentChildStderr.slice(-3);
+
+    if (stderrTail.length === 0 || stderrTail.some((line) => normalized.message.includes(line))) {
+      return normalized;
+    }
+
+    return new Error(`${normalized.message}: ${stderrTail.join(' | ')}`);
   }
 
   private async flushBufferedTurnEvents(turnId: string): Promise<void> {
@@ -885,15 +950,15 @@ function resolveCommandInvocation(command: string): { command: string; argsPrefi
   };
 }
 
-function resolveAppServerTransport(
+export function resolveAppServerTransport(
   configuredTransport: AppServerTransport | undefined,
-  command: string,
+  _command: string,
 ): Exclude<AppServerTransport, 'auto'> {
   if (configuredTransport === 'stdio' || configuredTransport === 'ws') {
     return configuredTransport;
   }
 
-  return /\.(?:[cm]?js|ts)$/i.test(command) ? 'stdio' : 'ws';
+  return 'stdio';
 }
 
 function parseWebSocketPayload(raw: unknown): Record<string, unknown> | undefined {

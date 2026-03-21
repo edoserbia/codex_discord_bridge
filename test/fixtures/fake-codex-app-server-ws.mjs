@@ -80,6 +80,15 @@ function handle(socket, message) {
         turn: { id: turnId },
       });
 
+      if (prompt.includes('[app-ws-close]')) {
+        process.stderr.write('simulated websocket app-server crash\n');
+        setTimeout(() => {
+          socket.close();
+          server.close(() => process.exit(1));
+        }, 20);
+        return;
+      }
+
       if (prompt.includes('[app-plan]')) {
         notify(socket, 'turn/plan/updated', {
           threadId,

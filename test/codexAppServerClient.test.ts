@@ -6,7 +6,7 @@ import { readdir, readFile, realpath } from 'node:fs/promises';
 import type { AppConfig } from '../src/config.js';
 import type { ChannelBinding } from '../src/types.js';
 
-import { CodexAppServerClient } from '../src/codexAppServerClient.js';
+import { CodexAppServerClient, resolveAppServerTransport } from '../src/codexAppServerClient.js';
 
 import { cleanupDir, createWorkspace, makeTempDir, waitFor } from './helpers/testUtils.js';
 
@@ -451,6 +451,40 @@ test('app-server client can use websocket transport when configured', async () =
     assert.ok(events.includes('turn.started'));
     assert.ok(events.includes('plan.updated'));
     assert.ok(events.includes('turn.completed'));
+  } finally {
+    await client.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('app-server transport auto mode defaults to stdio for the real codex command', () => {
+  assert.equal(resolveAppServerTransport(undefined, 'codex'), 'stdio');
+  assert.equal(resolveAppServerTransport(undefined, '/usr/local/bin/codex'), 'stdio');
+  assert.equal(resolveAppServerTransport(undefined, fakeAppServerCommand), 'stdio');
+  assert.equal(resolveAppServerTransport('ws', 'codex'), 'ws');
+});
+
+test('app-server client preserves recent child stderr when websocket transport closes unexpectedly', async () => {
+  const rootDir = await makeTempDir('codex-app-server-client-ws-close-');
+  const workspace = await createWorkspace(rootDir);
+  const binding = makeBinding(workspace);
+  const config = makeConfig(rootDir, fakeWsAppServerCommand) as AppConfig & {
+    codexAppServerTransport?: 'ws';
+    codexAppServerStartupTimeoutMs?: number;
+  };
+  config.codexAppServerTransport = 'ws';
+  config.codexAppServerStartupTimeoutMs = 500;
+  const client = new CodexAppServerClient(config as AppConfig);
+
+  try {
+    const threadId = await client.ensureThread(binding, undefined);
+    const turn = await client.startTurn(binding, threadId, {
+      prompt: '[app-ws-close] crash after start',
+      imagePaths: [],
+      extraAddDirs: [],
+    });
+
+    await assert.rejects(turn.done, /simulated websocket app-server crash/i);
   } finally {
     await client.stop();
     await cleanupDir(rootDir);
