@@ -1521,6 +1521,43 @@ run_stop() {
 }
 
 run_restart() {
+  local installed_mode=''
+  installed_mode="$(detect_installed_service_mode || true)"
+
+  if [[ -n "${installed_mode}" ]]; then
+    print_header "重启 $(service_mode_label "${installed_mode}")"
+    if has_multiple_installed_service_modes; then
+      print_warn '同时检测到 LaunchAgent 和 LaunchDaemon，属于冲突状态。建议卸载后仅保留一种模式。'
+    fi
+    if [[ "${installed_mode}" == 'daemon' && "${EUID}" -ne 0 ]]; then
+      rerun_with_sudo '重启开机启动 LaunchDaemon' restart
+    fi
+
+    normalize_service_plist_permissions "${installed_mode}"
+    if ! service_is_bootstrapped "${installed_mode}"; then
+      if ! launchctl bootstrap "$(service_domain_for_mode "${installed_mode}")" "$(service_plist_path_for_mode "${installed_mode}")"; then
+        print_warn 'launchd 重启失败，回退到普通后台进程启动；本次运行不会具备 launchd 自动拉起能力。'
+        run_start_manual
+        return 0
+      fi
+    fi
+
+    if ! launchctl kickstart -k "$(service_target_for_mode "${installed_mode}")"; then
+      print_warn 'launchd 原子重启失败，回退到重新加载服务定义。'
+      launchctl bootout "$(service_target_for_mode "${installed_mode}")" >/dev/null 2>&1 || true
+      if ! launchctl bootstrap "$(service_domain_for_mode "${installed_mode}")" "$(service_plist_path_for_mode "${installed_mode}")"; then
+        print_warn 'launchd 重载失败，回退到普通后台进程启动；本次运行不会具备 launchd 自动拉起能力。'
+        run_start_manual
+        return 0
+      fi
+      launchctl kickstart -k "$(service_target_for_mode "${installed_mode}")" >/dev/null 2>&1 || true
+    fi
+
+    sleep 2
+    run_status
+    return 0
+  fi
+
   run_stop
   run_start
 }

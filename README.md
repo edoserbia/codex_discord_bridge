@@ -92,6 +92,8 @@ cd /path/to/codex-discord-bridge
 
 启动脚本会先探测 Discord 直连；如果直连失败，会自动尝试 `http://127.0.0.1:7890`，并把结果写回 `CODEX_DISCORD_BRIDGE_PROXY`。当检测到代理时，脚本还会自动为 Node 注入 `--use-system-ca`；如果系统存在 `/etc/ssl/cert.pem`，也会一并作为额外 CA bundle 注入，处理代理环境下常见的证书链问题。
 
+如果你已经安装了 `LaunchAgent` / `LaunchDaemon`，当前版本的 `restart` 会优先走 `launchctl kickstart -k` 做原子重启，而不是先 `stop` 再 `start`。这样即使重启命令是从 bridge 自己承载的会话里发起，也不会因为先停掉当前服务而把后续 `start` 一并中断。
+
 部署结束后，脚本会继续询问是否安装为 macOS 自启动服务：
 
 - `daemon`：开机启动，适合长期在线
