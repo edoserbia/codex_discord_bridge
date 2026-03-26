@@ -15,6 +15,13 @@ DEFAULT_ALLOWED_ROOTS="$HOME/work,$HOME/projects"
 SECRET_DIR="${HOME}/.codex-tunning"
 SECRET_ENV_FILE="${CODEX_TUNNING_SECRETS_FILE:-${SECRET_DIR}/secrets.env}"
 TOKEN_ENV_KEY='CODEX_TUNNING_DISCORD_BOT_TOKEN'
+BRIDGE_PROXY_ENV_KEY='CODEX_DISCORD_BRIDGE_PROXY'
+BRIDGE_CA_CERT_ENV_KEY='CODEX_DISCORD_BRIDGE_CA_CERT'
+LEGACY_BRIDGE_PROXY_ENV_KEY='OPENCLAW_DISCORD_PROXY'
+LEGACY_BRIDGE_CA_CERT_ENV_KEY='OPENCLAW_DISCORD_CA_CERT'
+DEFAULT_DISCORD_PROXY_CANDIDATE='http://127.0.0.1:7890'
+DEFAULT_DISCORD_PROBE_URL='https://discord.com/api/v10/gateway'
+DEFAULT_DISCORD_PROBE_TIMEOUT_SECONDS='5'
 ENV_CREATED_THIS_RUN=0
 SERVICE_ARG_MODE=''
 SERVICE_ARG_ASSUME_YES=0
@@ -329,12 +336,10 @@ ensure_env_file() {
     print_info '已从 .env.example 创建 .env'
   fi
 
-  local openclaw_proxy web_token
-  openclaw_proxy="$(get_openclaw_field 'channels.discord.proxy')"
+  local web_token
   web_token="$(node -e 'console.log(require("node:crypto").randomBytes(16).toString("hex"))')"
 
   ENV_FILE_PATH="${ENV_FILE}" \
-  OPENCLAW_PROXY="${openclaw_proxy}" \
   DEFAULT_ALLOWED_ROOTS="${DEFAULT_ALLOWED_ROOTS}" \
   GENERATED_WEB_AUTH_TOKEN="${web_token}" \
   node <<'NODE'
@@ -342,8 +347,7 @@ const fs = require('fs');
 const path = process.env.ENV_FILE_PATH;
 const source = fs.readFileSync(path, 'utf8');
 let lines = source.split(/\r?\n/);
-const openclawProxy = process.env.OPENCLAW_PROXY || '';
-  const defaults = new Map([
+const defaults = new Map([
   ['COMMAND_PREFIX', '!'],
   ['DATA_DIR', './data'],
   ['CODEX_COMMAND', 'codex'],
@@ -388,12 +392,6 @@ for (const [key, value] of defaults.entries()) {
   if (placeholderValues.has(existing)) {
     lines[index] = `${key}=${value}`;
   }
-}
-
-if (openclawProxy && !lines.some((line) => line.startsWith('# OPENCLAW_DISCORD_PROXY=')) && !lines.some((line) => line.startsWith('OPENCLAW_DISCORD_PROXY='))) {
-  lines.push('');
-  lines.push('# 仅供 scripts/macos-bridge.sh start / service-run 自动注入到 HTTP_PROXY/HTTPS_PROXY');
-  lines.push(`OPENCLAW_DISCORD_PROXY=${openclawProxy}`);
 }
 
 fs.writeFileSync(path, `${lines.join('\n').replace(/\n+$/,'')}\n`);
@@ -449,6 +447,19 @@ fs.writeFileSync(envPath, `${lines.join('\n').replace(/\n+$/,'')}\n`);
 NODE
 }
 
+read_env_value_first_non_empty() {
+  local key value
+  for key in "$@"; do
+    value="$(read_env_value "${key}" || true)"
+    if [[ -n "${value}" ]]; then
+      printf '%s' "${value}"
+      return 0
+    fi
+  done
+
+  return 0
+}
+
 remove_env_keys() {
   if [[ ! -f "${ENV_FILE}" ]]; then
     return 0
@@ -483,6 +494,123 @@ migrate_project_token_to_secret_env() {
     remove_env_keys 'DISCORD_BOT_TOKEN' 'DISCORD_TOKEN'
     print_info '已从项目 .env 移除内联 Discord Token，避免与其他机器人配置混淆'
   fi
+}
+
+migrate_legacy_bridge_proxy_env_keys() {
+  local current_proxy current_ca legacy_proxy legacy_ca migrated=0
+  current_proxy="$(read_env_value "${BRIDGE_PROXY_ENV_KEY}" || true)"
+  current_ca="$(read_env_value "${BRIDGE_CA_CERT_ENV_KEY}" || true)"
+  legacy_proxy="$(read_env_value "${LEGACY_BRIDGE_PROXY_ENV_KEY}" || true)"
+  legacy_ca="$(read_env_value "${LEGACY_BRIDGE_CA_CERT_ENV_KEY}" || true)"
+
+  if [[ -z "${current_proxy}" && -n "${legacy_proxy}" ]]; then
+    write_env_value "${BRIDGE_PROXY_ENV_KEY}" "${legacy_proxy}"
+    migrated=1
+  fi
+
+  if [[ -z "${current_ca}" && -n "${legacy_ca}" ]]; then
+    write_env_value "${BRIDGE_CA_CERT_ENV_KEY}" "${legacy_ca}"
+    migrated=1
+  fi
+
+  if [[ -n "${legacy_proxy}" || -n "${legacy_ca}" ]]; then
+    remove_env_keys "${LEGACY_BRIDGE_PROXY_ENV_KEY}" "${LEGACY_BRIDGE_CA_CERT_ENV_KEY}"
+    print_info "已将旧代理变量迁移到 ${BRIDGE_PROXY_ENV_KEY} / ${BRIDGE_CA_CERT_ENV_KEY}"
+  elif [[ "${migrated}" == '1' ]]; then
+    print_info "已更新代理配置变量：${BRIDGE_PROXY_ENV_KEY} / ${BRIDGE_CA_CERT_ENV_KEY}"
+  fi
+}
+
+read_bridge_proxy_value() {
+  read_env_value_first_non_empty "${BRIDGE_PROXY_ENV_KEY}" "${LEGACY_BRIDGE_PROXY_ENV_KEY}"
+}
+
+read_bridge_ca_cert_value() {
+  read_env_value_first_non_empty "${BRIDGE_CA_CERT_ENV_KEY}" "${LEGACY_BRIDGE_CA_CERT_ENV_KEY}"
+}
+
+get_bridge_proxy_candidate() {
+  printf '%s' "${CODEX_DISCORD_BRIDGE_PROXY_CANDIDATE:-${DEFAULT_DISCORD_PROXY_CANDIDATE}}"
+}
+
+get_discord_probe_url() {
+  printf '%s' "${CODEX_DISCORD_BRIDGE_PROBE_URL:-${DEFAULT_DISCORD_PROBE_URL}}"
+}
+
+get_discord_probe_timeout_seconds() {
+  printf '%s' "${CODEX_DISCORD_BRIDGE_PROBE_TIMEOUT_SECONDS:-${DEFAULT_DISCORD_PROBE_TIMEOUT_SECONDS}}"
+}
+
+probe_discord_reachability() {
+  local proxy="${1-}"
+  local url timeout
+  local -a cmd
+
+  url="$(get_discord_probe_url)"
+  timeout="$(get_discord_probe_timeout_seconds)"
+  cmd=(
+    curl
+    --silent
+    --show-error
+    --fail
+    --location
+    --output /dev/null
+    --max-time "${timeout}"
+    --connect-timeout "${timeout}"
+  )
+  if [[ -n "${proxy}" ]]; then
+    cmd+=(--proxy "${proxy}")
+  fi
+  cmd+=("${url}")
+
+  env \
+    -u HTTP_PROXY \
+    -u HTTPS_PROXY \
+    -u http_proxy \
+    -u https_proxy \
+    -u ALL_PROXY \
+    -u all_proxy \
+    "${cmd[@]}" >/dev/null 2>&1
+}
+
+persist_bridge_proxy_value() {
+  local desired="${1-}"
+  local current
+  current="$(read_env_value "${BRIDGE_PROXY_ENV_KEY}" || true)"
+  if [[ "${current}" != "${desired}" ]]; then
+    write_env_value "${BRIDGE_PROXY_ENV_KEY}" "${desired}"
+  fi
+}
+
+auto_configure_bridge_proxy() {
+  local current_proxy proxy_candidate
+
+  migrate_legacy_bridge_proxy_env_keys
+  current_proxy="$(read_env_value "${BRIDGE_PROXY_ENV_KEY}" || true)"
+  proxy_candidate="$(get_bridge_proxy_candidate)"
+
+  if probe_discord_reachability; then
+    persist_bridge_proxy_value ''
+    if [[ -n "${current_proxy}" ]]; then
+      print_info '检测到 Discord 可直接访问，已清空 bridge 代理配置'
+    else
+      print_info '检测到 Discord 可直接访问，无需 bridge 代理'
+    fi
+    return 0
+  fi
+
+  if [[ -n "${proxy_candidate}" ]] && probe_discord_reachability "${proxy_candidate}"; then
+    persist_bridge_proxy_value "${proxy_candidate}"
+    if [[ "${current_proxy}" == "${proxy_candidate}" ]]; then
+      print_info "Discord 直连不可达，继续使用 bridge 代理：${proxy_candidate}"
+    else
+      print_info "Discord 直连不可达，已自动设置 bridge 代理：${proxy_candidate}"
+    fi
+    return 0
+  fi
+
+  persist_bridge_proxy_value ''
+  print_warn 'Discord 直连探测失败，7890 代理探测也失败；已保持 bridge 代理为空，请检查网络或本地代理状态'
 }
 
 prompt_env_value() {
@@ -607,8 +735,8 @@ prompt_interactive_configuration() {
   prompt_env_value 'DISCORD_ADMIN_USER_IDS' '你的 Discord 用户 ID（可选，多个用逗号；启用 Developer Mode 后可复制）' '' 0 0 1
   prompt_env_value 'WEB_PORT' 'Web 面板端口' '3769' 1 0 0
   prompt_env_value 'WEB_AUTH_TOKEN' 'Web 面板鉴权 Token（回车保留当前/自动生成值）' "$(read_env_value 'WEB_AUTH_TOKEN' || true)" 0 1 0
-  prompt_env_value 'OPENCLAW_DISCORD_PROXY' 'Discord / 附件下载代理（可选，例如 http://127.0.0.1:7890）' "$(read_env_value 'OPENCLAW_DISCORD_PROXY' || true)" 0 0 1
-  prompt_env_value 'OPENCLAW_DISCORD_CA_CERT' '代理 CA 证书文件（可选；daemon 模式下如遇 TLS 报错可填，例如 ~/.codex-tunning/clash-ca.pem）' "$(read_env_value 'OPENCLAW_DISCORD_CA_CERT' || true)" 0 0 1
+  print_info 'Discord 代理将由脚本在直连与本地 7890 之间自动探测切换。'
+  prompt_env_value "${BRIDGE_CA_CERT_ENV_KEY}" '代理 CA 证书文件（可选；如代理导致 TLS 报错可填，例如 ~/.codex-tunning/clash-ca.pem）' "$(read_bridge_ca_cert_value || true)" 0 0 1
 
   print_info "配置已写入：${ENV_FILE}"
   print_info "Discord Token 已单独写入：${SECRET_ENV_FILE}"
@@ -659,7 +787,7 @@ validate_required_env() {
 
 maybe_export_proxy() {
   local proxy=''
-  proxy="$(read_env_value 'OPENCLAW_DISCORD_PROXY' || true)"
+  proxy="$(read_bridge_proxy_value || true)"
   if [[ -z "${HTTP_PROXY:-}" && -n "${proxy}" ]]; then
     export HTTP_PROXY="${proxy}"
     export http_proxy="${proxy}"
@@ -706,8 +834,8 @@ append_node_option_flag() {
 
 maybe_configure_node_tls() {
   local proxy raw_ca_cert ca_cert
-  proxy="$(read_env_value 'OPENCLAW_DISCORD_PROXY' || true)"
-  raw_ca_cert="$(read_env_value 'OPENCLAW_DISCORD_CA_CERT' || true)"
+  proxy="$(read_bridge_proxy_value || true)"
+  raw_ca_cert="$(read_bridge_ca_cert_value || true)"
 
   if [[ -n "${proxy}" || -n "${raw_ca_cert}" ]]; then
     append_node_option_flag '--use-system-ca'
@@ -1193,8 +1321,8 @@ run_doctor() {
   fi
 
   local proxy raw_ca_cert ca_cert
-  proxy="$(read_env_value 'OPENCLAW_DISCORD_PROXY' || true)"
-  raw_ca_cert="$(read_env_value 'OPENCLAW_DISCORD_CA_CERT' || true)"
+  proxy="$(read_bridge_proxy_value || true)"
+  raw_ca_cert="$(read_bridge_ca_cert_value || true)"
   if [[ -n "${proxy}" ]]; then
     print_info "已配置 Discord 代理：${proxy}"
     print_info '检测到代理时，start / service-run 会自动为 Node 注入 --use-system-ca'
@@ -1207,10 +1335,10 @@ run_doctor() {
     if [[ -f "${ca_cert}" ]]; then
       print_info "已配置额外 CA 证书：${ca_cert}"
     else
-      print_warn "已配置 OPENCLAW_DISCORD_CA_CERT，但文件不存在：${ca_cert}"
+      print_warn "已配置 ${BRIDGE_CA_CERT_ENV_KEY}，但文件不存在：${ca_cert}"
     fi
   elif [[ -n "${proxy}" ]]; then
-    print_info '如代理仍报 unable to get local issuer certificate，可额外设置 OPENCLAW_DISCORD_CA_CERT=/path/to/proxy-ca.pem'
+    print_info "如代理仍报 unable to get local issuer certificate，可额外设置 ${BRIDGE_CA_CERT_ENV_KEY}=/path/to/proxy-ca.pem"
   fi
 
   if [[ -f "$(daemon_plist_path)" ]]; then
@@ -1241,6 +1369,7 @@ run_setup() {
     prompt_interactive_configuration
   fi
 
+  auto_configure_bridge_proxy
   validate_required_env
   augment_launch_path
 
@@ -1273,9 +1402,11 @@ run_service_run() {
   augment_launch_path
   require_command node
   require_command codex
+  require_command curl
   load_secret_env
   ensure_env_file
   migrate_project_token_to_secret_env
+  auto_configure_bridge_proxy
   validate_required_env
   maybe_export_proxy
   maybe_configure_node_tls
@@ -1301,9 +1432,11 @@ run_start_manual() {
   require_command node
   require_command npm
   require_command codex
+  require_command curl
   load_secret_env
   ensure_env_file
   migrate_project_token_to_secret_env
+  auto_configure_bridge_proxy
   validate_required_env
   maybe_export_proxy
   maybe_configure_node_tls
@@ -1700,4 +1833,6 @@ main() {
   esac
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
