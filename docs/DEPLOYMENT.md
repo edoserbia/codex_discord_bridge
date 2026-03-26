@@ -147,7 +147,7 @@ http://127.0.0.1:3769/?token=<YOUR_WEB_AUTH_TOKEN>
 如果 Discord 或附件下载在你的网络环境下不稳定，可以配置：
 
 ```text
-OPENCLAW_DISCORD_PROXY=http://127.0.0.1:7890
+CODEX_DISCORD_BRIDGE_PROXY=http://127.0.0.1:7890
 ```
 
 启动脚本和 launchd 前台入口都会自动注入：
@@ -157,7 +157,7 @@ OPENCLAW_DISCORD_PROXY=http://127.0.0.1:7890
 - `http_proxy`
 - `https_proxy`
 
-当检测到 `OPENCLAW_DISCORD_PROXY` 时，脚本还会自动为 Node 注入：
+当检测到 `CODEX_DISCORD_BRIDGE_PROXY` 时，脚本还会自动为 Node 注入：
 
 - `NODE_OPTIONS=... --use-system-ca`
 - 若系统存在 `/etc/ssl/cert.pem`，额外注入 `NODE_EXTRA_CA_CERTS=/etc/ssl/cert.pem`
@@ -171,7 +171,7 @@ Error: unable to get local issuer certificate
 如果你使用 `LaunchDaemon`，且代理证书只在登录态或某个单独 PEM 中可用，可以进一步配置：
 
 ```text
-OPENCLAW_DISCORD_CA_CERT=/path/to/proxy-ca.pem
+CODEX_DISCORD_BRIDGE_CA_CERT=/path/to/proxy-ca.pem
 ```
 
 脚本会把它注入为 `NODE_EXTRA_CA_CERTS`。
@@ -213,9 +213,9 @@ cat ~/.codex-tunning/secrets.env
 
 如果日志里出现 `unable to get local issuer certificate`，优先检查：
 
-- `.env` 里的 `OPENCLAW_DISCORD_PROXY` 是否正确
+- `.env` 里的 `CODEX_DISCORD_BRIDGE_PROXY` 是否正确
 - 当前版本脚本启动时是否已打印 `已为 Node 启用系统证书信任（--use-system-ca）`
-- 如仍失败，是否需要额外设置 `OPENCLAW_DISCORD_CA_CERT=/path/to/proxy-ca.pem`
+- 如仍失败，是否需要额外设置 `CODEX_DISCORD_BRIDGE_CA_CERT=/path/to/proxy-ca.pem`
 
 ## Discord 仍提示只读时
 

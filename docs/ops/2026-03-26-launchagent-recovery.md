@@ -43,7 +43,7 @@
 最主要的可见问题是：
 
 - LaunchAgent plist 权限异常或 LaunchAgent 状态未正确 bootstrap；
-- 用户“重启服务”后，进程退出，但 launchctl 没有把服务重新挂回去，于是表现为“掉线且启动不起来”。
+- 更关键的是，旧版 `restart` 采用 `stop` 再 `start`。如果重启命令正好是从 bridge 自己承载的 Discord 会话里触发，`stop` 会先把当前 bridge 进程打掉，导致同一条命令链上的后续 `start` 来不及执行，于是就会留下“已安装但未加载”的状态。
 
 ## 已做修复
 
@@ -74,6 +74,16 @@ bash ./scripts/macos-bridge.sh service-status
 对应提交：
 
 - `644194b fix: self-heal launch agent plist permissions on macOS`
+
+### 3. 重启路径修复
+
+后续已把 `restart` 的 launchd 路径改成原子 `launchctl kickstart -k`：
+
+- 如果服务已经由 launchd 加载，直接交给 launchd 杀掉并立即拉起；
+- 如果服务 plist 还在但当前未加载，先 `bootstrap` 再 `kickstart`；
+- 只有未安装 launchd 服务时，才继续保留原来的 `stop` + `start` 行为。
+
+这样重启动作不再依赖“先把自己停掉之后还能继续执行后半段脚本”。
 
 ## 如何再次确认服务健康
 

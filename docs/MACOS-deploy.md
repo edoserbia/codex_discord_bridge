@@ -127,6 +127,8 @@ Error: unable to get local issuer certificate
 CODEX_DISCORD_BRIDGE_CA_CERT=/path/to/proxy-ca.pem
 ```
 
+如果你已经安装了 `LaunchAgent` / `LaunchDaemon`，当前版本的 `./scripts/macos-bridge.sh restart` 会优先使用 `launchctl kickstart -k` 做原子重启，而不是先停掉当前服务再重新拉起。这样可以避免从 bridge 自己的会话里执行重启时，`stop` 把当前会话和后续 `start` 一起中断。
+
 ### 6. OpenClaw 配置（可选）
 
 如果你的机器上已存在：

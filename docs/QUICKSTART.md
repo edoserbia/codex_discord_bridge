@@ -28,13 +28,13 @@ cd /path/to/codex-discord-bridge
 - `DISCORD_ADMIN_USER_IDS`
 - `WEB_PORT`
 - `WEB_AUTH_TOKEN`
-- `OPENCLAW_DISCORD_PROXY`（可选）
+- `CODEX_DISCORD_BRIDGE_PROXY`（自动探测，通常无需手填）
 
 其中：
 
 - Discord Bot Token 会单独写入 `~/.codex-tunning/secrets.env`
 - 不会写入项目 `.env`
-- 如果本机存在 `~/.openclaw/openclaw.json`，脚本会优先尝试自动导入其中可识别的 Discord Token / 代理
+- 如果本机存在 `~/.openclaw/openclaw.json`，脚本会优先尝试自动导入其中可识别的 Discord Token
 - 默认会把 `DEFAULT_CODEX_SANDBOX` 设为 `danger-full-access`
 
 如果你希望立即安装为自启动服务，也可以直接执行：
@@ -201,10 +201,10 @@ sudo ./scripts/install-service.sh --mode daemon
 
 ### 网络需要代理
 
-在交互配置里填写：
+脚本会先直连探测 Discord；如果失败，会自动回退到本地 `7890` 代理并把结果写入：
 
 ```text
-OPENCLAW_DISCORD_PROXY=http://127.0.0.1:7890
+CODEX_DISCORD_BRIDGE_PROXY=http://127.0.0.1:7890
 ```
 
 脚本会在启动时自动注入 `HTTP_PROXY` / `HTTPS_PROXY`，并自动为 Node 启用 `--use-system-ca`；如果系统存在 `/etc/ssl/cert.pem`，也会自动把它作为额外 CA bundle 注入。
@@ -218,5 +218,5 @@ Error: unable to get local issuer certificate
 通常是 `daemon` 模式拿不到代理证书链。把代理根证书导出成 PEM 后，在 `.env` 里补一行：
 
 ```text
-OPENCLAW_DISCORD_CA_CERT=/path/to/proxy-ca.pem
+CODEX_DISCORD_BRIDGE_CA_CERT=/path/to/proxy-ca.pem
 ```
