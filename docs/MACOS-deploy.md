@@ -108,10 +108,10 @@ http://127.0.0.1:7890
 部署脚本会把它写入：
 
 ```text
-OPENCLAW_DISCORD_PROXY
+CODEX_DISCORD_BRIDGE_PROXY
 ```
 
-并在启动时自动注入 `HTTP_PROXY` / `HTTPS_PROXY`。
+并在启动时自动注入 `HTTP_PROXY` / `HTTPS_PROXY`。脚本现在会先直连探测 Discord；只有直连失败时，才会自动尝试 `http://127.0.0.1:7890` 并把结果写回这个变量。
 
 如果你在代理环境下启动时看到：
 
@@ -119,12 +119,12 @@ OPENCLAW_DISCORD_PROXY
 Error: unable to get local issuer certificate
 ```
 
-当前脚本会在检测到 `OPENCLAW_DISCORD_PROXY` 时自动为 Node 注入 `--use-system-ca`；如果系统存在 `/etc/ssl/cert.pem`，也会把它作为额外 CA bundle 注入。这通常足够让服务信任 macOS 已信任的代理根证书。
+当前脚本会在检测到 `CODEX_DISCORD_BRIDGE_PROXY` 时自动为 Node 注入 `--use-system-ca`；如果系统存在 `/etc/ssl/cert.pem`，也会把它作为额外 CA bundle 注入。这通常足够让服务信任 macOS 已信任的代理根证书。
 
 如果你使用的是 `daemon` 模式，且证书只存在于登录用户上下文，仍可能需要把代理根证书导出成 PEM，并在 `.env` 中额外设置：
 
 ```text
-OPENCLAW_DISCORD_CA_CERT=/path/to/proxy-ca.pem
+CODEX_DISCORD_BRIDGE_CA_CERT=/path/to/proxy-ca.pem
 ```
 
 ### 6. OpenClaw 配置（可选）
@@ -240,7 +240,7 @@ cd /path/to/codex-discord-bridge
 
 建议保留，避免本机 Web 面板裸奔。
 
-### `OPENCLAW_DISCORD_PROXY`
+### `CODEX_DISCORD_BRIDGE_PROXY`
 
 如果你访问 Discord 需要代理，这里填写：
 
@@ -319,7 +319,7 @@ cd <你的仓库目录名>
 - `DISCORD_ADMIN_USER_IDS`
 - `WEB_PORT`
 - `WEB_AUTH_TOKEN`
-- `OPENCLAW_DISCORD_PROXY`（可选）
+- `CODEX_DISCORD_BRIDGE_PROXY`（自动探测，通常无需手填）
 
 建议这样理解：
 
@@ -328,7 +328,7 @@ cd <你的仓库目录名>
 - `DISCORD_ADMIN_USER_IDS`：你的 Discord 用户 ID，可选但建议填写
 - `WEB_PORT`：本地管理面板端口，默认 `3769`
 - `WEB_AUTH_TOKEN`：本机 Web 管理面板鉴权 token，建议保留
-- `OPENCLAW_DISCORD_PROXY`：如果这台新机器访问 Discord 不稳定，就填 `http://127.0.0.1:7890`
+- `CODEX_DISCORD_BRIDGE_PROXY`：脚本会自动探测并在需要时写成 `http://127.0.0.1:7890`
 
 ### 5. 选择是否安装成自启动服务
 
@@ -437,7 +437,7 @@ npm run build
 ./scripts/macos-bridge.sh restart
 ```
 
-然后把 `OPENCLAW_DISCORD_PROXY` 配成：
+然后确认 `CODEX_DISCORD_BRIDGE_PROXY` 已自动写成：
 
 ```text
 http://127.0.0.1:7890
@@ -768,6 +768,11 @@ Web 面板可以用来：
 
 ## 十三、常见问题
 
+如果你遇到“LaunchAgent 已安装，但 `launchctl：未加载` / 服务重启后起不来”的情况，优先参考：
+
+- `docs/ops/2026-03-26-launchagent-recovery.md`
+
+
 ### 1. 机器人离线
 
 ```bash
@@ -811,7 +816,7 @@ npm run build
 优先检查网络和代理。必要时配置：
 
 ```text
-OPENCLAW_DISCORD_PROXY=http://127.0.0.1:7890
+CODEX_DISCORD_BRIDGE_PROXY=http://127.0.0.1:7890
 ```
 
 ### 5. 想改配置怎么办

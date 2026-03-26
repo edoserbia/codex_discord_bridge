@@ -86,11 +86,11 @@ cd /path/to/codex-discord-bridge
 - `DISCORD_ADMIN_USER_IDS`
 - `WEB_PORT`
 - `WEB_AUTH_TOKEN`
-- `OPENCLAW_DISCORD_PROXY`（可选）
+- `CODEX_DISCORD_BRIDGE_PROXY`（自动探测，可选保留为空）
 
 其中 Discord Bot Token 会单独保存到 `~/.codex-tunning/secrets.env`，不会写入项目 `.env`。
 
-如果配置了 `OPENCLAW_DISCORD_PROXY`，启动脚本会自动为 Node 注入 `--use-system-ca`；如果系统存在 `/etc/ssl/cert.pem`，也会一并作为额外 CA bundle 注入，处理代理环境下常见的证书链问题。
+启动脚本会先探测 Discord 直连；如果直连失败，会自动尝试 `http://127.0.0.1:7890`，并把结果写回 `CODEX_DISCORD_BRIDGE_PROXY`。当检测到代理时，脚本还会自动为 Node 注入 `--use-system-ca`；如果系统存在 `/etc/ssl/cert.pem`，也会一并作为额外 CA bundle 注入，处理代理环境下常见的证书链问题。
 
 部署结束后，脚本会继续询问是否安装为 macOS 自启动服务：
 
@@ -384,18 +384,18 @@ http://127.0.0.1:3769/?token=<YOUR_WEB_AUTH_TOKEN>
 | `DEFAULT_CODEX_SEARCH` | 默认是否开启搜索 |
 | `WEB_PORT` | Web 面板端口，默认 `3769` |
 | `WEB_AUTH_TOKEN` | Web 面板鉴权 token |
-| `OPENCLAW_DISCORD_PROXY` | Discord / 附件下载所用代理，例如 `http://127.0.0.1:7890` |
-| `OPENCLAW_DISCORD_CA_CERT` | 代理 CA 证书 PEM 文件；当 `daemon` 模式下代理导致 TLS 报错时可显式指定 |
+| `CODEX_DISCORD_BRIDGE_PROXY` | Bridge 自己的 Discord / 附件下载代理。`setup` / `start` / `service-run` 会自动在直连和 `http://127.0.0.1:7890` 之间探测并回写这个值 |
+| `CODEX_DISCORD_BRIDGE_CA_CERT` | 代理 CA 证书 PEM 文件；当代理导致 TLS 报错时可显式指定 |
 | `OPENCLAW_CONFIG_PATH` | OpenClaw 配置路径，默认 `~/.openclaw/openclaw.json` |
 
 完整示例见 `.env.example`。
 
-如果设置了 `OPENCLAW_DISCORD_PROXY`，启动脚本会自动为 Node 注入 `--use-system-ca`，并在系统存在 `/etc/ssl/cert.pem` 时把它作为额外 CA bundle 注入，以兼容 macOS 上已信任的本地代理根证书。
+如果设置了 `CODEX_DISCORD_BRIDGE_PROXY`，启动脚本会自动为 Node 注入 `--use-system-ca`，并在系统存在 `/etc/ssl/cert.pem` 时把它作为额外 CA bundle 注入，以兼容 macOS 上已信任的本地代理根证书。
 
 如果仍然出现 `unable to get local issuer certificate`，通常是 `LaunchDaemon` 拿不到登录会话里的证书链。此时请把代理根证书导出为 PEM，并设置：
 
 ```text
-OPENCLAW_DISCORD_CA_CERT=/path/to/proxy-ca.pem
+CODEX_DISCORD_BRIDGE_CA_CERT=/path/to/proxy-ca.pem
 ```
 
 ## 文档
@@ -428,6 +428,11 @@ npm run smoke:discord
 - 若你不希望 Discord 中的 Codex 默认拥有写权限，可将 `DEFAULT_CODEX_SANDBOX` 改回 `workspace-write` 或 `read-only`
 
 ## 故障排查
+
+如果你遇到“服务已安装但 launchctl 未加载 / 进程未运行”的情况，先看：
+
+- `docs/ops/2026-03-26-launchagent-recovery.md`
+
 
 ### Discord 里明明绑定了高权限，但仍提示只读
 
