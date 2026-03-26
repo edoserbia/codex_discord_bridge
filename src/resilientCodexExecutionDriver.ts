@@ -1,6 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
-
 import type { AppConfig } from './config.js';
 import type { ChannelBinding, CodexRunInput, CodexRunResult } from './types.js';
 import type { CodexExecutionDriver, CodexRunHooks, RunningCodexJob } from './codexRunner.js';
@@ -23,35 +20,6 @@ export class ResilientCodexExecutionDriver implements CodexExecutionDriver {
     existingThreadId: string | undefined,
     hooks: CodexRunHooks = {},
   ): RunningCodexJob {
-    const skipGitFallbackReason = getSkipGitRepoFallbackReason(binding);
-    if (skipGitFallbackReason) {
-      const fallbackGate = Promise.resolve(
-        hooks.onFallbackActivated?.({
-          from: 'app-server',
-          to: 'legacy-exec',
-          reason: skipGitFallbackReason,
-        }),
-      ).catch(() => undefined);
-      const gatedHooks = gateHooksAfterFallbackNotice(hooks, fallbackGate);
-      const legacyJob = this.legacyRunner.start(binding, input, undefined, gatedHooks);
-
-      return {
-        get pid() {
-          return legacyJob.pid;
-        },
-        get driverMode() {
-          return legacyJob.driverMode;
-        },
-        get steer() {
-          return legacyJob.steer;
-        },
-        cancel: () => {
-          legacyJob.cancel();
-        },
-        done: legacyJob.done,
-      };
-    }
-
     let currentJob!: RunningCodexJob;
     let cancelled = false;
     let pendingThreadId: string | undefined;
@@ -166,35 +134,6 @@ export class ResilientCodexExecutionDriver implements CodexExecutionDriver {
 
   async stop(): Promise<void> {
     await this.appServerRunner.stop?.();
-  }
-}
-
-function getSkipGitRepoFallbackReason(binding: ChannelBinding): string | undefined {
-  if (!binding.codex.skipGitRepoCheck) {
-    return undefined;
-  }
-
-  if (isInsideGitRepo(binding.workspacePath)) {
-    return undefined;
-  }
-
-  return 'workspace is outside a Git repository and app-server has no documented skipGitRepoCheck equivalent';
-}
-
-function isInsideGitRepo(workspacePath: string): boolean {
-  let currentPath = path.resolve(workspacePath);
-
-  while (true) {
-    if (fs.existsSync(path.join(currentPath, '.git'))) {
-      return true;
-    }
-
-    const parentPath = path.dirname(currentPath);
-    if (parentPath === currentPath) {
-      return false;
-    }
-
-    currentPath = parentPath;
   }
 }
 

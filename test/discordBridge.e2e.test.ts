@@ -628,7 +628,7 @@ test('bridge falls back to queued guidance instead of native steer after the act
   }
 });
 
-test('bridge preemptively falls back outside git repos when skipGitRepoCheck is enabled in app-server mode', { concurrency: false }, async () => {
+test('bridge keeps app-server active outside git repos when skipGitRepoCheck is enabled', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-app-server-non-git-fallback-');
   const workspace = await createWorkspace(rootDir, { git: false });
   const logDir = path.join(rootDir, 'fake-app-server-non-git-logs');
@@ -645,15 +645,16 @@ test('bridge preemptively falls back outside git repos when skipGitRepoCheck is 
     await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
     await dispatch(bridge, createUserMessage(rootChannel, 'first prompt'));
 
-    await waitFor(() => rootChannel.sent.some((message) => /\[\d{2}:\d{2}\].*legacy-exec.*fallback/i.test(message.content)), 15_000);
-    await waitFor(() => rootChannel.sent.some((message) => /ok: first prompt/.test(message.content)), 15_000);
+    await waitFor(() => rootChannel.sent.some((message) => /app-server ok: first prompt/.test(message.content)), 15_000);
 
     const session = store.getSession(rootChannel.id);
-    assert.equal(session?.driver, 'legacy-exec');
-    assert.equal(session?.fallbackActive, true);
+    assert.equal(session?.driver, 'app-server');
+    assert.notEqual(session?.fallbackActive, true);
+
+    assert.ok(!rootChannel.sent.some((message) => /\[\d{2}:\d{2}\].*legacy-exec.*fallback/i.test(message.content)));
 
     const appServerLogs = await readdir(logDir).catch(() => []);
-    assert.equal(appServerLogs.length, 0);
+    assert.ok(appServerLogs.length > 0);
   } finally {
     await (bridge as any).stop?.();
     delete process.env.FAKE_CODEX_APP_SERVER_LOG_DIR;
