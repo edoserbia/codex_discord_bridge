@@ -816,6 +816,20 @@ service_target_for_mode() {
   printf '%s/%s' "$(service_domain_for_mode "$1")" "${SERVICE_LABEL}"
 }
 
+normalize_service_plist_permissions() {
+  local mode="$1"
+  local plist_path
+  plist_path="$(service_plist_path_for_mode "${mode}")"
+
+  if [[ ! -f "${plist_path}" ]]; then
+    return 0
+  fi
+
+  if [[ "${mode}" == 'agent' ]]; then
+    chmod 644 "${plist_path}" 2>/dev/null || true
+  fi
+}
+
 detect_installed_service_mode() {
   if [[ -f "$(agent_plist_path)" ]]; then
     printf 'agent'
@@ -1106,6 +1120,7 @@ install_launchd_mode() {
     install -m 644 "${temp_plist}" "${plist_path}"
   fi
 
+  normalize_service_plist_permissions "${mode}"
   launchctl bootout "$(service_target_for_mode "${mode}")" >/dev/null 2>&1 || true
   launchctl bootstrap "$(service_domain_for_mode "${mode}")" "${plist_path}"
   launchctl kickstart -k "$(service_target_for_mode "${mode}")" >/dev/null 2>&1 || true
@@ -1334,6 +1349,7 @@ run_start() {
       rerun_with_sudo '启动开机启动 LaunchDaemon' start
     fi
 
+    normalize_service_plist_permissions "${installed_mode}"
     launchctl bootout "$(service_target_for_mode "${installed_mode}")" >/dev/null 2>&1 || true
     if ! launchctl bootstrap "$(service_domain_for_mode "${installed_mode}")" "$(service_plist_path_for_mode "${installed_mode}")"; then
       print_warn 'launchd 启动失败，回退到普通后台进程启动；本次运行不会具备 launchd 自动拉起能力。'
@@ -1399,6 +1415,7 @@ run_service_status() {
   fi
 
   if [[ -f "$(agent_plist_path)" ]]; then
+    normalize_service_plist_permissions agent
     print_info "已安装：$(service_mode_label agent)"
     print_info "plist：$(agent_plist_path)"
     if service_is_bootstrapped agent; then
