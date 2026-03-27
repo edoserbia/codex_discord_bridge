@@ -42,6 +42,22 @@ test('parse queue insert command', () => {
   });
 });
 
+test('parse sendfile command with a workspace path', () => {
+  const parsed = parseCommand('!sendfile report.pdf', '!');
+  assert.deepEqual(parsed, {
+    kind: 'sendfile',
+    request: 'report.pdf',
+  });
+});
+
+test('parse sendfile command with a numbered candidate selection', () => {
+  const parsed = parseCommand('!sendfile 2', '!');
+  assert.deepEqual(parsed, {
+    kind: 'sendfile',
+    index: 2,
+  });
+});
+
 test('reject unknown flag', () => {
   assert.throws(() => parseCommand('!bind api /tmp --unknown nope', '!'), /未知参数/);
 });
