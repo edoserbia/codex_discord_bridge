@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { FakeChannel, FakeMessage, createUserMessage } from './helpers/fakeDiscord.js';
@@ -20,6 +20,23 @@ async function dispatch(bridge: unknown, message: unknown): Promise<void> {
 
 function findSent(channel: FakeChannel, pattern: RegExp): boolean {
   return channel.sent.some((message) => pattern.test(message.content));
+}
+
+function findSentFile(channel: FakeChannel, pattern?: RegExp): boolean {
+  return channel.sent.some((message) => {
+    if (message.sentFiles.length === 0) {
+      return false;
+    }
+
+    if (!pattern) {
+      return true;
+    }
+
+    return message.sentFiles.some((file) => {
+      const value = typeof file === 'string' ? file : `${file.name ?? ''} ${file.attachment}`;
+      return pattern.test(value);
+    });
+  });
 }
 
 async function readStateFile(rootDir: string): Promise<any> {
@@ -1389,7 +1406,8 @@ test('bridge restores interrupted work on startup, announces recovery, and prior
     assert.ok(payloads.length >= 2);
     assert.match(payloads[0]!.prompt, /\[command\] interrupted first task/);
     assert.match(payloads[0]!.prompt, /不要从头重复已经完成的步骤|继续沿用当前会话里已经获得的上下文/);
-    assert.equal(payloads[1]!.prompt, 'second queued task');
+    assert.match(payloads[1]!.prompt, /^second queued task(?:\n|$)/);
+    assert.match(payloads[1]!.prompt, /BRIDGE_SEND_FILE/);
   } finally {
     delete process.env.FAKE_CODEX_LOG_DIR;
     await cleanupDir(rootDir);
@@ -1503,7 +1521,8 @@ test('bridge can insert a queued prompt into the active task with !queue insert'
     assert.ok(payloads.length >= 3);
     assert.match(payloads[1]!.prompt, /\[slow\] first task/);
     assert.match(payloads[1]!.prompt, /third task/);
-    assert.equal(payloads[2]!.prompt, 'second task');
+    assert.match(payloads[2]!.prompt, /^second task(?:\n|$)/);
+    assert.match(payloads[2]!.prompt, /BRIDGE_SEND_FILE/);
   } finally {
     delete process.env.FAKE_CODEX_LOG_DIR;
     await cleanupDir(rootDir);
@@ -1548,9 +1567,186 @@ test('bridge downloads attachments and forwards image files to codex -i', { conc
     assert.ok(payload.args.addDirs.length >= 1);
     assert.match(payload.prompt, /note\.txt/);
     assert.match(payload.prompt, /pic\.png/);
+    assert.equal(await readFile(path.join(workspace, 'inbox', 'note.txt'), 'utf8'), 'hello attachment');
+    assert.deepEqual(
+      await readFile(path.join(workspace, 'inbox', 'pic.png')),
+      Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+    );
   } finally {
     delete process.env.FAKE_CODEX_LOG_DIR;
     await staticServer.close();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge send file flow returns a workspace file to Discord for a natural-language request', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-send-file-');
+  const workspace = await createWorkspace(rootDir);
+  const reportPath = path.join(workspace, 'report.pdf');
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-send-file', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await writeFile(reportPath, 'pdf payload', 'utf8');
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+
+    await dispatch(bridge, createUserMessage(rootChannel, '把 report.pdf 发给我'));
+    await waitFor(() => findSentFile(rootChannel, /report\.pdf/), 3_000);
+  } finally {
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge lists numbered candidates instead of auto-sending when multiple files match', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-send-file-candidates-');
+  const workspace = await createWorkspace(rootDir);
+  const inboxDir = path.join(workspace, 'inbox');
+  const exportDir = path.join(workspace, 'exports');
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-send-file-candidates', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await mkdir(inboxDir, { recursive: true });
+    await mkdir(exportDir, { recursive: true });
+    await writeFile(path.join(inboxDir, 'report.pdf'), 'inbox payload', 'utf8');
+    await writeFile(path.join(exportDir, 'report.pdf'), 'export payload', 'utf8');
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+
+    await dispatch(bridge, createUserMessage(rootChannel, '把 report.pdf 发给我'));
+    await waitFor(() => findSent(rootChannel, /找到多个匹配文件|发第 2 个|!sendfile 2/), 3_000);
+    assert.equal(findSentFile(rootChannel, /report\.pdf/), false);
+  } finally {
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge sends the chosen candidate after a numbered follow-up', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-send-file-select-');
+  const workspace = await createWorkspace(rootDir);
+  const inboxDir = path.join(workspace, 'inbox');
+  const exportDir = path.join(workspace, 'exports');
+  const exportFile = path.join(exportDir, 'report.pdf');
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-send-file-select', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await mkdir(inboxDir, { recursive: true });
+    await mkdir(exportDir, { recursive: true });
+    await writeFile(path.join(inboxDir, 'report.pdf'), 'inbox payload', 'utf8');
+    await writeFile(exportFile, 'export payload', 'utf8');
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+
+    await dispatch(bridge, createUserMessage(rootChannel, '把 report.pdf 发给我'));
+    await waitFor(() => findSent(rootChannel, /找到多个匹配文件|发第 2 个|!sendfile 2/), 3_000);
+
+    await dispatch(bridge, createUserMessage(rootChannel, '发第 2 个'));
+    await waitFor(() => findSentFile(rootChannel, /report\.pdf/), 3_000);
+    assert.ok(rootChannel.sent.some((message) => message.sentFiles.some((file) => {
+      const value = typeof file === 'string' ? file : file.attachment;
+      return value.endsWith(path.join('exports', 'report.pdf'));
+    })));
+  } finally {
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge sendfile command returns a workspace file to Discord', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-sendfile-command-');
+  const workspace = await createWorkspace(rootDir);
+  const reportPath = path.join(workspace, 'report.pdf');
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-sendfile-command', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await writeFile(reportPath, 'pdf payload', 'utf8');
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!sendfile report.pdf'));
+    await waitFor(() => findSentFile(rootChannel, /report\.pdf/), 3_000);
+  } finally {
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge sendfile command can select a numbered candidate', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-sendfile-select-command-');
+  const workspace = await createWorkspace(rootDir);
+  const inboxDir = path.join(workspace, 'inbox');
+  const exportDir = path.join(workspace, 'exports');
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-sendfile-select-command', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await mkdir(inboxDir, { recursive: true });
+    await mkdir(exportDir, { recursive: true });
+    await writeFile(path.join(inboxDir, 'report.pdf'), 'inbox payload', 'utf8');
+    await writeFile(path.join(exportDir, 'report.pdf'), 'export payload', 'utf8');
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+
+    await dispatch(bridge, createUserMessage(rootChannel, '把 report.pdf 发给我'));
+    await waitFor(() => findSent(rootChannel, /找到多个匹配文件|发第 2 个|!sendfile 2/), 3_000);
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!sendfile 2'));
+    await waitFor(() => findSentFile(rootChannel, /report\.pdf/), 3_000);
+    assert.ok(rootChannel.sent.some((message) => message.sentFiles.some((file) => {
+      const value = typeof file === 'string' ? file : file.attachment;
+      return value.endsWith(path.join('exports', 'report.pdf'));
+    })));
+  } finally {
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge can upload a file requested by a Codex file-send marker', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-codex-send-file-');
+  const workspace = await createWorkspace(rootDir);
+  const reportPath = path.join(workspace, 'report.pdf');
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-codex-send-file', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await writeFile(reportPath, 'pdf payload', 'utf8');
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+
+    await dispatch(bridge, createUserMessage(rootChannel, '[bridge-send-file] generate and deliver the report'));
+    await waitFor(() => findSentFile(rootChannel, /report\.pdf/), 3_000);
+  } finally {
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge prompt includes the Codex file-send protocol instructions', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-file-send-prompt-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-codex-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-file-send-prompt', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '生成 report.pdf 然后发给我'));
+    await waitFor(() => findSent(rootChannel, /ok: 生成 report\.pdf 然后发给我/), 3_000);
+
+    const logFiles = await readdir(logDir);
+    assert.ok(logFiles.length > 0);
+    const latestLog = logFiles.sort().at(-1)!;
+    const payload = JSON.parse(await readFile(path.join(logDir, latestLog), 'utf8')) as {
+      prompt: string;
+    };
+
+    assert.match(payload.prompt, /BRIDGE_SEND_FILE/);
+    assert.match(payload.prompt, /如果用户要求把文件发回 Discord/);
+  } finally {
+    delete process.env.FAKE_CODEX_LOG_DIR;
     await cleanupDir(rootDir);
   }
 });

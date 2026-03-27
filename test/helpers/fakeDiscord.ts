@@ -1,5 +1,14 @@
 import { randomUUID } from 'node:crypto';
 
+export type FakeSentFile = string | { attachment: string; name?: string };
+
+type FakeOutgoingPayload =
+  | string
+  | {
+    content?: string;
+    files?: FakeSentFile[];
+  };
+
 export class FakePermissions {
   constructor(private readonly admin: boolean) {}
 
@@ -52,14 +61,16 @@ export class FakeChannel {
     return this.thread;
   }
 
-  async send(content: string): Promise<any> {
+  async send(payload: FakeOutgoingPayload): Promise<any> {
+    const normalized = normalizeOutgoingPayload(payload);
     const message = new FakeMessage({
       id: randomUUID(),
-      content,
+      content: normalized.content,
       channel: this,
       guildId: this.guildId,
       author: { id: 'bot', username: 'bot', bot: true },
       admin: true,
+      sentFiles: normalized.files,
     });
     this.store.set(message.id, message);
     this.sent.push(message);
@@ -95,6 +106,7 @@ interface FakeMessageInit {
   author: { id: string; username: string; bot: boolean };
   admin: boolean;
   attachments?: Map<string, any>;
+  sentFiles?: FakeSentFile[];
 }
 
 export class FakeMessage {
@@ -107,6 +119,7 @@ export class FakeMessage {
   public readonly author: { id: string; username: string; bot: boolean };
   public readonly member: { permissions: FakePermissions };
   public readonly attachments: Map<string, any>;
+  public readonly sentFiles: FakeSentFile[];
   public readonly reactions: string[] = [];
   public pinned = false;
 
@@ -119,11 +132,12 @@ export class FakeMessage {
     this.author = init.author;
     this.member = { permissions: new FakePermissions(init.admin) };
     this.attachments = init.attachments ?? new Map();
+    this.sentFiles = init.sentFiles ?? [];
     init.channel.addExistingMessage(this);
   }
 
-  async reply(content: string): Promise<any> {
-    return this.channel.send(content);
+  async reply(payload: FakeOutgoingPayload): Promise<any> {
+    return this.channel.send(payload);
   }
 
   async react(emoji: string): Promise<void> {
@@ -163,4 +177,18 @@ export function createUserMessage(
     admin: options.admin ?? true,
     attachments: options.attachments,
   });
+}
+
+function normalizeOutgoingPayload(payload: FakeOutgoingPayload): { content: string; files: FakeSentFile[] } {
+  if (typeof payload === 'string') {
+    return {
+      content: payload,
+      files: [],
+    };
+  }
+
+  return {
+    content: payload.content ?? '',
+    files: payload.files ?? [],
+  };
 }

@@ -114,6 +114,7 @@ const scenario = (() => {
   if (prompt.includes('[plan-status]')) return 'plan-status';
   if (prompt.includes('[subagent]')) return 'subagent';
   if (prompt.includes('[attachments]')) return 'attachments';
+  if (prompt.includes('[bridge-send-file]')) return 'bridge-send-file';
   if (prompt.includes('AUTOPILOT_REPORT')) return 'autopilot';
   return 'simple';
 })();
@@ -644,6 +645,18 @@ const finalText = scenario === 'attachments'
     ? `plan ok; resumed=${args.mode === 'resume'}; cwd=${process.cwd()}`
     : scenario === 'subagent'
       ? 'subagent ok; helper agent coordinated successfully'
+    : scenario === 'bridge-send-file'
+      ? [
+        '已生成 report.pdf，并准备通过 bridge 发回当前线程。',
+        '',
+        'BRIDGE_SEND_FILE',
+        '```json',
+        JSON.stringify({
+          request: 'report.pdf',
+          caption: '已按要求发送 report.pdf。',
+        }, null, 2),
+        '```',
+      ].join('\n')
     : scenario === 'autopilot'
       ? [
         'Autopilot finished one low-risk task and validation passed.',

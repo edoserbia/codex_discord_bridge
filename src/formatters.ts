@@ -211,6 +211,8 @@ export function formatHelp(prefix: string): string {
     '🤖 **Codex Discord Bridge 帮助**',
     '',
     `- 绑定频道：\`${prefix}bind <项目名> <目录> [--sandbox ...] [--approval ...] [--search on|off]\``,
+    `- 发送文件：\`${prefix}sendfile <文件名/相对路径>\``,
+    `- 发送候选序号：\`${prefix}sendfile 2\``,
     `- Autopilot 用法：\`${prefix}autopilot\``,
     `- 查看状态：\`${prefix}status\``,
     `- 查看队列：\`${prefix}queue\``,
@@ -227,10 +229,15 @@ export function formatHelp(prefix: string): string {
     '现在会在频道里持续更新实时进度、命令执行和计划状态。',
     'Subagent 支持已默认开启；如果你还希望 Codex 把 AGENTS.md 的层级说明显式透传给子代理，可在绑定时追加 `--config features.child_agents_md=true`。',
     '如果当前任务正在运行，可用 `!guide <内容>` 插入中途引导，bridge 会中断当前步骤，先处理引导，再按同一会话继续原任务。',
-    '图片附件会自动透传到 `codex -i`，普通文件会下载到本地附件目录供 Codex 读取。',
+    '图片附件会自动透传到 `codex -i`；上传的附件会同步到绑定目录里的 `inbox/` 子目录，普通文件也会保留一份 bridge 本地缓存。',
+    '发文件给 Discord 时，默认会在绑定目录里查找；可以直接说“把 report.pdf 发给我”，也可以用 `!sendfile <文件名/相对路径>`。',
+    '如果有多个匹配，bridge 会返回编号列表；你可以回复“发第 2 个”或 `!sendfile 2`。',
+    '显式绝对路径只允许管理员使用，例如 `!sendfile /absolute/path/to/report.pdf`。',
     '',
     '示例：',
     `\`${prefix}bind api "/path/to/workspaces/api" --sandbox danger-full-access --approval never --search on\``,
+    `\`把 report.pdf 发给我\``,
+    `\`${prefix}sendfile report.pdf\``,
   ].join('\n');
 }
 
@@ -561,8 +568,13 @@ export function formatWebAccessLinks(urls: WebAccessUrl[]): string {
   ].join('\n');
 }
 
-export function formatSuccessReply(binding: ChannelBinding, requestedBy: string, result: CodexRunResult): string {
-  const finalMessage = result.agentMessages.at(-1) ?? '本轮已完成，但 Codex 没有返回文本消息。';
+export function formatSuccessReply(
+  binding: ChannelBinding,
+  requestedBy: string,
+  result: CodexRunResult,
+  options: { finalMessage?: string } = {},
+): string {
+  const finalMessage = options.finalMessage ?? result.agentMessages.at(-1) ?? '本轮已完成，但 Codex 没有返回文本消息。';
 
   return [
     `🤖 **${binding.projectName}** · ${requestedBy}`,

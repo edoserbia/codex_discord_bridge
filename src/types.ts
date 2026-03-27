@@ -89,6 +89,7 @@ export interface PersistedState {
 export interface AttachmentRef {
   name: string;
   localPath: string;
+  workspaceLocalPath?: string | undefined;
   sourceUrl: string;
   isImage: boolean;
   contentType?: string | undefined;

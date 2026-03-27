@@ -109,6 +109,7 @@ sudo ./scripts/install-service.sh --mode daemon
 !autopilot project status
 !status
 !queue
+!sendfile <文件名/相对路径/绝对路径/序号>
 !guide <追加指令>
 !cancel
 !reset
@@ -149,10 +150,16 @@ sudo ./scripts/install-service.sh --mode daemon
 
 完整说明见 `docs/AUTOPILOT.md`。
 
-## 8. 附件与图片
+## 8. 文件收发
 
 - 图片附件会自动透传给 `codex -i`
-- 普通文件会下载到 `data/attachments/...` 后再提示 Codex 读取
+- 所有上传文件都会镜像到当前绑定目录里的 `inbox/`
+- 普通文件也会保留一份 bridge 本地缓存，路径仍位于 `data/attachments/...`
+- 你可以直接说 `把 report.pdf 发给我`
+- 也可以使用 `!sendfile report.pdf`
+- 如果命中多个文件，bridge 会返回编号列表；继续回复 `发第 2 个` 或 `!sendfile 2`
+- 显式绝对路径只允许管理员使用
+- 如果你要求 “生成 report.pdf 后直接发给我”，bridge 会把文件回传协议自动注入给 Codex，模型命中单个文件时会直接回传附件
 
 ## 9. 常见问题
 

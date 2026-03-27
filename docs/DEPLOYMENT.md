@@ -17,6 +17,7 @@
 - 运行日志：`/path/to/codex-discord-bridge/logs/codex-discord-bridge.log`
 - PID 文件：`/path/to/codex-discord-bridge/.run/codex-discord-bridge.pid`
 - 状态文件：`/path/to/codex-discord-bridge/data/state.json`
+- 上传附件缓存：`/path/to/codex-discord-bridge/data/attachments/`
 - Web 面板：`http://127.0.0.1:3769`
 - LaunchAgent plist：`~/Library/LaunchAgents/<label>.plist`
 - LaunchDaemon plist：`/Library/LaunchDaemons/<label>.plist`
@@ -256,6 +257,16 @@ cat ~/.codex-tunning/secrets.env
 - 线程：独立任务会话
 - 绑定、会话、消息状态：持久化到 `data/state.json`
 - 附件缓存：位于 `data/attachments/`
+- Discord 上传的文件会同步镜像到当前绑定项目目录下的 `inbox/`
+
+## 文件收发规则
+
+- 图片附件会自动透传给 `codex -i`
+- 普通文件会缓存到 `data/attachments/...`，同时镜像到绑定工作区的 `inbox/`
+- 默认文件搜索范围是绑定工作区；自然语言 `把 report.pdf 发给我` 与 `!sendfile report.pdf` 都走这条路径
+- 如果有多个匹配，bridge 会返回编号列表，后续可用 `发第 2 个` 或 `!sendfile 2`
+- 显式绝对路径只允许管理员使用
+- 当用户要求 Codex 生成文件并直接回传时，bridge 会自动向 Codex 注入 `BRIDGE_SEND_FILE` 协议说明，让模型可以直接请求回传单个文件
 
 如需清空本地会话状态，可以先停止服务，再删除 `data/state.json`。
 
