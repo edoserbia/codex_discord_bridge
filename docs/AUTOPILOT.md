@@ -3,6 +3,7 @@
 这份文档专门说明 `codex-discord-bridge` 里的 Autopilot 自动迭代能力，包括：
 
 - 用户如何使用
+- 本机 CLI 如何控制
 - 服务级和项目级的控制边界
 - 定时任务状态怎么看
 - Discord 中会出现哪些消息
@@ -142,6 +143,29 @@ Autopilot · api
 !autopilot project status
 ```
 
+### 4.7 在本机 CLI 控制同一套 Autopilot
+
+如果 bridge 服务已经在本机运行，也可以直接在终端里执行：
+
+```bash
+bridgectl autopilot status
+bridgectl autopilot server on
+bridgectl autopilot server concurrency 3
+bridgectl autopilot project status --project api
+bridgectl autopilot project interval 30m --project api
+bridgectl autopilot project prompt "优先补测试和稳定性，不要做大功能" --project api
+bridgectl autopilot project run --project api
+```
+
+项目定位规则：
+
+- `--channel <频道ID>` 优先
+- `--project <绑定项目名>` 次之
+- 如果都不传，按当前工作目录匹配绑定项目
+- 匹配不到或匹配多个时直接报错，不猜
+
+CLI 复用的是运行中的 bridge 服务和同一套 Autopilot 状态，不会直接改 `state.json`。
+
 ## 5. 命令总表
 
 ### 帮助
@@ -175,6 +199,7 @@ Autopilot · api
 - 服务级命令查看或修改的是当前 bridge 进程里的全部绑定项目
 - 服务级默认并行度为 `5`
 - `!autopilot server concurrency <N>` 可以随时调整并行数
+- 本机 CLI 对应命令为 `bridgectl autopilot ...`
 
 ### 项目级
 
@@ -199,6 +224,8 @@ Autopilot · api
 
 - `!autopilot project run` 会立刻触发当前项目执行 1 次
 - 本轮完成后，下一次周期时间会按本轮完成时间重新计算
+- 本机 CLI 里使用同样的命令形态，只是把 `!` 前缀改成 `bridgectl`
+- 在终端里执行项目级命令时，推荐显式加 `--project <项目名>`；如果省略，会按当前工作目录匹配绑定项目
 
 ## 6. 周期格式
 

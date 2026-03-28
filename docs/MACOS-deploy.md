@@ -25,6 +25,7 @@
 - 服务重启后，未完成任务会优先自动恢复，并在 Discord 中带恢复提示
 - 可以安装为 `launchd` 服务，实现开机启动或登录后启动
 - 可通过 Web 面板查看绑定和会话状态
+- 可通过本机 `bridgectl autopilot ...` CLI 在终端里控制同一套 Autopilot
 
 ## 二、前置条件
 
@@ -198,7 +199,30 @@ cd /path/to/codex-discord-bridge
 ./scripts/macos-bridge.sh install-service --mode daemon
 ./scripts/macos-bridge.sh uninstall-service --mode daemon
 ./scripts/macos-bridge.sh deploy
+./scripts/bridgectl autopilot status
+./scripts/bridgectl autopilot project status --project api
 ```
+
+如果你希望在任意目录直接使用 `bridgectl`，可以在 bridge 仓库里执行一次：
+
+```bash
+npm run build
+npm link
+```
+
+之后即可在任意已绑定项目目录中执行：
+
+```bash
+bridgectl autopilot project status
+bridgectl autopilot project run
+```
+
+项目定位规则：
+
+- `--channel <频道ID>` 优先
+- `--project <绑定项目名>` 次之
+- 两者都不传时按当前工作目录匹配绑定项目
+- 匹配不到或匹配多个时直接报错，不猜
 
 ## 六、部署脚本会做什么
 

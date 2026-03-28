@@ -151,6 +151,15 @@ http://127.0.0.1:3769/?token=<YOUR_WEB_AUTH_TOKEN>
 
 bridge 会返回当前 Web 面板可直接打开的本地地址和局域网地址；如果配置了 `WEB_AUTH_TOKEN`，返回链接会自动带上 token。
 
+如果你在本机终端里控制 Autopilot，也可以使用：
+
+```bash
+bridgectl autopilot status
+bridgectl autopilot project status --project api
+```
+
+CLI 通过这个 Web 控制面连接正在运行的 bridge 服务；如果配置了 `WEB_AUTH_TOKEN`，CLI 会默认复用它，也可以用 `CODEX_DISCORD_BRIDGE_WEB_AUTH_TOKEN` 临时覆盖。
+
 ## 驱动与恢复行为
 
 - 普通文本任务默认优先使用官方 `app-server`

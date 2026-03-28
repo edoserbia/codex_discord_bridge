@@ -169,6 +169,29 @@ sudo ./scripts/install-service.sh --mode daemon
 
 完整说明见 `docs/AUTOPILOT.md`。
 
+如果你在桌面端本机操作，也可以直接用 CLI 控制同一套 Autopilot：
+
+```bash
+npm run build
+npm link
+bridgectl autopilot project status --project api
+bridgectl autopilot project run --project api
+```
+
+或者不做全局安装，直接在 bridge 仓库中执行：
+
+```bash
+./scripts/bridgectl autopilot status
+npm run cli -- autopilot project status --project api
+```
+
+项目定位规则：
+
+- `--channel <频道ID>` 优先
+- `--project <绑定项目名>` 次之
+- 两者都不传时，按当前工作目录匹配绑定项目
+- 匹配不到或匹配多个时会报错，不会自动猜测
+
 ## 8. 文件收发
 
 - 图片附件会自动透传给 `codex -i`
@@ -182,6 +205,7 @@ sudo ./scripts/install-service.sh --mode daemon
 - 如果命中多个文件，bridge 会返回编号列表；继续回复 `发第 2 个` 或 `!sendfile 2`
 - 显式绝对路径只允许管理员使用
 - 如果你要求 “生成 report.pdf 后直接发给我”，bridge 会把文件回传协议自动注入给 Codex，模型命中单个文件时会直接回传附件
+- 上传和发回文件时都会尽量保留原文件名；只有目标路径已存在同名文件时，才会在扩展名前追加随机后缀
 
 ## 9. 常见问题
 

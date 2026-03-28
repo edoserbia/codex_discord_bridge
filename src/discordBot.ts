@@ -31,6 +31,13 @@ import {
   normalizeAutopilotBoardDocument,
   parseAutopilotReport,
 } from './autopilot.js';
+import {
+  resolveAutopilotBindingTarget,
+  toAutopilotTargetCandidate,
+  type AutopilotResolvedTarget,
+  type AutopilotTargetCandidate,
+  type AutopilotTargetHints,
+} from './autopilotControl.js';
 import type { AppConfig } from './config.js';
 import type { BindCommandOptions, ParsedCommand } from './commandParser.js';
 import type { CodexExecutionDriver, CodexRunHooks, RunningCodexJob } from './codexRunner.js';
@@ -193,6 +200,14 @@ interface PendingRuntimeViewRefresh {
 interface PendingFileSelection {
   candidates: FileTransferCandidate[];
   expiresAtMs: number;
+}
+
+interface AutopilotControlResult {
+  ok: boolean;
+  message: string;
+  resolvedTarget?: AutopilotResolvedTarget | undefined;
+  candidates?: AutopilotTargetCandidate[] | undefined;
+  code?: 'target_required' | 'binding_not_found' | 'ambiguous_target' | undefined;
 }
 
 function hasBindingExecutionChanged(previous: ChannelBinding | undefined, next: ChannelBinding): boolean {
@@ -519,6 +534,37 @@ export class DiscordCodexBridge {
       driver: undefined,
       fallbackActive: undefined,
     }, bindingChannelId);
+  }
+
+  async executeAutopilotControlCommand(
+    command: Exclude<Extract<ParsedCommand, { kind: 'autopilot' }>, { scope: 'help' }>,
+    targetHints: AutopilotTargetHints = {},
+  ): Promise<AutopilotControlResult> {
+    if (command.scope === 'server') {
+      return {
+        ok: true,
+        message: await this.executeAutopilotServerCommand(command),
+      };
+    }
+
+    const resolution = resolveAutopilotBindingTarget(this.store.listBindings(), targetHints);
+    if (!resolution.ok) {
+      return {
+        ok: false,
+        code: resolution.code,
+        message: resolution.message,
+        candidates: resolution.candidates,
+      };
+    }
+
+    return {
+      ok: true,
+      message: await this.executeAutopilotProjectCommand(resolution.binding, command),
+      resolvedTarget: {
+        ...toAutopilotTargetCandidate(resolution.binding),
+        mode: resolution.mode,
+      },
+    };
   }
 
   private async resetBindingSessions(bindingChannelId: string): Promise<void> {
@@ -1428,25 +1474,12 @@ export class DiscordCodexBridge {
     command: Exclude<Extract<ParsedCommand, { kind: 'autopilot' }>, { scope: 'help' }>,
   ): Promise<void> {
     if (command.scope === 'server') {
+      const response = await this.executeAutopilotServerCommand(command);
       if (command.action === 'status') {
-        await this.replyWithChunks(message, await this.buildAutopilotServiceStatusText());
+        await this.replyWithChunks(message, response);
         return;
       }
-
-      if (command.action === 'concurrency') {
-        await this.setAutopilotParallelismAcrossBindings(command.parallelism);
-        await message.reply(formatAutopilotServiceAck('concurrency', command.parallelism));
-        return;
-      }
-
-      if (command.action === 'clear') {
-        await this.clearAllAutopilotProjects();
-        await message.reply(formatAutopilotServiceAck('clear'));
-        return;
-      }
-
-      await this.setAutopilotEnabledAcrossBindings(command.action === 'on');
-      await message.reply(formatAutopilotServiceAck(command.action));
+      await message.reply(response);
       return;
     }
 
@@ -1455,58 +1488,77 @@ export class DiscordCodexBridge {
       return;
     }
 
-    const binding = resolved.binding;
+    const response = await this.executeAutopilotProjectCommand(resolved.binding, command);
+    if (command.action === 'status') {
+      await this.replyWithChunks(message, response);
+      return;
+    }
+    await message.reply(response);
+  }
+
+  private async executeAutopilotServerCommand(
+    command: Extract<Exclude<Extract<ParsedCommand, { kind: 'autopilot' }>, { scope: 'help' }>, { scope: 'server' }>,
+  ): Promise<string> {
+    if (command.action === 'status') {
+      return this.buildAutopilotServiceStatusText();
+    }
+
+    if (command.action === 'concurrency') {
+      await this.setAutopilotParallelismAcrossBindings(command.parallelism);
+      return formatAutopilotServiceAck('concurrency', command.parallelism);
+    }
+
+    if (command.action === 'clear') {
+      await this.clearAllAutopilotProjects();
+      return formatAutopilotServiceAck('clear');
+    }
+
+    await this.setAutopilotEnabledAcrossBindings(command.action === 'on');
+    return formatAutopilotServiceAck(command.action);
+  }
+
+  private async executeAutopilotProjectCommand(
+    binding: ChannelBinding,
+    command: Extract<Exclude<Extract<ParsedCommand, { kind: 'autopilot' }>, { scope: 'help' }>, { scope: 'project' }>,
+  ): Promise<string> {
     const project = await this.ensureAutopilotResources(binding);
 
     switch (command.action) {
       case 'status':
-        await this.replyWithChunks(
-          message,
-          this.buildAutopilotProjectStatusText(binding, project, this.store.getAutopilotService(binding.guildId)),
-        );
-        return;
+        return this.buildAutopilotProjectStatusText(binding, project, this.store.getAutopilotService(binding.guildId));
       case 'on': {
         const nextProject = await this.setAutopilotProjectEnabled(binding, project, true);
-        await message.reply(formatAutopilotProjectAck('on', binding, nextProject));
-        return;
+        return formatAutopilotProjectAck('on', binding, nextProject);
       }
       case 'off': {
         const nextProject = await this.setAutopilotProjectEnabled(binding, project, false);
-        await message.reply(formatAutopilotProjectAck('off', binding, nextProject));
-        return;
+        return formatAutopilotProjectAck('off', binding, nextProject);
       }
       case 'clear': {
         const nextProject = await this.clearAutopilotProject(binding, project, '已清空项目 Autopilot 状态');
-        await message.reply(formatAutopilotProjectAck('clear', binding, nextProject));
-        return;
+        return formatAutopilotProjectAck('clear', binding, nextProject);
       }
       case 'run': {
         const trigger = await this.triggerAutopilotProjectRun(binding);
         if (trigger.status === 'already-running') {
-          await message.reply('当前项目的 Autopilot 已在运行中。');
-          return;
+          return '当前项目的 Autopilot 已在运行中。';
         }
         if (trigger.status === 'busy') {
           const service = this.store.getAutopilotService(binding.guildId);
-          await message.reply(`当前服务器的 Autopilot 已达到并行上限 ${this.getAutopilotParallelism(service)}，请稍后再试，或先执行 \`!autopilot server concurrency <N>\` 调大并行数。`);
-          return;
+          return `当前服务器的 Autopilot 已达到并行上限 ${this.getAutopilotParallelism(service)}，请稍后再试，或先执行 \`!autopilot server concurrency <N>\` 调大并行数。`;
         }
         if (trigger.status === 'unavailable') {
-          await message.reply('当前项目的 Autopilot 线程不可用，暂时无法立即执行。');
-          return;
+          return '当前项目的 Autopilot 线程不可用，暂时无法立即执行。';
         }
-        await message.reply(formatAutopilotProjectAck('run', binding, trigger.project));
-        return;
+        return formatAutopilotProjectAck('run', binding, trigger.project);
       }
       case 'interval': {
         const nextProject = await this.setAutopilotProjectInterval(binding, project, command.intervalMs);
-        await message.reply(formatAutopilotProjectAck('interval', binding, nextProject));
-        return;
+        return formatAutopilotProjectAck('interval', binding, nextProject);
       }
       case 'prompt': {
         const nextProject = await this.updateAutopilotProjectBrief(binding, project, command.prompt);
-        await message.reply(formatAutopilotProjectAck('prompt', binding, nextProject));
-        return;
+        return formatAutopilotProjectAck('prompt', binding, nextProject);
       }
     }
   }
