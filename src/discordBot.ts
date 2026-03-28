@@ -105,6 +105,7 @@ type SendableChannel = {
   id: string;
   parentId?: string | null;
   guildId?: string | null;
+  attachmentSizeLimit?: number;
   send: (content: SendPayload) => Promise<SendableMessage>;
   sendTyping: () => Promise<void>;
   setArchived?: (archived: boolean) => Promise<unknown>;
@@ -178,7 +179,7 @@ const AUTOPILOT_THREAD_AUTO_ARCHIVE_MINUTES: ThreadAutoArchiveDuration = 1440;
 const AUTOPILOT_REQUESTED_BY = 'Autopilot';
 const AUTOPILOT_REQUESTED_BY_ID = 'autopilot';
 const FILE_SELECTION_TTL_MS = 10 * 60 * 1000;
-const MAX_DISCORD_ATTACHMENT_BYTES = 8 * 1024 * 1024;
+const DEFAULT_DISCORD_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const execFileAsync = promisify(execFile);
 
 interface PendingRuntimeViewRefresh {
@@ -580,7 +581,36 @@ export class DiscordCodexBridge {
       this.runtimes.set(conversationId, runtime);
     }
 
+    this.recoverDetachedActiveRun(conversationId, runtime);
     return runtime;
+  }
+
+  private recoverDetachedActiveRun(conversationId: string, runtime: ChannelRuntime): void {
+    const activeRun = runtime.activeRun;
+    if (!activeRun || this.activeJobs.has(conversationId)) {
+      return;
+    }
+
+    const taskId = activeRun.task.id.slice(0, 8);
+
+    if (this.isRecoverableActiveRun(activeRun)) {
+      runtime.queue.unshift(buildRecoveryTask(
+        activeRun,
+        'restart',
+        'bridge 检测到运行状态残留，正在恢复中断任务',
+        (activeRun.task.recovery?.attempt ?? 0) + 1,
+      ));
+      console.warn(
+        `[bridge-runtime] recovered detached active run conversation=${conversationId} task=${taskId}`,
+      );
+    } else {
+      console.warn(
+        `[bridge-runtime] cleared detached finished run conversation=${conversationId} task=${taskId}`,
+      );
+    }
+
+    runtime.activeRun = undefined;
+    this.scheduleRuntimeStateSave(conversationId, true);
   }
 
   private scheduleRuntimeStateSave(conversationId: string, immediate = false): void {
@@ -805,7 +835,10 @@ export class DiscordCodexBridge {
     file: FileTransferCandidate,
     content = `已发送文件：${file.name}`,
   ): Promise<void> {
-    const validationError = await this.getResolvedFileSendError(file);
+    const validationError = await this.getResolvedFileSendError(
+      file,
+      message.channel as { attachmentSizeLimit?: number } | null,
+    );
     if (validationError) {
       await message.reply(validationError);
       return;
@@ -817,15 +850,35 @@ export class DiscordCodexBridge {
     });
   }
 
-  private async getResolvedFileSendError(file: FileTransferCandidate): Promise<string | undefined> {
+  private getDiscordAttachmentSizeLimit(channel?: { attachmentSizeLimit?: number } | null): number {
+    const limit = channel?.attachmentSizeLimit;
+    if (typeof limit === 'number' && Number.isFinite(limit) && limit > 0) {
+      return limit;
+    }
+    return DEFAULT_DISCORD_ATTACHMENT_BYTES;
+  }
+
+  private formatAttachmentSizeLimit(limitBytes: number): string {
+    const limitMiB = limitBytes / (1024 * 1024);
+    if (Number.isInteger(limitMiB)) {
+      return `${limitMiB.toFixed(0)} MiB`;
+    }
+    return `${limitMiB.toFixed(1)} MiB`;
+  }
+
+  private async getResolvedFileSendError(
+    file: FileTransferCandidate,
+    channel?: { attachmentSizeLimit?: number } | null,
+  ): Promise<string | undefined> {
     const stat = await fs.stat(file.absolutePath).catch(() => null);
 
     if (!stat || !stat.isFile()) {
       return `文件不存在或已不可读：${file.absolutePath}`;
     }
 
-    if (stat.size > MAX_DISCORD_ATTACHMENT_BYTES) {
-      return `文件过大，当前只支持发送不超过 ${(MAX_DISCORD_ATTACHMENT_BYTES / (1024 * 1024)).toFixed(0)} MB 的文件。`;
+    const attachmentSizeLimit = this.getDiscordAttachmentSizeLimit(channel);
+    if (stat.size > attachmentSizeLimit) {
+      return `文件过大，当前频道最多支持发送 ${this.formatAttachmentSizeLimit(attachmentSizeLimit)} 的文件。`;
     }
 
     return undefined;
@@ -885,6 +938,7 @@ export class DiscordCodexBridge {
   }
 
   private async buildSuccessReplyPayload(
+    channel: SendableChannel,
     binding: ChannelBinding,
     task: PromptTask,
     result: CodexRunResult,
@@ -912,7 +966,7 @@ export class DiscordCodexBridge {
 
     switch (resolution.kind) {
       case 'single': {
-        const validationError = await this.getResolvedFileSendError(resolution.file);
+        const validationError = await this.getResolvedFileSendError(resolution.file, channel);
         if (validationError) {
           return `${baseContent}\n\n${validationError}`;
         }
@@ -2800,7 +2854,7 @@ export class DiscordCodexBridge {
       this.scheduleRuntimeStateSave(conversationId, true);
       if (!suppressReply && currentTask.origin !== 'autopilot') {
         const replyPayload = result.success
-          ? await this.buildSuccessReplyPayload(binding, currentTask, result)
+          ? await this.buildSuccessReplyPayload(channel, binding, currentTask, result)
           : formatFailureReply(binding, currentTask.requestedBy, result);
         await this.safeReplyToOriginalMessage(
           channel,

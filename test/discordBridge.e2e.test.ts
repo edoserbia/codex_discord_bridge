@@ -1414,6 +1414,69 @@ test('bridge restores interrupted work on startup, announces recovery, and prior
   }
 });
 
+test('bridge recovers a detached active run so queued prompts do not stay blocked forever', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-detached-active-run-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-detached-active-run', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+
+    const detachedMessage = createUserMessage(rootChannel, '[command] detached stale task');
+    await store.updateSession(rootChannel.id, {
+      codexThreadId: 'thread-detached-1',
+      driver: 'legacy-exec',
+    }, rootChannel.id);
+
+    const runtime = (bridge as any).getRuntime(rootChannel.id);
+    runtime.activeRun = {
+      task: {
+        id: 'detached-active-task',
+        prompt: '[command] detached stale task',
+        effectivePrompt: '[command] detached stale task',
+        rootPrompt: '[command] detached stale task',
+        rootEffectivePrompt: '[command] detached stale task',
+        requestedBy: detachedMessage.author.username,
+        requestedById: detachedMessage.author.id,
+        messageId: detachedMessage.id,
+        enqueuedAt: '2026-03-21T00:00:00.000Z',
+        bindingChannelId: rootChannel.id,
+        conversationId: rootChannel.id,
+        attachments: [],
+        extraAddDirs: [],
+        origin: 'user',
+      },
+      driverMode: 'legacy-exec',
+      status: 'running',
+      startedAt: '2026-03-21T00:00:00.000Z',
+      updatedAt: '2026-03-21T00:00:01.000Z',
+      latestActivity: '正在执行命令',
+      currentCommand: '/bin/zsh -lc "pwd"',
+      agentMessages: [],
+      reasoningSummaries: [],
+      planItems: [],
+      collabToolCalls: [],
+      timeline: ['[00:00] 任务中断'],
+      stderr: [],
+      usedResume: true,
+      codexThreadId: 'thread-detached-1',
+    };
+    await store.upsertRuntimeState(runtime);
+    (bridge as any).activeJobs.delete(rootChannel.id);
+
+    await dispatch(bridge, createUserMessage(rootChannel, 'follow-up prompt after stale active run'));
+    await waitFor(() => findSent(rootChannel, /ok: follow-up prompt after stale active run/), 15_000);
+    await waitFor(() => {
+      const nextRuntime = (bridge as any).getRuntime(rootChannel.id);
+      return !nextRuntime.activeRun && nextRuntime.queue.length === 0;
+    }, 15_000);
+  } finally {
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge cancels an automatically recovered task with !cancel', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-recovery-cancel-');
   const workspace = await createWorkspace(rootDir);
