@@ -833,14 +833,11 @@ append_node_option_flag() {
 }
 
 maybe_configure_node_tls() {
-  local proxy raw_ca_cert ca_cert
-  proxy="$(read_bridge_proxy_value || true)"
+  local raw_ca_cert ca_cert
   raw_ca_cert="$(read_bridge_ca_cert_value || true)"
 
-  if [[ -n "${proxy}" || -n "${raw_ca_cert}" ]]; then
-    append_node_option_flag '--use-system-ca'
-    print_info '已为 Node 启用系统证书信任（--use-system-ca）'
-  fi
+  append_node_option_flag '--use-system-ca'
+  print_info '已为 Node 启用系统证书信任（--use-system-ca）'
 
   if [[ -n "${raw_ca_cert}" ]]; then
     ca_cert="$(expand_home_path "${raw_ca_cert}")"
