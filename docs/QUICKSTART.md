@@ -81,6 +81,7 @@ sudo ./scripts/install-service.sh --mode daemon
 - 该主频道的普通消息会直接驱动 Codex
 - 该主频道下创建的线程会自动继承同一个项目目录
 - 每个线程会拥有独立 Codex 会话
+- 如果目标目录本身不是 Git 仓库，建议改成 `!bind api "/path/to/workspaces/api" --sandbox danger-full-access --approval never --search off --skip-git-check on`
 
 ## 5. 直接开始对话
 
@@ -94,6 +95,7 @@ sudo ./scripts/install-service.sh --mode daemon
 
 - 一条持续更新的“Codex 实时进度”消息
 - 一条最终结果消息
+- 如果服务刚刚重启而上一个任务未完成，bridge 会优先自动恢复它，并在进度消息里标明这是恢复执行
 
 ## 6. 常用控制命令
 
@@ -109,6 +111,8 @@ sudo ./scripts/install-service.sh --mode daemon
 !autopilot project status
 !status
 !queue
+!queue insert 2
+!web
 !sendfile <文件名/相对路径/绝对路径/序号>
 !guide <追加指令>
 !cancel
@@ -118,6 +122,21 @@ sudo ./scripts/install-service.sh --mode daemon
 ```
 
 `!guide` 的语义是“插入中途引导，再继续原任务”，不是直接丢弃当前复杂任务。
+
+管理员判定规则：
+
+- 用户 ID 命中 `DISCORD_ADMIN_USER_IDS`
+- 或当前 Discord 成员拥有 `Manage Guild` / `Manage Channels` 权限
+
+管理员才能执行：
+
+- `!bind`、`!unbind`
+- `!cancel`、`!reset`
+- `!queue insert <序号>`
+- 所有会修改 Autopilot 状态的命令
+- 显式绝对路径文件发送，例如 `!sendfile /absolute/path/to/report.pdf`
+
+如果忘了命令，直接发 `!help`，返回内容里已经包含自然语言发文件和 `!sendfile` 的完整用法。
 
 ## 7. 最快开启 Autopilot
 
@@ -155,7 +174,10 @@ sudo ./scripts/install-service.sh --mode daemon
 - 图片附件会自动透传给 `codex -i`
 - 所有上传文件都会镜像到当前绑定目录里的 `inbox/`
 - 普通文件也会保留一份 bridge 本地缓存，路径仍位于 `data/attachments/...`
+- 上传和发回文件时都会尽量保留原文件名；只有目标位置已存在同名文件时，才会在扩展名前追加一段随机后缀
+- 发文件回 Discord 时，bridge 会优先在绑定目录的 `inbox/` 中查找，再扩展到其余工作区文件
 - 你可以直接说 `把 report.pdf 发给我`
+- 也可以直接说 `生成完 report.pdf 后直接发给我`
 - 也可以使用 `!sendfile report.pdf`
 - 如果命中多个文件，bridge 会返回编号列表；继续回复 `发第 2 个` 或 `!sendfile 2`
 - 显式绝对路径只允许管理员使用
@@ -166,6 +188,16 @@ sudo ./scripts/install-service.sh --mode daemon
 ### `!bind` 在线程里无效
 
 `!bind` 只能在普通文本频道执行；线程会自动继承主频道绑定。
+
+### 绑定的是非 Git 目录，结果掉到了 `legacy-exec`
+
+优先重新绑定一次，并显式打开跳过仓库检查：
+
+```text
+!bind demo "/path/to/non-git-workspace" --sandbox danger-full-access --approval never --search off --skip-git-check on
+```
+
+当前 bridge 默认优先走 `app-server`；如果你把工作目录绑定到非 Git 目录，又关闭了仓库检查，才会看到“workspace is outside a Git repository”这类 fallback 提示。
 
 ### Bot 显示离线
 

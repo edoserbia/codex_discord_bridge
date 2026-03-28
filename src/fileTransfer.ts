@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
@@ -306,12 +307,20 @@ function stripWrappedQuotes(value: string): string {
   return trimmed;
 }
 
-async function allocateUniqueFilePath(directory: string, fileName: string): Promise<string> {
+export async function allocateUniqueFilePath(directory: string, fileName: string): Promise<string> {
   const extension = path.extname(fileName);
   const baseName = extension ? fileName.slice(0, -extension.length) : fileName;
+  const originalPath = path.join(directory, fileName);
 
-  for (let index = 0; index < 10_000; index += 1) {
-    const candidateName = index === 0 ? fileName : `${baseName}-${index + 1}${extension}`;
+  try {
+    await fs.access(originalPath);
+  } catch {
+    return originalPath;
+  }
+
+  for (let index = 0; index < 256; index += 1) {
+    const suffix = randomBytes(4).toString('hex');
+    const candidateName = `${baseName}-${suffix}${extension}`;
     const candidatePath = path.join(directory, candidateName);
 
     try {

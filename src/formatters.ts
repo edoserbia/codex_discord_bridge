@@ -230,6 +230,7 @@ export function formatHelp(prefix: string): string {
     'Subagent 支持已默认开启；如果你还希望 Codex 把 AGENTS.md 的层级说明显式透传给子代理，可在绑定时追加 `--config features.child_agents_md=true`。',
     '如果当前任务正在运行，可用 `!guide <内容>` 插入中途引导，bridge 会中断当前步骤，先处理引导，再按同一会话继续原任务。',
     '图片附件会自动透传到 `codex -i`；上传的附件会同步到绑定目录里的 `inbox/` 子目录，普通文件也会保留一份 bridge 本地缓存。',
+    '上传和发回文件时会尽量保留原文件名；只有目标位置已存在同名文件时，才会在扩展名前追加一段随机后缀。',
     '发文件给 Discord 时，默认会在绑定目录里查找；可以直接说“把 report.pdf 发给我”，也可以用 `!sendfile <文件名/相对路径>`。',
     '如果有多个匹配，bridge 会返回编号列表；你可以回复“发第 2 个”或 `!sendfile 2`。',
     '显式绝对路径只允许管理员使用，例如 `!sendfile /absolute/path/to/report.pdf`。',

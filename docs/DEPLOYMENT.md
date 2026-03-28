@@ -108,7 +108,7 @@ sudo ./scripts/install-service.sh --mode daemon
 
 ## 升级流程
 
-如果你通过 Git / Gitee 管理这个仓库，推荐更新流程：
+如果你通过 Git / GitLab 管理这个仓库，推荐更新流程：
 
 ```bash
 git pull
@@ -142,6 +142,33 @@ http://127.0.0.1:3769/?token=<YOUR_WEB_AUTH_TOKEN>
 ```
 
 浏览器会自动写入认证 Cookie，后续访问无需重复输入 Header。
+
+另外，Discord 里可以直接发送：
+
+```text
+!web
+```
+
+bridge 会返回当前 Web 面板可直接打开的本地地址和局域网地址；如果配置了 `WEB_AUTH_TOKEN`，返回链接会自动带上 token。
+
+## 驱动与恢复行为
+
+- 普通文本任务默认优先使用官方 `app-server`
+- 如果 `app-server` 暂时不可用，或当前绑定目录不满足启动条件，bridge 会明确提示当前请求已回退到 `legacy-exec`
+- 进度卡会显示本轮实际驱动模式，避免“看起来像正常运行，实际上已经 fallback”这种误判
+- bridge 重启后，会优先恢复上一次中断的任务，再处理普通排队消息；Discord 中会看到恢复提示和恢复模式
+
+## 非 Git 目录绑定
+
+当前环境变量 `DEFAULT_CODEX_SKIP_GIT_REPO_CHECK` 默认值为 `true`，适合把 bridge 绑定到尚未初始化 Git 的目录。
+
+如果你希望对某个频道显式指定，可以在绑定时加：
+
+```text
+!bind demo "/path/to/workspace" --skip-git-check on
+```
+
+如果你把它关掉，而目录本身又不在 Git 仓库里，`app-server` 可能会因为工作区检查失败而回退到 `legacy-exec`。
 
 ## 代理配置
 
@@ -256,6 +283,7 @@ cat ~/.codex-tunning/secrets.env
 - 主频道：项目级入口
 - 线程：独立任务会话
 - 绑定、会话、消息状态：持久化到 `data/state.json`
+- 当前运行中的可恢复快照也会落盘，用于服务重启后的自动恢复
 - 附件缓存：位于 `data/attachments/`
 - Discord 上传的文件会同步镜像到当前绑定项目目录下的 `inbox/`
 
@@ -263,12 +291,30 @@ cat ~/.codex-tunning/secrets.env
 
 - 图片附件会自动透传给 `codex -i`
 - 普通文件会缓存到 `data/attachments/...`，同时镜像到绑定工作区的 `inbox/`
+- 上传和发回文件时都会尽量保留原文件名；只有目标位置已存在同名文件时，才会在扩展名前追加一段随机后缀
+- 发文件回 Discord 时，默认会优先匹配 `inbox/`，再匹配其余工作区文件
 - 默认文件搜索范围是绑定工作区；自然语言 `把 report.pdf 发给我` 与 `!sendfile report.pdf` 都走这条路径
 - 如果有多个匹配，bridge 会返回编号列表，后续可用 `发第 2 个` 或 `!sendfile 2`
 - 显式绝对路径只允许管理员使用
 - 当用户要求 Codex 生成文件并直接回传时，bridge 会自动向 Codex 注入 `BRIDGE_SEND_FILE` 协议说明，让模型可以直接请求回传单个文件
 
 如需清空本地会话状态，可以先停止服务，再删除 `data/state.json`。
+
+## 管理员与权限边界
+
+管理员判定规则：
+
+- 用户 ID 命中 `DISCORD_ADMIN_USER_IDS`
+- 或当前 Discord 成员拥有 `Manage Guild` / `Manage Channels` 权限
+
+管理员命令包括：
+
+- `!bind`、`!unbind`
+- `!cancel`、`!reset`
+- `!queue insert <序号>`
+- 所有会修改 Autopilot 状态的命令
+
+显式绝对路径文件发送也属于管理员能力。
 
 ## 权限说明
 

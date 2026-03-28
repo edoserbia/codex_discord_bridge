@@ -152,6 +152,12 @@ Autopilot · api
 
 任何频道都可以使用。会返回完整的 Autopilot 使用说明。
 
+权限边界：
+
+- `!autopilot`、`!autopilot status`、`!autopilot server status`、`!autopilot project status` 只读查看，普通成员也可以用
+- 所有会修改 Autopilot 状态的命令都要求管理员权限
+- 管理员判定规则与主 README 一致：用户 ID 命中 `DISCORD_ADMIN_USER_IDS`，或当前 Discord 成员拥有 `Manage Guild` / `Manage Channels` 权限
+
 ### 服务级
 
 ```text

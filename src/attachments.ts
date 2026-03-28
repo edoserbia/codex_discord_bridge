@@ -5,7 +5,7 @@ import { pipeline } from 'node:stream/promises';
 
 import type { AttachmentRef } from './types.js';
 
-import { allocateInboxFilePath } from './fileTransfer.js';
+import { allocateInboxFilePath, allocateUniqueFilePath } from './fileTransfer.js';
 import { detectImageMime, ensureDirectory, sanitizeFilename } from './utils.js';
 
 interface AttachmentLike {
@@ -59,19 +59,20 @@ export async function downloadAttachments(
       throw new Error(`下载附件失败：${attachment.url} (${response.status})`);
     }
 
-    const name = sanitizeFilename(attachment.name || `attachment-${index + 1}`);
-    const localPath = path.join(attachmentDir, name);
+    const requestedName = sanitizeFilename(attachment.name || `attachment-${index + 1}`);
+    const localPath = await allocateUniqueFilePath(attachmentDir, requestedName);
+    const storedName = path.basename(localPath);
     await pipeline(response.body, createWriteStream(localPath));
     const workspaceLocalPath = workspacePath
-      ? await mirrorAttachmentIntoWorkspace(workspacePath, name, localPath)
+      ? await mirrorAttachmentIntoWorkspace(workspacePath, storedName, localPath)
       : undefined;
 
     attachments.push({
-      name,
+      name: storedName,
       localPath,
       workspaceLocalPath,
       sourceUrl: attachment.url,
-      isImage: detectImageMime(name, attachment.contentType),
+      isImage: detectImageMime(storedName, attachment.contentType),
       contentType: attachment.contentType ?? undefined,
       size: attachment.size ?? undefined,
     });
