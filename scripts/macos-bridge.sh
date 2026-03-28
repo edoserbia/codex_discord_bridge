@@ -589,13 +589,17 @@ auto_configure_bridge_proxy() {
   current_proxy="$(read_env_value "${BRIDGE_PROXY_ENV_KEY}" || true)"
   proxy_candidate="$(get_bridge_proxy_candidate)"
 
+  if [[ -n "${current_proxy}" ]]; then
+    if probe_discord_reachability "${current_proxy}"; then
+      print_info "检测到已显式配置 bridge 代理，继续使用：${current_proxy}"
+      return 0
+    fi
+    print_warn "已显式配置 bridge 代理但探测失败：${current_proxy}；将继续尝试直连/默认代理候选"
+  fi
+
   if probe_discord_reachability; then
     persist_bridge_proxy_value ''
-    if [[ -n "${current_proxy}" ]]; then
-      print_info '检测到 Discord 可直接访问，已清空 bridge 代理配置'
-    else
-      print_info '检测到 Discord 可直接访问，无需 bridge 代理'
-    fi
+    print_info '检测到 Discord 可直接访问，无需 bridge 代理'
     return 0
   fi
 
