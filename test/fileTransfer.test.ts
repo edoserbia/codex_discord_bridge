@@ -3,12 +3,33 @@ import assert from 'node:assert/strict';
 import { mkdir, utimes, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { formatFileCandidates, getWorkspaceInboxDir, resolveFileRequest } from '../src/fileTransfer.js';
+import { allocateInboxFilePath, formatFileCandidates, getWorkspaceInboxDir, resolveFileRequest } from '../src/fileTransfer.js';
 
 import { cleanupDir, createWorkspace, makeTempDir } from './helpers/testUtils.js';
 
 test('getWorkspaceInboxDir returns the default inbox path inside the workspace', () => {
   assert.equal(getWorkspaceInboxDir('/tmp/demo-workspace'), path.join('/tmp/demo-workspace', 'inbox'));
+});
+
+test('allocateInboxFilePath preserves the original name and adds a random suffix only on collision', async () => {
+  const rootDir = await makeTempDir('codex-bridge-file-transfer-allocate-');
+  const workspace = await createWorkspace(rootDir);
+  const inboxDir = path.join(workspace, 'inbox');
+
+  try {
+    await mkdir(inboxDir, { recursive: true });
+
+    const freePath = await allocateInboxFilePath(workspace, 'Quarterly Report 终稿.pdf');
+    assert.equal(path.basename(freePath), 'Quarterly Report 终稿.pdf');
+
+    await writeFile(path.join(inboxDir, 'Quarterly Report 终稿.pdf'), 'existing', 'utf8');
+
+    const collidedPath = await allocateInboxFilePath(workspace, 'Quarterly Report 终稿.pdf');
+    assert.match(path.basename(collidedPath), /^Quarterly Report 终稿-[a-f0-9]{8}\.pdf$/);
+    assert.notEqual(path.basename(collidedPath), 'Quarterly Report 终稿.pdf');
+  } finally {
+    await cleanupDir(rootDir);
+  }
 });
 
 test('resolveFileRequest ranks inbox matches before the rest of the workspace', async () => {

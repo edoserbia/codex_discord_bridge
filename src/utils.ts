@@ -305,8 +305,17 @@ export async function ensureDirectory(targetPath: string): Promise<string> {
 }
 
 export function sanitizeFilename(value: string): string {
-  const trimmed = value.trim() || 'attachment';
-  return trimmed.replace(/[^a-zA-Z0-9._-]+/g, '_');
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === '.' || trimmed === '..') {
+    return 'attachment';
+  }
+
+  const normalized = trimmed
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim();
+
+  return normalized && normalized !== '.' && normalized !== '..' ? normalized : 'attachment';
 }
 
 export function detectImageMime(filename: string, contentType?: string | null): boolean {

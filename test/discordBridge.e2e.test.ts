@@ -1672,6 +1672,29 @@ test('bridge sendfile command returns a workspace file to Discord', { concurrenc
   }
 });
 
+test('bridge sends Discord attachments using the selected file basename as the outgoing name', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-sendfile-name-');
+  const workspace = await createWorkspace(rootDir);
+  const reportPath = path.join(workspace, 'Quarterly Report 终稿.pdf');
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-sendfile-name', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await writeFile(reportPath, 'pdf payload', 'utf8');
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!sendfile "Quarterly Report 终稿.pdf"'));
+    await waitFor(() => findSentFile(rootChannel, /Quarterly Report 终稿\.pdf/), 3_000);
+
+    assert.ok(rootChannel.sent.some((message) => message.sentFiles.some((file) => (
+      typeof file !== 'string' && file.name === 'Quarterly Report 终稿.pdf'
+    ))));
+  } finally {
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge sendfile command can select a numbered candidate', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-sendfile-select-command-');
   const workspace = await createWorkspace(rootDir);
