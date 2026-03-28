@@ -90,7 +90,7 @@ import {
   formatWebAccessLinks,
 } from './formatters.js';
 import { JsonStateStore } from './store.js';
-import { cloneCodexOptions, formatClockTimestamp, formatDurationMs, isWithinAllowedRoots, normalizeAllowedRoots, resolveExistingDirectory, splitIntoDiscordChunks, summarizeReasoningText, truncate, uniqueStrings } from './utils.js';
+import { cloneCodexOptions, formatClockTimestamp, formatDurationMs, isWithinAllowedRoots, normalizeAllowedRoots, resolveDirectoryPath, resolveExistingDirectory, splitIntoDiscordChunks, summarizeReasoningText, truncate, uniqueStrings } from './utils.js';
 import { buildWebAccessUrls } from './webAccess.js';
 
 type SendPayload =
@@ -415,18 +415,20 @@ export class DiscordCodexBridge {
   }
 
   async bindChannel(request: BindRequest): Promise<ChannelBinding> {
-    const resolvedWorkspace = await resolveExistingDirectory(request.workspacePath);
     const resolvedGuildId = request.guildId ?? (await this.fetchChannel(request.channelId))?.guildId ?? undefined;
     const allowedRoots = await normalizeAllowedRoots(this.config.allowedWorkspaceRoots);
+    const targetWorkspace = await resolveDirectoryPath(request.workspacePath);
 
     if (!resolvedGuildId) {
       throw new Error(`无法解析频道 ${request.channelId} 对应的 guildId，请确认机器人已加入该服务器并能访问此频道。`);
     }
 
-    if (!isWithinAllowedRoots(resolvedWorkspace, allowedRoots)) {
-      throw new Error(`该目录不在允许的根目录下：${resolvedWorkspace}`);
+    if (!isWithinAllowedRoots(targetWorkspace, allowedRoots)) {
+      throw new Error(`该目录不在允许的根目录下：${targetWorkspace}`);
     }
 
+    await fs.mkdir(targetWorkspace, { recursive: true });
+    const resolvedWorkspace = await resolveExistingDirectory(targetWorkspace);
     const options = request.options ?? { addDirs: [], extraConfig: [] };
     const addDirs = await Promise.all(options.addDirs.map(async (item) => resolveExistingDirectory(item)));
 

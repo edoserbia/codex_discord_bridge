@@ -211,6 +211,7 @@ export function formatHelp(prefix: string): string {
     '🤖 **Codex Discord Bridge 帮助**',
     '',
     `- 绑定频道：\`${prefix}bind <项目名> <目录> [--sandbox ...] [--approval ...] [--search on|off]\``,
+    '  如果主绑定目录不存在，bridge 会先自动创建该目录',
     `- 发送文件：\`${prefix}sendfile <文件名/相对路径>\``,
     `- 发送候选序号：\`${prefix}sendfile 2\``,
     `- Autopilot 用法：\`${prefix}autopilot\``,

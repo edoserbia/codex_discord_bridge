@@ -602,6 +602,7 @@ Discord bot connected as <bot-name>#<discriminator>
 
 - `!bind` 必须在主频道执行
 - 该主频道下创建的线程会自动继承此绑定
+- 如果主绑定目录还不存在，bridge 会先自动创建这个目录
 - 默认 `.env` 已把 `DEFAULT_CODEX_SANDBOX` 设为 `danger-full-access`
 - 如果工作目录本身不是 Git 仓库，建议显式补上 `--skip-git-check on`
 

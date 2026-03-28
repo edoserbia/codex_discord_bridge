@@ -81,6 +81,7 @@ sudo ./scripts/install-service.sh --mode daemon
 - 该主频道的普通消息会直接驱动 Codex
 - 该主频道下创建的线程会自动继承同一个项目目录
 - 每个线程会拥有独立 Codex 会话
+- 如果主绑定目录还不存在，bridge 会先自动创建这个目录
 - 如果目标目录本身不是 Git 仓库，建议改成 `!bind api "/path/to/workspaces/api" --sandbox danger-full-access --approval never --search off --skip-git-check on`
 
 ## 5. 直接开始对话

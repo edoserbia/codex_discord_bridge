@@ -71,6 +71,24 @@ test('bridge binds a root channel and reuses session on follow-up prompts', { co
   await cleanupDir(rootDir);
 });
 
+test('bridge creates a missing workspace directory during bind', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-bind-create-workspace-');
+  const workspace = path.join(rootDir, 'missing-workspace');
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-bind-create', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+
+    assert.equal(store.getBinding(rootChannel.id)?.projectName, 'api');
+    await readdir(workspace);
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge can drive manual sessions through app-server and reuse the same official thread', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-app-server-manual-');
   const workspace = await createWorkspace(rootDir);
