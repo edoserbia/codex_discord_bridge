@@ -42,6 +42,15 @@ test('parse queue insert command', () => {
   });
 });
 
+test('parse queue remove command', () => {
+  const parsed = parseCommand('!queue remove 2', '!');
+  assert.deepEqual(parsed, {
+    kind: 'queue',
+    action: 'remove',
+    index: 2,
+  });
+});
+
 test('parse sendfile command with a workspace path', () => {
   const parsed = parseCommand('!sendfile report.pdf', '!');
   assert.deepEqual(parsed, {

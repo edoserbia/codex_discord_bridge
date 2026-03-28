@@ -323,6 +323,7 @@ cat ~/.codex-tunning/secrets.env
 - `!bind`、`!unbind`
 - `!cancel`、`!reset`
 - `!queue insert <序号>`
+- `!queue remove <序号>`
 - 所有会修改 Autopilot 状态的命令
 
 显式绝对路径文件发送也属于管理员能力。
