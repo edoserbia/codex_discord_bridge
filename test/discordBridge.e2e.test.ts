@@ -1610,6 +1610,44 @@ test('bridge can insert a queued prompt into the active task with !queue insert'
   }
 });
 
+test('bridge can remove a queued prompt with !queue remove', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-queue-remove-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-queue-remove-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-queue-remove', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[slow] first task'));
+    await waitFor(() => (bridge as any).getDashboardData().some((entry: any) => entry.conversations.some((c: any) => c.status === 'running' || c.status === 'starting')), 15_000);
+
+    await dispatch(bridge, createUserMessage(rootChannel, 'second task'));
+    await dispatch(bridge, createUserMessage(rootChannel, 'third task'));
+    await waitFor(() => {
+      const runtime = (bridge as any).getRuntime(rootChannel.id);
+      return runtime.queue.length === 2;
+    }, 15_000);
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!queue remove 1', { userId: 'admin-user' }));
+
+    await waitFor(() => findSent(rootChannel, /已从队列中移除 #1/), 15_000);
+    await waitFor(async () => {
+      const runtime = (bridge as any).getRuntime(rootChannel.id);
+      return runtime.queue.length === 1 && runtime.queue[0]?.prompt === 'third task';
+    }, 15_000);
+
+    const queueSnapshot = (bridge as any).getRuntime(rootChannel.id);
+    assert.equal(queueSnapshot.queue.length, 1);
+    assert.equal(queueSnapshot.queue[0]?.prompt, 'third task');
+  } finally {
+    delete process.env.FAKE_CODEX_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge downloads attachments and forwards image files to codex -i', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-attach-');
   const workspace = await createWorkspace(rootDir);

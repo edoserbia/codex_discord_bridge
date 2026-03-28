@@ -1218,7 +1218,11 @@ export class DiscordCodexBridge {
           await message.reply('只有管理员才能调整队列。');
           return;
         }
-        await this.handleQueueInsertCommand(message, resolved, command.index);
+        if (command.action === 'insert') {
+          await this.handleQueueInsertCommand(message, resolved, command.index);
+          return;
+        }
+        await this.handleQueueRemoveCommand(message, resolved, command.index);
         return;
       }
     }
@@ -1402,6 +1406,38 @@ export class DiscordCodexBridge {
     runtime.activeRun = undefined;
     this.scheduleRuntimeStateSave(resolved.conversationId, true);
     this.startProcessQueue(resolved.conversationId);
+  }
+
+  private async handleQueueRemoveCommand(
+    message: Message,
+    resolved: ResolvedConversation | undefined,
+    index: number,
+  ): Promise<void> {
+    if (!resolved) {
+      await message.reply('当前频道未绑定项目。先执行 `!bind`。');
+      return;
+    }
+
+    const runtime = this.getRuntime(resolved.conversationId);
+    const queueIndex = index - 1;
+    if (queueIndex < 0 || queueIndex >= runtime.queue.length) {
+      await message.reply(`队列序号无效。当前等待队列共有 ${runtime.queue.length} 条任务。`);
+      return;
+    }
+
+    const [removedTask] = runtime.queue.splice(queueIndex, 1);
+    if (!removedTask) {
+      await message.reply('未找到指定的队列项。');
+      return;
+    }
+
+    this.pushRunTimeline(runtime, `🗑️ 已移除队列中的 #${index}：${truncate(removedTask.prompt, 120)}`);
+    this.scheduleRuntimeStateSave(resolved.conversationId, true);
+
+    await message.reply(`已从队列中移除 #${index}：${truncate(removedTask.prompt, 120)}`);
+
+    const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
+    await this.refreshRuntimeViews(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
   }
 
   private async handleResetCommand(message: Message, resolved: ResolvedConversation | undefined): Promise<void> {

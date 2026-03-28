@@ -113,6 +113,7 @@ sudo ./scripts/install-service.sh --mode daemon
 !status
 !queue
 !queue insert 2
+!queue remove 2
 !web
 !sendfile <文件名/相对路径/绝对路径/序号>
 !guide <追加指令>
@@ -134,6 +135,7 @@ sudo ./scripts/install-service.sh --mode daemon
 - `!bind`、`!unbind`
 - `!cancel`、`!reset`
 - `!queue insert <序号>`
+- `!queue remove <序号>`
 - 所有会修改 Autopilot 状态的命令
 - 显式绝对路径文件发送，例如 `!sendfile /absolute/path/to/report.pdf`
 

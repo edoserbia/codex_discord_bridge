@@ -816,6 +816,7 @@ Web 面板可以用来：
 !status    查看当前会话状态
 !queue     查看当前会话队列
 !queue insert 2  把队列中的某一项提到前面
+!queue remove 2  删除队列中的某一项
 !web       返回 Web 面板访问链接
 !guide ... 在当前任务中途插入新引导
 !sendfile  发送工作区文件或选择候选序号
@@ -837,6 +838,7 @@ Web 面板可以用来：
 - `!bind`、`!unbind`
 - `!cancel`、`!reset`
 - `!queue insert <序号>`
+- `!queue remove <序号>`
 - 所有会修改 Autopilot 状态的命令
 - 显式绝对路径文件发送
 

@@ -218,6 +218,7 @@ export function formatHelp(prefix: string): string {
     `- 查看状态：\`${prefix}status\``,
     `- 查看队列：\`${prefix}queue\``,
     `- 队列插入：\`${prefix}queue insert <序号>\``,
+    `- 队列删除：\`${prefix}queue remove <序号>\``,
     `- Web 链接：\`${prefix}web\``,
     `- 运行中引导：\`${prefix}guide <追加指令>\``,
     `- 取消执行：\`${prefix}cancel\``,
