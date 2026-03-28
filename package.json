@@ -4,10 +4,14 @@
   "private": true,
   "description": "Discord backend bridge for Codex CLI with per-channel project mapping, attachments, thread sessions, web admin, and live progress updates",
   "type": "module",
+  "bin": {
+    "bridgectl": "./scripts/bridgectl"
+  },
   "engines": {
     "node": ">=20.11"
   },
   "scripts": {
+    "cli": "./scripts/bridgectl",
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
