@@ -205,6 +205,8 @@ bridgectl autopilot status
 !bind api "/path/to/workspaces/api"
 ```
 
+如果目标项目目录还不存在，bridge 会先自动创建这个目录，再完成绑定。
+
 绑定后会自动创建：
 
 - 主频道里的 `Autopilot 入口` 置顶卡片

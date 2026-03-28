@@ -177,6 +177,8 @@ CLI 通过这个 Web 控制面连接正在运行的 bridge 服务；如果配置
 !bind demo "/path/to/workspace" --skip-git-check on
 ```
 
+如果这个主绑定目录还不存在，bridge 会先自动创建该目录，然后再建立绑定。
+
 如果你把它关掉，而目录本身又不在 Git 仓库里，`app-server` 可能会因为工作区检查失败而回退到 `legacy-exec`。
 
 ## 代理配置

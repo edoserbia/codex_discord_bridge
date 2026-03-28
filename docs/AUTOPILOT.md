@@ -102,6 +102,8 @@ Autopilot · api
 !bind api "/path/to/workspaces/api"
 ```
 
+如果主绑定目录还不存在，bridge 会先自动创建这个目录，再生成 Autopilot 线程和看板文件。
+
 ### 4.2 开启服务级 Autopilot
 
 ```text
