@@ -17,6 +17,7 @@
 - 运行日志：`/path/to/codex-discord-bridge/logs/codex-discord-bridge.log`
 - PID 文件：`/path/to/codex-discord-bridge/.run/codex-discord-bridge.pid`
 - 状态文件：`/path/to/codex-discord-bridge/data/state.json`
+- 上传附件缓存：`/path/to/codex-discord-bridge/data/attachments/`
 - Web 面板：`http://127.0.0.1:3769`
 - LaunchAgent plist：`~/Library/LaunchAgents/<label>.plist`
 - LaunchDaemon plist：`/Library/LaunchDaemons/<label>.plist`
@@ -107,7 +108,7 @@ sudo ./scripts/install-service.sh --mode daemon
 
 ## 升级流程
 
-如果你通过 Git / Gitee 管理这个仓库，推荐更新流程：
+如果你通过 Git / GitLab 管理这个仓库，推荐更新流程：
 
 ```bash
 git pull
@@ -142,12 +143,50 @@ http://127.0.0.1:3769/?token=<YOUR_WEB_AUTH_TOKEN>
 
 浏览器会自动写入认证 Cookie，后续访问无需重复输入 Header。
 
+另外，Discord 里可以直接发送：
+
+```text
+!web
+```
+
+bridge 会返回当前 Web 面板可直接打开的本地地址和局域网地址；如果配置了 `WEB_AUTH_TOKEN`，返回链接会自动带上 token。
+
+如果你在本机终端里控制 Autopilot，也可以使用：
+
+```bash
+bridgectl autopilot status
+bridgectl autopilot project status --project api
+```
+
+CLI 通过这个 Web 控制面连接正在运行的 bridge 服务；如果配置了 `WEB_AUTH_TOKEN`，CLI 会默认复用它，也可以用 `CODEX_DISCORD_BRIDGE_WEB_AUTH_TOKEN` 临时覆盖。
+
+## 驱动与恢复行为
+
+- 普通文本任务默认优先使用官方 `app-server`
+- 如果 `app-server` 暂时不可用，或当前绑定目录不满足启动条件，bridge 会明确提示当前请求已回退到 `legacy-exec`
+- 进度卡会显示本轮实际驱动模式，避免“看起来像正常运行，实际上已经 fallback”这种误判
+- bridge 重启后，会优先恢复上一次中断的任务，再处理普通排队消息；Discord 中会看到恢复提示和恢复模式
+
+## 非 Git 目录绑定
+
+当前环境变量 `DEFAULT_CODEX_SKIP_GIT_REPO_CHECK` 默认值为 `true`，适合把 bridge 绑定到尚未初始化 Git 的目录。
+
+如果你希望对某个频道显式指定，可以在绑定时加：
+
+```text
+!bind demo "/path/to/workspace" --skip-git-check on
+```
+
+如果这个主绑定目录还不存在，bridge 会先自动创建该目录，然后再建立绑定。
+
+如果你把它关掉，而目录本身又不在 Git 仓库里，`app-server` 可能会因为工作区检查失败而回退到 `legacy-exec`。
+
 ## 代理配置
 
 如果 Discord 或附件下载在你的网络环境下不稳定，可以配置：
 
 ```text
-OPENCLAW_DISCORD_PROXY=http://127.0.0.1:7890
+CODEX_DISCORD_BRIDGE_PROXY=http://127.0.0.1:7890
 ```
 
 启动脚本和 launchd 前台入口都会自动注入：
@@ -157,7 +196,7 @@ OPENCLAW_DISCORD_PROXY=http://127.0.0.1:7890
 - `http_proxy`
 - `https_proxy`
 
-当检测到 `OPENCLAW_DISCORD_PROXY` 时，脚本还会自动为 Node 注入：
+当检测到 `CODEX_DISCORD_BRIDGE_PROXY` 时，脚本还会自动为 Node 注入：
 
 - `NODE_OPTIONS=... --use-system-ca`
 - 若系统存在 `/etc/ssl/cert.pem`，额外注入 `NODE_EXTRA_CA_CERTS=/etc/ssl/cert.pem`
@@ -171,7 +210,7 @@ Error: unable to get local issuer certificate
 如果你使用 `LaunchDaemon`，且代理证书只在登录态或某个单独 PEM 中可用，可以进一步配置：
 
 ```text
-OPENCLAW_DISCORD_CA_CERT=/path/to/proxy-ca.pem
+CODEX_DISCORD_BRIDGE_CA_CERT=/path/to/proxy-ca.pem
 ```
 
 脚本会把它注入为 `NODE_EXTRA_CA_CERTS`。
@@ -213,9 +252,9 @@ cat ~/.codex-tunning/secrets.env
 
 如果日志里出现 `unable to get local issuer certificate`，优先检查：
 
-- `.env` 里的 `OPENCLAW_DISCORD_PROXY` 是否正确
+- `.env` 里的 `CODEX_DISCORD_BRIDGE_PROXY` 是否正确
 - 当前版本脚本启动时是否已打印 `已为 Node 启用系统证书信任（--use-system-ca）`
-- 如仍失败，是否需要额外设置 `OPENCLAW_DISCORD_CA_CERT=/path/to/proxy-ca.pem`
+- 如仍失败，是否需要额外设置 `CODEX_DISCORD_BRIDGE_CA_CERT=/path/to/proxy-ca.pem`
 
 ## Discord 仍提示只读时
 
@@ -255,9 +294,39 @@ cat ~/.codex-tunning/secrets.env
 - 主频道：项目级入口
 - 线程：独立任务会话
 - 绑定、会话、消息状态：持久化到 `data/state.json`
+- 当前运行中的可恢复快照也会落盘，用于服务重启后的自动恢复
 - 附件缓存：位于 `data/attachments/`
+- Discord 上传的文件会同步镜像到当前绑定项目目录下的 `inbox/`
+
+## 文件收发规则
+
+- 图片附件会自动透传给 `codex -i`
+- 普通文件会缓存到 `data/attachments/...`，同时镜像到绑定工作区的 `inbox/`
+- 上传和发回文件时都会尽量保留原文件名；只有目标位置已存在同名文件时，才会在扩展名前追加一段随机后缀
+- 发文件回 Discord 时，默认会优先匹配 `inbox/`，再匹配其余工作区文件
+- 默认文件搜索范围是绑定工作区；自然语言 `把 report.pdf 发给我` 与 `!sendfile report.pdf` 都走这条路径
+- 如果有多个匹配，bridge 会返回编号列表，后续可用 `发第 2 个` 或 `!sendfile 2`
+- 显式绝对路径只允许管理员使用
+- 当用户要求 Codex 生成文件并直接回传时，bridge 会自动向 Codex 注入 `BRIDGE_SEND_FILE` 协议说明，让模型可以直接请求回传单个文件
 
 如需清空本地会话状态，可以先停止服务，再删除 `data/state.json`。
+
+## 管理员与权限边界
+
+管理员判定规则：
+
+- 用户 ID 命中 `DISCORD_ADMIN_USER_IDS`
+- 或当前 Discord 成员拥有 `Manage Guild` / `Manage Channels` 权限
+
+管理员命令包括：
+
+- `!bind`、`!unbind`
+- `!cancel`、`!reset`
+- `!queue insert <序号>`
+- `!queue remove <序号>`
+- 所有会修改 Autopilot 状态的命令
+
+显式绝对路径文件发送也属于管理员能力。
 
 ## 权限说明
 

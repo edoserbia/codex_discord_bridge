@@ -2,7 +2,7 @@ import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 import type { AppConfig } from './config.js';
-import type { BindCommandOptions } from './commandParser.js';
+import { parseCommand, type BindCommandOptions } from './commandParser.js';
 
 import { DiscordCodexBridge } from './discordBot.js';
 import { formatDashboardHtml } from './formatters.js';
@@ -84,6 +84,47 @@ export class AdminWebServer {
 
       if (request.method === 'GET' && url.pathname === '/api/dashboard') {
         this.sendJson(response, 200, this.bridge.getDashboardData());
+        return;
+      }
+
+      if (request.method === 'POST' && url.pathname === '/api/autopilot/command') {
+        const payload = await this.readJsonBody(request) as {
+          commandText?: string;
+          channelId?: string;
+          projectName?: string;
+          cwd?: string;
+        };
+
+        const commandText = payload.commandText?.trim();
+        if (!commandText) {
+          this.sendJson(response, 400, {
+            ok: false,
+            message: 'commandText 是必填项。',
+          });
+          return;
+        }
+
+        const parsed = parseCommand(commandText, this.config.commandPrefix);
+        if (parsed.kind !== 'autopilot' || parsed.scope === 'help') {
+          this.sendJson(response, 400, {
+            ok: false,
+            message: `只支持 ${this.config.commandPrefix}autopilot ... 命令。`,
+          });
+          return;
+        }
+
+        const result = await this.bridge.executeAutopilotControlCommand(parsed, {
+          channelId: payload.channelId,
+          projectName: payload.projectName,
+          cwd: payload.cwd,
+        });
+        const statusCode = result.ok
+          ? 200
+          : result.code === 'binding_not_found'
+            ? 404
+            : 400;
+
+        this.sendJson(response, statusCode, result);
         return;
       }
 

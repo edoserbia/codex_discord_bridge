@@ -121,6 +121,108 @@ test('web server supports bearer auth and browser token bootstrap cookie', { con
   }
 });
 
+test('web server executes autopilot commands through the local control API', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-web-autopilot-api-');
+  const workspaceA = await createWorkspace(path.join(rootDir, 'workspace-a'));
+  const workspaceB = await createWorkspace(path.join(rootDir, 'workspace-b'));
+  const { bridge, config, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeCodexCommand,
+    webEnabled: true,
+    webPort: 0,
+    webAuthToken: 'secret-token',
+  });
+
+  const apiChannel = new FakeChannel('channel-api', 'guild-1');
+  const webChannel = new FakeChannel('channel-web', 'guild-1');
+  channels.set(apiChannel.id, apiChannel);
+  channels.set(webChannel.id, webChannel);
+
+  await bridge.bindChannel({
+    channelId: apiChannel.id,
+    guildId: apiChannel.guildId,
+    projectName: 'api',
+    workspacePath: workspaceA,
+  });
+  await bridge.bindChannel({
+    channelId: webChannel.id,
+    guildId: webChannel.guildId,
+    projectName: 'web',
+    workspacePath: workspaceB,
+  });
+
+  const webServer = new AdminWebServer(config, bridge);
+  await webServer.start();
+
+  try {
+    const serviceResponse = await fetch(`${webServer.getOrigin()}/api/autopilot/command`, {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer secret-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        commandText: '!autopilot server on',
+      }),
+    });
+
+    assert.equal(serviceResponse.status, 200);
+    const servicePayload = await serviceResponse.json() as { ok: boolean; message: string };
+    assert.equal(servicePayload.ok, true);
+    assert.match(servicePayload.message, /已开启当前 bridge 进程里所有已绑定项目的服务级 Autopilot/);
+
+    const projectResponse = await fetch(`${webServer.getOrigin()}/api/autopilot/command`, {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer secret-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        commandText: '!autopilot project on',
+        projectName: 'api',
+      }),
+    });
+
+    assert.equal(projectResponse.status, 200);
+    const projectPayload = await projectResponse.json() as {
+      ok: boolean;
+      message: string;
+      resolvedTarget?: { projectName: string; channelId: string; mode: string };
+    };
+    assert.equal(projectPayload.ok, true);
+    assert.equal(projectPayload.resolvedTarget?.projectName, 'api');
+    assert.equal(projectPayload.resolvedTarget?.channelId, apiChannel.id);
+    assert.equal(projectPayload.resolvedTarget?.mode, 'project');
+    assert.match(projectPayload.message, /已更新 \*\*api\*\* 的项目级 Autopilot 设置/);
+
+    const cwdResponse = await fetch(`${webServer.getOrigin()}/api/autopilot/command`, {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer secret-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        commandText: '!autopilot project status',
+        cwd: workspaceB,
+      }),
+    });
+
+    assert.equal(cwdResponse.status, 200);
+    const cwdPayload = await cwdResponse.json() as {
+      ok: boolean;
+      message: string;
+      resolvedTarget?: { projectName: string; mode: string };
+    };
+    assert.equal(cwdPayload.ok, true);
+    assert.equal(cwdPayload.resolvedTarget?.projectName, 'web');
+    assert.equal(cwdPayload.resolvedTarget?.mode, 'cwd');
+    assert.match(cwdPayload.message, /Autopilot 项目状态：\*\*web\*\*/);
+  } finally {
+    await webServer.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('web server builds concrete local and lan access urls instead of exposing 0.0.0.0', { concurrency: false }, async () => {
   const urls = ((webServerModule as any).buildWebAccessUrls?.({
     bind: '0.0.0.0',

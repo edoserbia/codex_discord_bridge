@@ -4,15 +4,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- 新增 Discord 双向文件传输说明：上传附件镜像到绑定目录 `inbox/`，支持自然语言“把 report.pdf 发给我”、`!sendfile` 候选选择，以及 Codex 通过 `BRIDGE_SEND_FILE` 协议主动回传单个文件。
+- 新增文档化说明 `!web`、`--skip-git-check`、启动自动恢复、`app-server` / `legacy-exec` 驱动切换和管理员权限边界。
+
 ### Changed
 
-- 补充 `docs/MACOS-deploy.md`，新增“新 Mac 从 Gitee clone 到上线”的完整部署、验证与升级流程。
+- README、`docs/QUICKSTART.md`、`docs/DEPLOYMENT.md`、`docs/MACOS-deploy.md` 已统一到当前实际行为：文件收发、代理自动探测、LaunchAgent 原子重启、任务恢复、Web 链接和管理员判定都已补齐。
+- Git 文档默认口径改为自建 GitLab；新增 `docs/GIT.md`，旧 `docs/GITEE.md` 改为兼容提示入口。
 
 ### Fixed
 
 - 修复 `!guide` 在复杂任务中会把原任务整体替换掉的问题；现在会先处理中途引导，再继续原任务。
 - 状态面板、实时进度和队列展示现在会区分“当前引导”和“原任务”。
-- Git / Gitee 文档中的提交示例统一改为中文提交信息。
+- 文档中仍指向 Gitee、遗漏 `!web` / `!queue insert` / 管理员规则 / 非 Git 目录绑定说明的内容已补齐。
 
 ## [0.3.0] - 2026-03-12
 

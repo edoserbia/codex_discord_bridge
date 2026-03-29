@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### 变更概览
+- 补充 README 与 `docs/` 文档，统一说明当前 bridge 的文件收发、`!web`、管理员判定、`--skip-git-check`、`app-server` / `legacy-exec` 切换、任务自动恢复，以及 GitLab 远端使用方式。
+- 新增 `docs/GIT.md` 作为当前 Git / GitLab 主文档，旧 `docs/GITEE.md` 改为兼容提示入口。
+
 ## v0.3.3 - 2026-03-14
 
 ### 变更概览

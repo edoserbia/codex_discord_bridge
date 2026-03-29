@@ -234,8 +234,42 @@ export function cloneCodexOptions(value: BindingCodexOptions): BindingCodexOptio
   };
 }
 
-export async function resolveExistingDirectory(inputPath: string): Promise<string> {
+export async function resolveDirectoryPath(inputPath: string): Promise<string> {
   const resolved = path.resolve(inputPath);
+
+  try {
+    return await fs.realpath(resolved);
+  } catch (error) {
+    if (!isMissingPathError(error)) {
+      throw error;
+    }
+  }
+
+  const missingSegments: string[] = [];
+  let current = resolved;
+
+  while (true) {
+    const parent = path.dirname(current);
+    if (parent === current) {
+      return resolved;
+    }
+
+    missingSegments.unshift(path.basename(current));
+    current = parent;
+
+    try {
+      const realBase = await fs.realpath(current);
+      return path.join(realBase, ...missingSegments);
+    } catch (error) {
+      if (!isMissingPathError(error)) {
+        throw error;
+      }
+    }
+  }
+}
+
+export async function resolveExistingDirectory(inputPath: string): Promise<string> {
+  const resolved = await resolveDirectoryPath(inputPath);
   const stat = await fs.stat(resolved);
 
   if (!stat.isDirectory()) {
@@ -304,9 +338,22 @@ export async function ensureDirectory(targetPath: string): Promise<string> {
   return targetPath;
 }
 
+function isMissingPathError(error: unknown): error is NodeJS.ErrnoException {
+  return Boolean(error && typeof error === 'object' && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT');
+}
+
 export function sanitizeFilename(value: string): string {
-  const trimmed = value.trim() || 'attachment';
-  return trimmed.replace(/[^a-zA-Z0-9._-]+/g, '_');
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === '.' || trimmed === '..') {
+    return 'attachment';
+  }
+
+  const normalized = trimmed
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim();
+
+  return normalized && normalized !== '.' && normalized !== '..' ? normalized : 'attachment';
 }
 
 export function detectImageMime(filename: string, contentType?: string | null): boolean {

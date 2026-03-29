@@ -5,6 +5,7 @@ import { pipeline } from 'node:stream/promises';
 
 import type { AttachmentRef } from './types.js';
 
+import { allocateInboxFilePath, allocateUniqueFilePath } from './fileTransfer.js';
 import { detectImageMime, ensureDirectory, sanitizeFilename } from './utils.js';
 
 interface AttachmentLike {
@@ -42,6 +43,7 @@ export async function downloadAttachments(
   conversationId: string,
   taskId: string,
   rawAttachments: AttachmentLike[],
+  workspacePath?: string,
 ): Promise<DownloadedAttachments> {
   if (rawAttachments.length === 0) {
     return { attachments: [] };
@@ -57,15 +59,20 @@ export async function downloadAttachments(
       throw new Error(`下载附件失败：${attachment.url} (${response.status})`);
     }
 
-    const name = sanitizeFilename(attachment.name || `attachment-${index + 1}`);
-    const localPath = path.join(attachmentDir, name);
+    const requestedName = sanitizeFilename(attachment.name || `attachment-${index + 1}`);
+    const localPath = await allocateUniqueFilePath(attachmentDir, requestedName);
+    const storedName = path.basename(localPath);
     await pipeline(response.body, createWriteStream(localPath));
+    const workspaceLocalPath = workspacePath
+      ? await mirrorAttachmentIntoWorkspace(workspacePath, storedName, localPath)
+      : undefined;
 
     attachments.push({
-      name,
+      name: storedName,
       localPath,
+      workspaceLocalPath,
       sourceUrl: attachment.url,
-      isImage: detectImageMime(name, attachment.contentType),
+      isImage: detectImageMime(storedName, attachment.contentType),
       contentType: attachment.contentType ?? undefined,
       size: attachment.size ?? undefined,
     });
@@ -90,7 +97,8 @@ export function buildPromptWithAttachments(prompt: string, attachments: Attachme
 
   for (const attachment of attachments) {
     const label = attachment.isImage ? 'image' : 'file';
-    lines.push(`- [${label}] ${attachment.name} -> ${attachment.localPath}`);
+    const workspaceNote = attachment.workspaceLocalPath ? ` (workspace copy: ${attachment.workspaceLocalPath})` : '';
+    lines.push(`- [${label}] ${attachment.name} -> ${attachment.localPath}${workspaceNote}`);
   }
 
   lines.push('如果图像附件有视觉内容，请结合已附加的图片输入一起分析。');
@@ -103,4 +111,10 @@ export async function removeAttachmentDir(attachmentDir?: string): Promise<void>
   }
 
   await fs.rm(attachmentDir, { recursive: true, force: true });
+}
+
+async function mirrorAttachmentIntoWorkspace(workspacePath: string, fileName: string, sourcePath: string): Promise<string> {
+  const destinationPath = await allocateInboxFilePath(workspacePath, fileName);
+  await fs.copyFile(sourcePath, destinationPath);
+  return destinationPath;
 }
