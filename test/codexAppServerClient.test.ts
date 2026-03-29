@@ -227,6 +227,37 @@ test('app-server client resolves buffered interrupted terminal notifications cor
   }
 });
 
+test('app-server client preserves failure details from app-server error notifications', async () => {
+  const rootDir = await makeTempDir('codex-app-server-client-failed-message-');
+  const workspace = await createWorkspace(rootDir);
+  const binding = makeBinding(workspace);
+  const client = new CodexAppServerClient(makeConfig(rootDir));
+  const failureMessages: string[] = [];
+
+  try {
+    await client.start();
+    const threadId = await client.ensureThread(binding, undefined);
+    const turn = await client.startTurn(binding, threadId, {
+      prompt: '[app-failed-message] simulate 429 retry exhaustion',
+      imagePaths: [],
+      extraAddDirs: [],
+      onEvent: async (event) => {
+        const candidate = event as { type: string; message?: string };
+        if (candidate.type === 'turn.failed' && candidate.message) {
+          failureMessages.push(candidate.message);
+        }
+      },
+    });
+
+    const result = await turn.done;
+    assert.equal(result.success, false);
+    assert.deepEqual(failureMessages, ['exceeded retry limit, last status: 429 Too Many Requests']);
+  } finally {
+    await client.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('app-server client forwards per-thread config and writable roots to the official protocol', async () => {
   const rootDir = await makeTempDir('codex-app-server-client-config-');
   const workspace = await createWorkspace(rootDir);

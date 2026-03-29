@@ -38,6 +38,7 @@ import type {
   ActiveRunState,
   AutopilotProjectState,
   AutopilotServiceState,
+  CancellationReason,
   ChannelRuntime,
   ChannelBinding,
   CollabToolCall,
@@ -278,6 +279,23 @@ function buildRecoveryTask(
       lastKnownCommand: activeRun.currentCommand,
     },
   };
+}
+
+function shouldAutoRetryFailedRun(
+  activeRun: ActiveRunState | undefined,
+  result: CodexRunResult,
+  cancellationReason: CancellationReason | undefined,
+  failureKind: ReturnType<typeof diagnoseCodexFailure>['kind'],
+): boolean {
+  if (result.success || cancellationReason) {
+    return false;
+  }
+
+  if (failureKind === 'transient' || failureKind === 'stale-session' || failureKind === 'unexpected-empty-exit') {
+    return true;
+  }
+
+  return Boolean(activeRun && shouldContinueRecoveryFromState(activeRun));
 }
 
 function buildRunInputFromTask(task: PromptTask): CodexRunInput {
@@ -2512,10 +2530,16 @@ export class DiscordCodexBridge {
         result = await job.done;
         const cancellationReason = runtime.activeRun?.cancellationReason;
         const failureDiagnosis = diagnoseCodexFailure(result, cancellationReason);
+        const shouldAutoRetry = shouldAutoRetryFailedRun(
+          runtime.activeRun,
+          result,
+          cancellationReason,
+          failureDiagnosis.kind,
+        );
 
-        this.logCodexAttemptExit(binding, currentTask, conversationId, attemptsUsed, result, failureDiagnosis.retryable, failureDiagnosis.kind);
+        this.logCodexAttemptExit(binding, currentTask, conversationId, attemptsUsed, result, shouldAutoRetry, failureDiagnosis.kind);
 
-        if (failureDiagnosis.retryable && attemptsUsed < MAX_CODEX_ATTEMPTS) {
+        if (shouldAutoRetry && attemptsUsed < MAX_CODEX_ATTEMPTS) {
           pendingRetryKind = failureDiagnosis.kind;
           let nextSession = this.store.getSession(conversationId) ?? attemptSession;
           const retryDescription = this.describeRetry(failureDiagnosis.kind, attemptsUsed);
@@ -2729,10 +2753,10 @@ export class DiscordCodexBridge {
   }
 
   private describeRetry(kind: ReturnType<typeof diagnoseCodexFailure>['kind'], attempt: number): {
-    latestActivity: string;
-    timeline: string;
-    resetThreadBeforeRetry: boolean;
-  } {
+      latestActivity: string;
+      timeline: string;
+      resetThreadBeforeRetry: boolean;
+    } {
     switch (kind) {
       case 'stale-session':
         return {
@@ -2750,6 +2774,19 @@ export class DiscordCodexBridge {
           : {
               latestActivity: 'Codex 连接中断，bridge 正在继续当前会话并自动重试',
               timeline: '🔁 Codex 连接中断，bridge 正在继续当前会话并自动重试',
+              resetThreadBeforeRetry: false,
+            };
+      case 'diagnostic':
+      case 'none':
+        return attempt >= 2
+          ? {
+              latestActivity: 'Codex 连续失败，bridge 正在放弃当前会话并改用全新会话自动恢复',
+              timeline: '🧹 Codex 连续失败，bridge 正在放弃当前会话并改用全新会话自动恢复',
+              resetThreadBeforeRetry: true,
+            }
+          : {
+              latestActivity: 'Codex 执行失败，bridge 正在基于当前工作区状态自动恢复',
+              timeline: '🔁 Codex 执行失败，bridge 正在基于当前工作区状态自动恢复',
               resetThreadBeforeRetry: false,
             };
       case 'unexpected-empty-exit':

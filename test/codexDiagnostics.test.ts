@@ -92,6 +92,24 @@ test('diagnostics classifies transient Codex stream failures from structured eve
   assert.equal(diagnosis.kind, 'transient');
 });
 
+test('diagnostics classifies surfaced 429 retry exhaustion as transient', () => {
+  const diagnosis = diagnoseCodexFailure({
+    success: false,
+    exitCode: null,
+    signal: null,
+    usedResume: true,
+    turnCompleted: false,
+    agentMessages: [],
+    reasoning: [],
+    planItems: [],
+    stderr: ['Codex turn failed: exceeded retry limit, last status: 429 Too Many Requests'],
+    commands: [],
+  });
+
+  assert.equal(diagnosis.retryable, true);
+  assert.equal(diagnosis.kind, 'transient');
+});
+
 test('diagnostics classifies stale resume failures separately from generic exits', () => {
   const diagnosis = diagnoseCodexFailure({
     success: false,

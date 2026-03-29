@@ -86,7 +86,7 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
           break;
         case 'turn.failed':
           await flushCommandBuffers(null);
-          await emitDiagnosticLine('Codex turn failed.');
+          await emitDiagnosticLine(event.message ? `Codex turn failed: ${event.message}` : 'Codex turn failed.');
           break;
         case 'turn.interrupted':
           await flushCommandBuffers(null);

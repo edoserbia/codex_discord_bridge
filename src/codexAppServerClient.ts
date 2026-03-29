@@ -63,6 +63,7 @@ export class CodexAppServerClient {
   private messageChain: Promise<void> = Promise.resolve();
   private childStderrBuffer = '';
   private recentChildStderr: string[] = [];
+  private readonly pendingTurnFailureMessages = new Map<string, string[]>();
 
   constructor(private readonly config: AppConfig) {}
 
@@ -80,6 +81,7 @@ export class CodexAppServerClient {
     this.messageChain = Promise.resolve();
     this.childStderrBuffer = '';
     this.recentChildStderr = [];
+    this.pendingTurnFailureMessages.clear();
     this.transportMode = resolveAppServerTransport(this.config.codexAppServerTransport, this.config.codexCommand);
 
     const startup = this.startTransport(startupWorkspacePath);
@@ -109,6 +111,7 @@ export class CodexAppServerClient {
     this.driverFailure = undefined;
     this.childStderrBuffer = '';
     this.recentChildStderr = [];
+    this.pendingTurnFailureMessages.clear();
 
     if (socket) {
       try {
@@ -466,6 +469,14 @@ export class CodexAppServerClient {
     }
 
     switch (method) {
+      case 'error': {
+        const messageText = extractAppServerFailureMessage(params);
+        const target = this.resolveTurnReference(params);
+        if (messageText && target) {
+          this.rememberTurnFailureMessage(target.turnId, messageText);
+        }
+        break;
+      }
       case 'turn/started': {
         const threadId = typeof params.threadId === 'string' ? params.threadId : '';
         const turnId = extractNestedString(params, ['turn', 'id']);
@@ -503,6 +514,7 @@ export class CodexAppServerClient {
           }
 
           if (status === 'completed') {
+            this.pendingTurnFailureMessages.delete(turnId);
             await this.emitTurnEvent(turnId, {
               event: {
                 type: 'turn.completed',
@@ -519,11 +531,17 @@ export class CodexAppServerClient {
             break;
           }
 
+          const message = combineFailureMessages(
+            extractAppServerFailureMessage(params),
+            this.consumeTurnFailureMessage(turnId),
+            status !== 'failed' ? `app-server reported turn status ${status}` : undefined,
+          );
           await this.emitTurnEvent(turnId, {
             event: {
               type: 'turn.failed',
               threadId,
               turnId,
+              message,
             },
             terminalResult: {
               success: false,
@@ -654,6 +672,7 @@ export class CodexAppServerClient {
     activeTurn.completed = true;
     this.activeTurns.delete(turnId);
     this.bufferedTurnEvents.delete(turnId);
+    this.pendingTurnFailureMessages.delete(turnId);
     activeTurn.resolve(result);
   }
 
@@ -669,6 +688,7 @@ export class CodexAppServerClient {
     this.transportMode = undefined;
     this.stdoutBuffer = Buffer.alloc(0);
     this.messageChain = Promise.resolve();
+    this.pendingTurnFailureMessages.clear();
 
     for (const pending of this.pendingRequests.values()) {
       if (pending.timeout) {
@@ -818,6 +838,64 @@ export class CodexAppServerClient {
 
   private getRequestTimeoutMs(): number {
     return Math.max(1, this.config.codexAppServerRequestTimeoutMs ?? this.getStartupTimeoutMs());
+  }
+
+  private rememberTurnFailureMessage(turnId: string, message: string): void {
+    const normalized = normalizeCodexDiagnosticLine(message);
+    if (!normalized) {
+      return;
+    }
+
+    const next = uniqueStrings([
+      ...(this.pendingTurnFailureMessages.get(turnId) ?? []),
+      normalized,
+    ]);
+    this.pendingTurnFailureMessages.set(turnId, next.slice(-3));
+  }
+
+  private consumeTurnFailureMessage(turnId: string): string | undefined {
+    const messages = this.pendingTurnFailureMessages.get(turnId) ?? [];
+    this.pendingTurnFailureMessages.delete(turnId);
+    return messages.length > 0 ? messages.join(' | ') : undefined;
+  }
+
+  private resolveTurnReference(params: Record<string, unknown>): { threadId: string; turnId: string } | undefined {
+    const turnId = extractNestedString(params, ['turn', 'id'])
+      ?? (typeof params.turnId === 'string' ? params.turnId : undefined);
+    const threadId = typeof params.threadId === 'string' ? params.threadId : undefined;
+
+    if (turnId && threadId) {
+      return { threadId, turnId };
+    }
+
+    if (turnId) {
+      const activeTurn = this.activeTurns.get(turnId);
+      if (activeTurn) {
+        return { threadId: activeTurn.threadId, turnId };
+      }
+    }
+
+    if (threadId) {
+      const matchingTurns = [...this.activeTurns.values()].filter((turn) => turn.threadId === threadId && !turn.completed);
+      if (matchingTurns.length === 1) {
+        return {
+          threadId,
+          turnId: matchingTurns[0]!.turnId,
+        };
+      }
+    }
+
+    if (this.activeTurns.size === 1) {
+      const [onlyTurn] = this.activeTurns.values();
+      if (onlyTurn && !onlyTurn.completed) {
+        return {
+          threadId: onlyTurn.threadId,
+          turnId: onlyTurn.turnId,
+        };
+      }
+    }
+
+    return undefined;
   }
 }
 
@@ -975,6 +1053,22 @@ function extractNestedString(value: unknown, path: string[]): string | undefined
   }
 
   return typeof current === 'string' && current.trim() ? current.trim() : undefined;
+}
+
+function combineFailureMessages(...messages: Array<string | undefined>): string | undefined {
+  const normalized = uniqueStrings(messages.map((message) => normalizeCodexDiagnosticLine(message ?? '')).filter(Boolean));
+  return normalized.length > 0 ? normalized.join(' | ') : undefined;
+}
+
+function extractAppServerFailureMessage(value: unknown): string | undefined {
+  return combineFailureMessages(
+    extractNestedString(value, ['turn', 'error', 'message']),
+    extractNestedString(value, ['turn', 'error']),
+    extractNestedString(value, ['error', 'message']),
+    extractNestedString(value, ['error']),
+    extractNestedString(value, ['message']),
+    extractNestedString(value, ['detail']),
+  );
 }
 
 function resolveCommandInvocation(command: string): { command: string; argsPrefix: string[] } {

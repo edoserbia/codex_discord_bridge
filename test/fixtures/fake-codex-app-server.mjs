@@ -181,6 +181,23 @@ async function handleAsync(message) {
         return;
       }
 
+      if (prompt.includes('[app-failed-message]')) {
+        notify('error', {
+          message: 'exceeded retry limit, last status: 429 Too Many Requests',
+        });
+        setTimeout(() => {
+          if (!activeTurns.has(turnId)) {
+            return;
+          }
+          activeTurns.delete(turnId);
+          notify('turn/completed', {
+            threadId,
+            turn: { id: turnId, status: 'failed' },
+          });
+        }, 20);
+        return;
+      }
+
       if (prompt.includes('[app-plan]')) {
         notify('turn/plan/updated', {
           threadId,
