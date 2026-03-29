@@ -9,7 +9,7 @@
 - 如何安装开机启动服务
 - 如何在 Discord 里把“频道 ↔ 项目目录”绑定起来
 - 如何使用线程作为独立 Codex 会话
-- 如何查看实时进度、传图片和普通附件
+- 如何查看实时进度、传图片和普通附件，以及把工作区文件发回 Discord
 - 如何排查常见问题
 
 ## 一、你最终会得到什么
@@ -20,8 +20,12 @@
 - 主频道下每个线程对应该项目里的一个独立 Codex 会话
 - 在 Discord 里发消息即可驱动本机 `codex`
 - 运行中可以实时看到 reasoning、todo/plan、时间线、当前命令和输出预览
+- Discord 上传的文件会进入项目 `inbox/`，生成后的工作区文件也可以直接发回当前频道
+- 普通文本任务默认优先走 `app-server`，必要时会显式回退到 `legacy-exec`
+- 服务重启后，未完成任务会优先自动恢复，并在 Discord 中带恢复提示
 - 可以安装为 `launchd` 服务，实现开机启动或登录后启动
 - 可通过 Web 面板查看绑定和会话状态
+- 可通过本机 `bridgectl autopilot ...` CLI 在终端里控制同一套 Autopilot
 
 ## 二、前置条件
 
@@ -108,10 +112,10 @@ http://127.0.0.1:7890
 部署脚本会把它写入：
 
 ```text
-OPENCLAW_DISCORD_PROXY
+CODEX_DISCORD_BRIDGE_PROXY
 ```
 
-并在启动时自动注入 `HTTP_PROXY` / `HTTPS_PROXY`。
+并在启动时自动注入 `HTTP_PROXY` / `HTTPS_PROXY`。脚本现在会先直连探测 Discord；只有直连失败时，才会自动尝试 `http://127.0.0.1:7890` 并把结果写回这个变量。
 
 如果你在代理环境下启动时看到：
 
@@ -119,13 +123,15 @@ OPENCLAW_DISCORD_PROXY
 Error: unable to get local issuer certificate
 ```
 
-当前脚本会在检测到 `OPENCLAW_DISCORD_PROXY` 时自动为 Node 注入 `--use-system-ca`；如果系统存在 `/etc/ssl/cert.pem`，也会把它作为额外 CA bundle 注入。这通常足够让服务信任 macOS 已信任的代理根证书。
+当前脚本会在检测到 `CODEX_DISCORD_BRIDGE_PROXY` 时自动为 Node 注入 `--use-system-ca`；如果系统存在 `/etc/ssl/cert.pem`，也会把它作为额外 CA bundle 注入。这通常足够让服务信任 macOS 已信任的代理根证书。
 
 如果你使用的是 `daemon` 模式，且证书只存在于登录用户上下文，仍可能需要把代理根证书导出成 PEM，并在 `.env` 中额外设置：
 
 ```text
-OPENCLAW_DISCORD_CA_CERT=/path/to/proxy-ca.pem
+CODEX_DISCORD_BRIDGE_CA_CERT=/path/to/proxy-ca.pem
 ```
+
+如果你已经安装了 `LaunchAgent` / `LaunchDaemon`，当前版本的 `./scripts/macos-bridge.sh restart` 会优先使用 `launchctl kickstart -k` 做原子重启，而不是先停掉当前服务再重新拉起。这样可以避免从 bridge 自己的会话里执行重启时，`stop` 把当前会话和后续 `start` 一起中断。
 
 ### 6. OpenClaw 配置（可选）
 
@@ -193,7 +199,30 @@ cd /path/to/codex-discord-bridge
 ./scripts/macos-bridge.sh install-service --mode daemon
 ./scripts/macos-bridge.sh uninstall-service --mode daemon
 ./scripts/macos-bridge.sh deploy
+./scripts/bridgectl autopilot status
+./scripts/bridgectl autopilot project status --project api
 ```
+
+如果你希望在任意目录直接使用 `bridgectl`，可以在 bridge 仓库里执行一次：
+
+```bash
+npm run build
+npm link
+```
+
+之后即可在任意已绑定项目目录中执行：
+
+```bash
+bridgectl autopilot project status
+bridgectl autopilot project run
+```
+
+项目定位规则：
+
+- `--channel <频道ID>` 优先
+- `--project <绑定项目名>` 次之
+- 两者都不传时按当前工作目录匹配绑定项目
+- 匹配不到或匹配多个时直接报错，不猜
 
 ## 六、部署脚本会做什么
 
@@ -240,7 +269,7 @@ cd /path/to/codex-discord-bridge
 
 建议保留，避免本机 Web 面板裸奔。
 
-### `OPENCLAW_DISCORD_PROXY`
+### `CODEX_DISCORD_BRIDGE_PROXY`
 
 如果你访问 Discord 需要代理，这里填写：
 
@@ -248,7 +277,7 @@ cd /path/to/codex-discord-bridge
 http://127.0.0.1:7890
 ```
 
-## 八、在一台新 Mac 上，从 Gitee 拉下来之后怎么完整部署
+## 八、在一台新 Mac 上，从 GitLab 拉下来之后怎么完整部署
 
 这部分就是“换一台全新的 macOS 机器”时，最推荐照着走的一条龙流程。
 
@@ -270,26 +299,34 @@ npm -v
 codex --version
 ```
 
-### 2. 从 Gitee 拉代码
+### 2. 从 GitLab 拉代码
 
-如果你已经给这台 Mac 配好了 Gitee SSH Key，推荐直接用 SSH：
+如果你已经给这台 Mac 配好了 GitLab SSH Key，推荐直接用 SSH：
 
 ```bash
-git clone git@gitee.com:<你的 Gitee 用户名>/<你的仓库名>.git
+git clone git@<your-gitlab-host>:<namespace>/<repo>.git
 cd <你的仓库目录名>
 ```
 
 如果你还没有配 SSH Key，也可以先用 HTTPS：
 
 ```bash
-git clone https://gitee.com/<你的 Gitee 用户名>/<你的仓库名>.git
+git clone https://<your-gitlab-host>/<namespace>/<repo>.git
 cd <你的仓库目录名>
 ```
 
 如果这是一个私有仓库：
 
-- 使用 SSH 时，要先把这台 Mac 的公钥加到 Gitee 账号
-- 使用 HTTPS 时，拉取时需要输入 Gitee 账号凭据
+- 使用 SSH 时，要先把这台 Mac 的公钥加到 GitLab 账号
+- 使用 HTTPS 时，拉取时需要输入 GitLab 账号凭据
+
+如果你手里拿到的是旧 Gitee 时代的本地工作区，推荐直接把 `origin` 改到当前 GitLab 仓库：
+
+```bash
+git remote set-url origin git@<your-gitlab-host>:<namespace>/<repo>.git
+git fetch origin --prune
+git branch -u origin/main main
+```
 
 ### 3. 直接执行一键部署
 
@@ -319,7 +356,7 @@ cd <你的仓库目录名>
 - `DISCORD_ADMIN_USER_IDS`
 - `WEB_PORT`
 - `WEB_AUTH_TOKEN`
-- `OPENCLAW_DISCORD_PROXY`（可选）
+- `CODEX_DISCORD_BRIDGE_PROXY`（自动探测，通常无需手填）
 
 建议这样理解：
 
@@ -328,7 +365,7 @@ cd <你的仓库目录名>
 - `DISCORD_ADMIN_USER_IDS`：你的 Discord 用户 ID，可选但建议填写
 - `WEB_PORT`：本地管理面板端口，默认 `3769`
 - `WEB_AUTH_TOKEN`：本机 Web 管理面板鉴权 token，建议保留
-- `OPENCLAW_DISCORD_PROXY`：如果这台新机器访问 Discord 不稳定，就填 `http://127.0.0.1:7890`
+- `CODEX_DISCORD_BRIDGE_PROXY`：脚本会自动探测并在需要时写成 `http://127.0.0.1:7890`
 
 ### 5. 选择是否安装成自启动服务
 
@@ -401,7 +438,7 @@ Discord bot connected as <bot-name>#<discriminator>
 ./scripts/macos-bridge.sh configure
 ```
 
-如果你从 Gitee 拉了新版本，推荐更新流程：
+如果你从 GitLab 拉了新版本，推荐更新流程：
 
 ```bash
 git pull
@@ -418,7 +455,7 @@ npm run build
 
 优先检查：
 
-- 这台 Mac 是否已经配置 Gitee SSH Key
+- 这台 Mac 是否已经配置 GitLab SSH Key
 - 私有仓库是否有访问权限
 - 是否需要改用 HTTPS 克隆
 
@@ -437,7 +474,7 @@ npm run build
 ./scripts/macos-bridge.sh restart
 ```
 
-然后把 `OPENCLAW_DISCORD_PROXY` 配成：
+然后确认 `CODEX_DISCORD_BRIDGE_PROXY` 已自动写成：
 
 ```text
 http://127.0.0.1:7890
@@ -565,7 +602,9 @@ Discord bot connected as <bot-name>#<discriminator>
 
 - `!bind` 必须在主频道执行
 - 该主频道下创建的线程会自动继承此绑定
+- 如果主绑定目录还不存在，bridge 会先自动创建这个目录
 - 默认 `.env` 已把 `DEFAULT_CODEX_SANDBOX` 设为 `danger-full-access`
+- 如果工作目录本身不是 Git 仓库，建议显式补上 `--skip-git-check on`
 
 ### 2. 线程会自动变成独立会话
 
@@ -587,7 +626,15 @@ Bridge 会中断当前步骤，并在**同一会话**中先处理这条引导，
 ### 4. 图片和文件怎么传
 
 - 图片附件会自动透传给 `codex -i`
-- 普通文件会下载到本地附件目录，并提示 Codex 读取
+- 普通文件会下载到 bridge 本地附件目录，并同步到绑定项目目录的 `inbox/`
+- 上传和发回文件时都会尽量保留原文件名；只有目标位置已存在同名文件时，才会在扩展名前追加一段随机后缀
+- 发文件回 Discord 时，bridge 会优先在 `inbox/` 中查找，再扩展到其余工作区文件
+- 如果你想把工作区里的文件发回 Discord，可以直接说 `把 report.pdf 发给我`
+- 也可以直接说 `生成完 report.pdf 后直接发给我`
+- 也可以用 `!sendfile report.pdf`
+- 多个匹配时，bridge 会给出候选编号；继续回复 `发第 2 个` 或 `!sendfile 2`
+- 显式绝对路径只允许管理员使用
+- 当你要求 “生成 report.pdf 后直接发给我” 时，bridge 会自动把文件回传协议注入给 Codex；模型定位到单个文件后会直接把附件发回当前频道/线程
 
 ## 十三、权限和写文件说明
 
@@ -666,14 +713,14 @@ destructive_enabled = true
 - Bot 是否已加入目标服务器
 - 网络是否需要代理
 
-## 十、在 Discord 里如何使用
+## 十五、在 Discord 里如何使用
 
 ### 1. 主频道绑定项目
 
 在一个普通文本频道中执行：
 
 ```text
-!bind api "/path/to/workspaces/api" --sandbox workspace-write --approval never --search off
+!bind api "/path/to/workspaces/api" --sandbox danger-full-access --approval never --search off
 ```
 
 绑定后，这个主频道就对应：
@@ -724,14 +771,19 @@ destructive_enabled = true
 ### 6. 图片和普通附件怎么处理
 
 - 图片附件：直接透传给 `codex -i`
-- 普通文件：先下载到本地附件目录，再把路径告知 Codex
+- 普通文件：先下载到本地附件目录，再同步到绑定目录的 `inbox/`
+- 上传和发回文件时都会尽量保留原文件名；只有目标位置已存在同名文件时，才会在扩展名前追加一段随机后缀
+- 发回文件时会优先在 `inbox/` 命中，再继续搜索其他工作区文件
+- 发回文件：可以直接说 `把 report.pdf 发给我`，或使用 `!sendfile report.pdf`
+- 多候选时：回复 `发第 2 个` 或 `!sendfile 2`
+- 绝对路径：仅管理员可用
 
 适合：
 
 - 截图让 Codex 看 UI / 报错
 - 发送日志、配置文件、Markdown、代码片段等
 
-## 十一、Web 管理面板怎么用
+## 十六、Web 管理面板怎么用
 
 默认打开方式：
 
@@ -754,19 +806,48 @@ Web 面板可以用来：
 - 创建 / 删除绑定
 - 重置会话
 
-## 十二、常用命令说明
+如果你已经在 Discord 里，直接发 `!web` 也可以让 bridge 返回当前本地和局域网访问链接。
+
+## 十七、常用命令说明
 
 ```text
 !help      查看帮助
+!autopilot 查看 Autopilot 帮助
 !status    查看当前会话状态
 !queue     查看当前会话队列
+!queue insert 2  把队列中的某一项提到前面
+!queue remove 2  删除队列中的某一项
+!web       返回 Web 面板访问链接
+!guide ... 在当前任务中途插入新引导
+!sendfile  发送工作区文件或选择候选序号
 !cancel    取消当前任务
 !reset     重置当前会话上下文
 !unbind    解绑当前主频道
 !projects  查看当前服务器中的项目绑定
 ```
 
-## 十三、常见问题
+### 管理员怎么识别
+
+管理员判定规则：
+
+- 用户 ID 命中 `DISCORD_ADMIN_USER_IDS`
+- 或当前 Discord 成员拥有 `Manage Guild` / `Manage Channels` 权限
+
+管理员才能执行：
+
+- `!bind`、`!unbind`
+- `!cancel`、`!reset`
+- `!queue insert <序号>`
+- `!queue remove <序号>`
+- 所有会修改 Autopilot 状态的命令
+- 显式绝对路径文件发送
+
+## 十八、常见问题
+
+如果你遇到“LaunchAgent 已安装，但 `launchctl：未加载` / 服务重启后起不来”的情况，优先参考：
+
+- `docs/ops/2026-03-26-launchagent-recovery.md`
+
 
 ### 1. 机器人离线
 
@@ -811,10 +892,20 @@ npm run build
 优先检查网络和代理。必要时配置：
 
 ```text
-OPENCLAW_DISCORD_PROXY=http://127.0.0.1:7890
+CODEX_DISCORD_BRIDGE_PROXY=http://127.0.0.1:7890
 ```
 
-### 5. 想改配置怎么办
+### 5. 绑定的是非 Git 目录，结果提示回退到 `legacy-exec`
+
+重新绑定时显式加上：
+
+```text
+!bind demo "/path/to/non-git-workspace" --sandbox danger-full-access --approval never --search off --skip-git-check on
+```
+
+当前 bridge 默认优先走 `app-server`；只有在工作目录不满足条件，或者你手动关掉了仓库检查时，才会显示 fallback 提示。
+
+### 6. 想改配置怎么办
 
 重新执行：
 
@@ -822,7 +913,7 @@ OPENCLAW_DISCORD_PROXY=http://127.0.0.1:7890
 ./scripts/macos-bridge.sh configure
 ```
 
-## 十四、推荐的日常使用方式
+## 十九、推荐的日常使用方式
 
 推荐你长期这样组织：
 

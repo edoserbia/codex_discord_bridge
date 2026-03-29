@@ -31,6 +31,13 @@ import {
   normalizeAutopilotBoardDocument,
   parseAutopilotReport,
 } from './autopilot.js';
+import {
+  resolveAutopilotBindingTarget,
+  toAutopilotTargetCandidate,
+  type AutopilotResolvedTarget,
+  type AutopilotTargetCandidate,
+  type AutopilotTargetHints,
+} from './autopilotControl.js';
 import type { AppConfig } from './config.js';
 import type { BindCommandOptions, ParsedCommand } from './commandParser.js';
 import type { CodexExecutionDriver, CodexRunHooks, RunningCodexJob } from './codexRunner.js';
@@ -52,8 +59,16 @@ import type {
 } from './types.js';
 
 import { buildPromptWithAttachments, downloadAttachments, extractMessageAttachments, removeAttachmentDir } from './attachments.js';
+import { appendBridgeFileSendInstructions, extractBridgeFileSendDirective } from './bridgeFileSendProtocol.js';
 import { diagnoseCodexFailure, filterDiagnosticStderr, isIgnorableCodexStderrLine } from './codexDiagnostics.js';
 import { isCommandMessage, parseCommand } from './commandParser.js';
+import {
+  detectNaturalLanguageFileRequest,
+  formatFileCandidates,
+  parseFileSelectionFollowUp,
+  resolveFileRequest,
+  type FileTransferCandidate,
+} from './fileTransfer.js';
 import {
   formatAutopilotBriefAck,
   formatAutopilotEntryCard,
@@ -76,13 +91,20 @@ import {
   formatWebAccessLinks,
 } from './formatters.js';
 import { JsonStateStore } from './store.js';
-import { cloneCodexOptions, formatClockTimestamp, formatDurationMs, isWithinAllowedRoots, normalizeAllowedRoots, resolveExistingDirectory, splitIntoDiscordChunks, summarizeReasoningText, truncate, uniqueStrings } from './utils.js';
+import { cloneCodexOptions, formatClockTimestamp, formatDurationMs, isWithinAllowedRoots, normalizeAllowedRoots, resolveDirectoryPath, resolveExistingDirectory, splitIntoDiscordChunks, summarizeReasoningText, truncate, uniqueStrings } from './utils.js';
 import { buildWebAccessUrls } from './webAccess.js';
+
+type SendPayload =
+  | string
+  | {
+    content?: string;
+    files?: Array<string | { attachment: string; name?: string }>;
+  };
 
 type SendableMessage = {
   id: string;
   content: string;
-  reply: (content: string) => Promise<SendableMessage>;
+  reply: (content: SendPayload) => Promise<SendableMessage>;
   edit: (content: string) => Promise<SendableMessage>;
   pin?: () => Promise<unknown>;
 };
@@ -91,7 +113,8 @@ type SendableChannel = {
   id: string;
   parentId?: string | null;
   guildId?: string | null;
-  send: (content: string) => Promise<SendableMessage>;
+  attachmentSizeLimit?: number;
+  send: (content: SendPayload) => Promise<SendableMessage>;
   sendTyping: () => Promise<void>;
   setArchived?: (archived: boolean) => Promise<unknown>;
   threads?: {
@@ -163,6 +186,8 @@ const MIN_RUNTIME_VIEW_REFRESH_INTERVAL_MS = 300;
 const AUTOPILOT_THREAD_AUTO_ARCHIVE_MINUTES: ThreadAutoArchiveDuration = 1440;
 const AUTOPILOT_REQUESTED_BY = 'Autopilot';
 const AUTOPILOT_REQUESTED_BY_ID = 'autopilot';
+const FILE_SELECTION_TTL_MS = 10 * 60 * 1000;
+const DEFAULT_DISCORD_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const execFileAsync = promisify(execFile);
 
 interface PendingRuntimeViewRefresh {
@@ -171,6 +196,19 @@ interface PendingRuntimeViewRefresh {
   session: ConversationSessionState;
   runtime: ChannelRuntime;
   isThreadConversation: boolean;
+}
+
+interface PendingFileSelection {
+  candidates: FileTransferCandidate[];
+  expiresAtMs: number;
+}
+
+interface AutopilotControlResult {
+  ok: boolean;
+  message: string;
+  resolvedTarget?: AutopilotResolvedTarget | undefined;
+  candidates?: AutopilotTargetCandidate[] | undefined;
+  code?: 'target_required' | 'binding_not_found' | 'ambiguous_target' | undefined;
 }
 
 function hasBindingExecutionChanged(previous: ChannelBinding | undefined, next: ChannelBinding): boolean {
@@ -300,7 +338,7 @@ function shouldAutoRetryFailedRun(
 
 function buildRunInputFromTask(task: PromptTask): CodexRunInput {
   return {
-    prompt: task.effectivePrompt,
+    prompt: appendBridgeFileSendInstructions(task.effectivePrompt),
     imagePaths: task.attachments.filter((item) => item.isImage).map((item) => item.localPath),
     extraAddDirs: [
       ...task.extraAddDirs,
@@ -342,6 +380,7 @@ export class DiscordCodexBridge {
   private readonly pendingRuntimeStateSaves = new Map<string, NodeJS.Timeout>();
   private readonly activeAutopilotProjects = new Set<string>();
   private readonly autopilotBoardSnapshots = new Map<string, AutopilotProjectState['board']>();
+  private readonly pendingFileSelections = new Map<string, PendingFileSelection>();
   private autopilotTicker: NodeJS.Timeout | undefined;
   private autopilotTickInFlight = false;
 
@@ -394,18 +433,20 @@ export class DiscordCodexBridge {
   }
 
   async bindChannel(request: BindRequest): Promise<ChannelBinding> {
-    const resolvedWorkspace = await resolveExistingDirectory(request.workspacePath);
     const resolvedGuildId = request.guildId ?? (await this.fetchChannel(request.channelId))?.guildId ?? undefined;
     const allowedRoots = await normalizeAllowedRoots(this.config.allowedWorkspaceRoots);
+    const targetWorkspace = await resolveDirectoryPath(request.workspacePath);
 
     if (!resolvedGuildId) {
       throw new Error(`无法解析频道 ${request.channelId} 对应的 guildId，请确认机器人已加入该服务器并能访问此频道。`);
     }
 
-    if (!isWithinAllowedRoots(resolvedWorkspace, allowedRoots)) {
-      throw new Error(`该目录不在允许的根目录下：${resolvedWorkspace}`);
+    if (!isWithinAllowedRoots(targetWorkspace, allowedRoots)) {
+      throw new Error(`该目录不在允许的根目录下：${targetWorkspace}`);
     }
 
+    await fs.mkdir(targetWorkspace, { recursive: true });
+    const resolvedWorkspace = await resolveExistingDirectory(targetWorkspace);
     const options = request.options ?? { addDirs: [], extraConfig: [] };
     const addDirs = await Promise.all(options.addDirs.map(async (item) => resolveExistingDirectory(item)));
 
@@ -515,6 +556,37 @@ export class DiscordCodexBridge {
     }, bindingChannelId);
   }
 
+  async executeAutopilotControlCommand(
+    command: Exclude<Extract<ParsedCommand, { kind: 'autopilot' }>, { scope: 'help' }>,
+    targetHints: AutopilotTargetHints = {},
+  ): Promise<AutopilotControlResult> {
+    if (command.scope === 'server') {
+      return {
+        ok: true,
+        message: await this.executeAutopilotServerCommand(command),
+      };
+    }
+
+    const resolution = resolveAutopilotBindingTarget(this.store.listBindings(), targetHints);
+    if (!resolution.ok) {
+      return {
+        ok: false,
+        code: resolution.code,
+        message: resolution.message,
+        candidates: resolution.candidates,
+      };
+    }
+
+    return {
+      ok: true,
+      message: await this.executeAutopilotProjectCommand(resolution.binding, command),
+      resolvedTarget: {
+        ...toAutopilotTargetCandidate(resolution.binding),
+        mode: resolution.mode,
+      },
+    };
+  }
+
   private async resetBindingSessions(bindingChannelId: string): Promise<void> {
     const sessions = this.store.listSessions(bindingChannelId);
 
@@ -575,7 +647,36 @@ export class DiscordCodexBridge {
       this.runtimes.set(conversationId, runtime);
     }
 
+    this.recoverDetachedActiveRun(conversationId, runtime);
     return runtime;
+  }
+
+  private recoverDetachedActiveRun(conversationId: string, runtime: ChannelRuntime): void {
+    const activeRun = runtime.activeRun;
+    if (!activeRun || this.activeJobs.has(conversationId)) {
+      return;
+    }
+
+    const taskId = activeRun.task.id.slice(0, 8);
+
+    if (this.isRecoverableActiveRun(activeRun)) {
+      runtime.queue.unshift(buildRecoveryTask(
+        activeRun,
+        'restart',
+        'bridge 检测到运行状态残留，正在恢复中断任务',
+        (activeRun.task.recovery?.attempt ?? 0) + 1,
+      ));
+      console.warn(
+        `[bridge-runtime] recovered detached active run conversation=${conversationId} task=${taskId}`,
+      );
+    } else {
+      console.warn(
+        `[bridge-runtime] cleared detached finished run conversation=${conversationId} task=${taskId}`,
+      );
+    }
+
+    runtime.activeRun = undefined;
+    this.scheduleRuntimeStateSave(conversationId, true);
   }
 
   private scheduleRuntimeStateSave(conversationId: string, immediate = false): void {
@@ -741,12 +842,216 @@ export class DiscordCodexBridge {
     }
 
     const prompt = message.content.trim();
+    const attachments = extractMessageAttachments(message);
 
-    if (!prompt && extractMessageAttachments(message).length === 0) {
+    if (!prompt && attachments.length === 0) {
       return;
     }
 
+    if (prompt && attachments.length === 0) {
+      const handled = await this.handleFileTransferMessage(message, resolved, prompt);
+      if (handled) {
+        return;
+      }
+    }
+
     await this.enqueuePrompt(message, resolved, prompt || '请分析我附带的附件内容。');
+  }
+
+  private async handleFileTransferMessage(
+    message: Message,
+    resolved: ResolvedConversation,
+    prompt: string,
+  ): Promise<boolean> {
+    const selectionIndex = parseFileSelectionFollowUp(prompt);
+    if (selectionIndex) {
+      if (!this.getPendingFileSelection(resolved.conversationId)) {
+        return false;
+      }
+      await this.handleSendFileSelection(message, resolved, selectionIndex);
+      return true;
+    }
+
+    const request = detectNaturalLanguageFileRequest(prompt);
+    if (!request) {
+      return false;
+    }
+
+    await this.handleSendFileRequest(message, resolved, request);
+    return true;
+  }
+
+  private getPendingFileSelection(conversationId: string): PendingFileSelection | undefined {
+    const pending = this.pendingFileSelections.get(conversationId);
+
+    if (!pending) {
+      return undefined;
+    }
+
+    if (pending.expiresAtMs <= Date.now()) {
+      this.pendingFileSelections.delete(conversationId);
+      return undefined;
+    }
+
+    return pending;
+  }
+
+  private async sendResolvedFile(
+    message: Message,
+    file: FileTransferCandidate,
+    content = `已发送文件：${file.name}`,
+  ): Promise<void> {
+    const validationError = await this.getResolvedFileSendError(
+      file,
+      message.channel as { attachmentSizeLimit?: number } | null,
+    );
+    if (validationError) {
+      await message.reply(validationError);
+      return;
+    }
+
+    await message.reply({
+      content,
+      files: [{ attachment: file.absolutePath, name: file.name }],
+    });
+  }
+
+  private getDiscordAttachmentSizeLimit(channel?: { attachmentSizeLimit?: number } | null): number {
+    const limit = channel?.attachmentSizeLimit;
+    if (typeof limit === 'number' && Number.isFinite(limit) && limit > 0) {
+      return limit;
+    }
+    return DEFAULT_DISCORD_ATTACHMENT_BYTES;
+  }
+
+  private formatAttachmentSizeLimit(limitBytes: number): string {
+    const limitMiB = limitBytes / (1024 * 1024);
+    if (Number.isInteger(limitMiB)) {
+      return `${limitMiB.toFixed(0)} MiB`;
+    }
+    return `${limitMiB.toFixed(1)} MiB`;
+  }
+
+  private async getResolvedFileSendError(
+    file: FileTransferCandidate,
+    channel?: { attachmentSizeLimit?: number } | null,
+  ): Promise<string | undefined> {
+    const stat = await fs.stat(file.absolutePath).catch(() => null);
+
+    if (!stat || !stat.isFile()) {
+      return `文件不存在或已不可读：${file.absolutePath}`;
+    }
+
+    const attachmentSizeLimit = this.getDiscordAttachmentSizeLimit(channel);
+    if (stat.size > attachmentSizeLimit) {
+      return `文件过大，当前频道最多支持发送 ${this.formatAttachmentSizeLimit(attachmentSizeLimit)} 的文件。`;
+    }
+
+    return undefined;
+  }
+
+  private async handleSendFileRequest(
+    message: Message,
+    resolved: ResolvedConversation,
+    request: string,
+  ): Promise<void> {
+    const result = await resolveFileRequest({
+      workspacePath: resolved.binding.workspacePath,
+      request,
+      allowAbsolutePath: this.isAdmin(message),
+    });
+
+    switch (result.kind) {
+      case 'single':
+        this.pendingFileSelections.delete(resolved.conversationId);
+        await this.sendResolvedFile(message, result.file);
+        return;
+      case 'candidates':
+        this.pendingFileSelections.set(resolved.conversationId, {
+          candidates: result.candidates,
+          expiresAtMs: Date.now() + FILE_SELECTION_TTL_MS,
+        });
+        await message.reply(formatFileCandidates(result.candidates, { commandPrefix: this.config.commandPrefix }));
+        return;
+      case 'denied':
+      case 'missing':
+        this.pendingFileSelections.delete(resolved.conversationId);
+        await message.reply(result.message);
+        return;
+    }
+  }
+
+  private async handleSendFileSelection(
+    message: Message,
+    resolved: ResolvedConversation,
+    index: number,
+  ): Promise<void> {
+    const pending = this.getPendingFileSelection(resolved.conversationId);
+
+    if (!pending) {
+      await message.reply('当前没有待选择的文件候选列表。先发送自然语言请求，或使用 `!sendfile <文件名>`。');
+      return;
+    }
+
+    const selected = pending.candidates[index - 1];
+    if (!selected) {
+      await message.reply(`当前候选只有 ${pending.candidates.length} 个，请回复有效序号。`);
+      return;
+    }
+
+    this.pendingFileSelections.delete(resolved.conversationId);
+    await this.sendResolvedFile(message, selected, `已发送第 ${index} 个文件：${selected.name}`);
+  }
+
+  private async buildSuccessReplyPayload(
+    channel: SendableChannel,
+    binding: ChannelBinding,
+    task: PromptTask,
+    result: CodexRunResult,
+  ): Promise<SendPayload> {
+    const finalMessage = result.agentMessages.at(-1) ?? '';
+    const directive = extractBridgeFileSendDirective(finalMessage);
+    const visibleMessage = directive.cleanText || directive.caption || undefined;
+    const baseContent = visibleMessage
+      ? formatSuccessReply(binding, task.requestedBy, result, { finalMessage: visibleMessage })
+      : formatSuccessReply(binding, task.requestedBy, result);
+
+    if (!directive.request) {
+      if (!directive.error) {
+        return baseContent;
+      }
+
+      return `${baseContent}\n\nBridge 文件发送请求无效：${directive.error}`;
+    }
+
+    const resolution = await resolveFileRequest({
+      workspacePath: binding.workspacePath,
+      request: directive.request,
+      allowAbsolutePath: false,
+    });
+
+    switch (resolution.kind) {
+      case 'single': {
+        const validationError = await this.getResolvedFileSendError(resolution.file, channel);
+        if (validationError) {
+          return `${baseContent}\n\n${validationError}`;
+        }
+
+        return {
+          content: baseContent,
+          files: [{ attachment: resolution.file.absolutePath, name: resolution.file.name }],
+        };
+      }
+      case 'candidates':
+        this.pendingFileSelections.set(task.conversationId, {
+          candidates: resolution.candidates,
+          expiresAtMs: Date.now() + FILE_SELECTION_TTL_MS,
+        });
+        return `${baseContent}\n\n${formatFileCandidates(resolution.candidates, { commandPrefix: this.config.commandPrefix })}`;
+      case 'denied':
+      case 'missing':
+        return `${baseContent}\n\n${resolution.message}`;
+    }
   }
 
   private async safeMessageReply(message: Message, content: string): Promise<void> {
@@ -857,6 +1162,17 @@ export class DiscordCodexBridge {
       case 'guide':
         await this.handleGuideCommand(message, resolved, command.prompt);
         return;
+      case 'sendfile':
+        if (!resolved) {
+          await message.reply('当前频道未绑定项目。先执行 `!bind`。');
+          return;
+        }
+        if ('index' in command) {
+          await this.handleSendFileSelection(message, resolved, command.index);
+          return;
+        }
+        await this.handleSendFileRequest(message, resolved, command.request);
+        return;
       case 'autopilot':
         if (command.scope === 'help') {
           await this.replyWithChunks(message, formatAutopilotHelp(this.config.commandPrefix));
@@ -920,7 +1236,11 @@ export class DiscordCodexBridge {
           await message.reply('只有管理员才能调整队列。');
           return;
         }
-        await this.handleQueueInsertCommand(message, resolved, command.index);
+        if (command.action === 'insert') {
+          await this.handleQueueInsertCommand(message, resolved, command.index);
+          return;
+        }
+        await this.handleQueueRemoveCommand(message, resolved, command.index);
         return;
       }
     }
@@ -1106,6 +1426,38 @@ export class DiscordCodexBridge {
     this.startProcessQueue(resolved.conversationId);
   }
 
+  private async handleQueueRemoveCommand(
+    message: Message,
+    resolved: ResolvedConversation | undefined,
+    index: number,
+  ): Promise<void> {
+    if (!resolved) {
+      await message.reply('当前频道未绑定项目。先执行 `!bind`。');
+      return;
+    }
+
+    const runtime = this.getRuntime(resolved.conversationId);
+    const queueIndex = index - 1;
+    if (queueIndex < 0 || queueIndex >= runtime.queue.length) {
+      await message.reply(`队列序号无效。当前等待队列共有 ${runtime.queue.length} 条任务。`);
+      return;
+    }
+
+    const [removedTask] = runtime.queue.splice(queueIndex, 1);
+    if (!removedTask) {
+      await message.reply('未找到指定的队列项。');
+      return;
+    }
+
+    this.pushRunTimeline(runtime, `🗑️ 已移除队列中的 #${index}：${truncate(removedTask.prompt, 120)}`);
+    this.scheduleRuntimeStateSave(resolved.conversationId, true);
+
+    await message.reply(`已从队列中移除 #${index}：${truncate(removedTask.prompt, 120)}`);
+
+    const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
+    await this.refreshRuntimeViews(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
+  }
+
   private async handleResetCommand(message: Message, resolved: ResolvedConversation | undefined): Promise<void> {
     if (!resolved) {
       await message.reply('当前频道未绑定项目。');
@@ -1178,25 +1530,12 @@ export class DiscordCodexBridge {
     command: Exclude<Extract<ParsedCommand, { kind: 'autopilot' }>, { scope: 'help' }>,
   ): Promise<void> {
     if (command.scope === 'server') {
+      const response = await this.executeAutopilotServerCommand(command);
       if (command.action === 'status') {
-        await this.replyWithChunks(message, await this.buildAutopilotServiceStatusText());
+        await this.replyWithChunks(message, response);
         return;
       }
-
-      if (command.action === 'concurrency') {
-        await this.setAutopilotParallelismAcrossBindings(command.parallelism);
-        await message.reply(formatAutopilotServiceAck('concurrency', command.parallelism));
-        return;
-      }
-
-      if (command.action === 'clear') {
-        await this.clearAllAutopilotProjects();
-        await message.reply(formatAutopilotServiceAck('clear'));
-        return;
-      }
-
-      await this.setAutopilotEnabledAcrossBindings(command.action === 'on');
-      await message.reply(formatAutopilotServiceAck(command.action));
+      await message.reply(response);
       return;
     }
 
@@ -1205,58 +1544,77 @@ export class DiscordCodexBridge {
       return;
     }
 
-    const binding = resolved.binding;
+    const response = await this.executeAutopilotProjectCommand(resolved.binding, command);
+    if (command.action === 'status') {
+      await this.replyWithChunks(message, response);
+      return;
+    }
+    await message.reply(response);
+  }
+
+  private async executeAutopilotServerCommand(
+    command: Extract<Exclude<Extract<ParsedCommand, { kind: 'autopilot' }>, { scope: 'help' }>, { scope: 'server' }>,
+  ): Promise<string> {
+    if (command.action === 'status') {
+      return this.buildAutopilotServiceStatusText();
+    }
+
+    if (command.action === 'concurrency') {
+      await this.setAutopilotParallelismAcrossBindings(command.parallelism);
+      return formatAutopilotServiceAck('concurrency', command.parallelism);
+    }
+
+    if (command.action === 'clear') {
+      await this.clearAllAutopilotProjects();
+      return formatAutopilotServiceAck('clear');
+    }
+
+    await this.setAutopilotEnabledAcrossBindings(command.action === 'on');
+    return formatAutopilotServiceAck(command.action);
+  }
+
+  private async executeAutopilotProjectCommand(
+    binding: ChannelBinding,
+    command: Extract<Exclude<Extract<ParsedCommand, { kind: 'autopilot' }>, { scope: 'help' }>, { scope: 'project' }>,
+  ): Promise<string> {
     const project = await this.ensureAutopilotResources(binding);
 
     switch (command.action) {
       case 'status':
-        await this.replyWithChunks(
-          message,
-          this.buildAutopilotProjectStatusText(binding, project, this.store.getAutopilotService(binding.guildId)),
-        );
-        return;
+        return this.buildAutopilotProjectStatusText(binding, project, this.store.getAutopilotService(binding.guildId));
       case 'on': {
         const nextProject = await this.setAutopilotProjectEnabled(binding, project, true);
-        await message.reply(formatAutopilotProjectAck('on', binding, nextProject));
-        return;
+        return formatAutopilotProjectAck('on', binding, nextProject);
       }
       case 'off': {
         const nextProject = await this.setAutopilotProjectEnabled(binding, project, false);
-        await message.reply(formatAutopilotProjectAck('off', binding, nextProject));
-        return;
+        return formatAutopilotProjectAck('off', binding, nextProject);
       }
       case 'clear': {
         const nextProject = await this.clearAutopilotProject(binding, project, '已清空项目 Autopilot 状态');
-        await message.reply(formatAutopilotProjectAck('clear', binding, nextProject));
-        return;
+        return formatAutopilotProjectAck('clear', binding, nextProject);
       }
       case 'run': {
         const trigger = await this.triggerAutopilotProjectRun(binding);
         if (trigger.status === 'already-running') {
-          await message.reply('当前项目的 Autopilot 已在运行中。');
-          return;
+          return '当前项目的 Autopilot 已在运行中。';
         }
         if (trigger.status === 'busy') {
           const service = this.store.getAutopilotService(binding.guildId);
-          await message.reply(`当前服务器的 Autopilot 已达到并行上限 ${this.getAutopilotParallelism(service)}，请稍后再试，或先执行 \`!autopilot server concurrency <N>\` 调大并行数。`);
-          return;
+          return `当前服务器的 Autopilot 已达到并行上限 ${this.getAutopilotParallelism(service)}，请稍后再试，或先执行 \`!autopilot server concurrency <N>\` 调大并行数。`;
         }
         if (trigger.status === 'unavailable') {
-          await message.reply('当前项目的 Autopilot 线程不可用，暂时无法立即执行。');
-          return;
+          return '当前项目的 Autopilot 线程不可用，暂时无法立即执行。';
         }
-        await message.reply(formatAutopilotProjectAck('run', binding, trigger.project));
-        return;
+        return formatAutopilotProjectAck('run', binding, trigger.project);
       }
       case 'interval': {
         const nextProject = await this.setAutopilotProjectInterval(binding, project, command.intervalMs);
-        await message.reply(formatAutopilotProjectAck('interval', binding, nextProject));
-        return;
+        return formatAutopilotProjectAck('interval', binding, nextProject);
       }
       case 'prompt': {
         const nextProject = await this.updateAutopilotProjectBrief(binding, project, command.prompt);
-        await message.reply(formatAutopilotProjectAck('prompt', binding, nextProject));
-        return;
+        return formatAutopilotProjectAck('prompt', binding, nextProject);
       }
     }
   }
@@ -2135,7 +2493,13 @@ export class DiscordCodexBridge {
   ): Promise<void> {
     const runtime = this.getRuntime(resolved.conversationId);
     const taskId = randomUUID();
-    const downloaded = await downloadAttachments(this.config.dataDir, resolved.conversationId, taskId, extractMessageAttachments(message));
+    const downloaded = await downloadAttachments(
+      this.config.dataDir,
+      resolved.conversationId,
+      taskId,
+      extractMessageAttachments(message),
+      resolved.binding.workspacePath,
+    );
     const basePrompt = buildPromptWithAttachments(prompt, downloaded.attachments, downloaded.attachmentDir);
     const activeTask = runtime.activeRun?.task;
     const rootPrompt = mode === 'guidance'
@@ -2603,12 +2967,13 @@ export class DiscordCodexBridge {
       await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       this.scheduleRuntimeStateSave(conversationId, true);
       if (!suppressReply && currentTask.origin !== 'autopilot') {
+        const replyPayload = result.success
+          ? await this.buildSuccessReplyPayload(channel, binding, currentTask, result)
+          : formatFailureReply(binding, currentTask.requestedBy, result);
         await this.safeReplyToOriginalMessage(
           channel,
           currentTask.messageId,
-          result.success
-            ? formatSuccessReply(binding, currentTask.requestedBy, result)
-            : formatFailureReply(binding, currentTask.requestedBy, result),
+          replyPayload,
         );
       }
 
@@ -3048,7 +3413,7 @@ export class DiscordCodexBridge {
     }
   }
 
-  private async safeReplyToOriginalMessage(channel: SendableChannel, messageId: string, content: string): Promise<void> {
+  private async safeReplyToOriginalMessage(channel: SendableChannel, messageId: string, content: SendPayload): Promise<void> {
     try {
       await this.replyToOriginalMessage(channel, messageId, content);
     } catch (error) {
@@ -3134,9 +3499,20 @@ export class DiscordCodexBridge {
     }
   }
 
-  private async replyToOriginalMessage(channel: SendableChannel, messageId: string, content: string): Promise<void> {
-    const chunks = splitIntoDiscordChunks(content, 1800);
+  private async replyToOriginalMessage(channel: SendableChannel, messageId: string, content: SendPayload): Promise<void> {
     const originalMessage = await channel.messages.fetch(messageId).catch(() => null);
+
+    if (typeof content !== 'string') {
+      if (originalMessage) {
+        await originalMessage.reply(content);
+        return;
+      }
+
+      await channel.send(content);
+      return;
+    }
+
+    const chunks = splitIntoDiscordChunks(content, 1800);
 
     if (!originalMessage) {
       for (const chunk of chunks) {

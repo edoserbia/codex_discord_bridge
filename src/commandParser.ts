@@ -17,6 +17,8 @@ export type ParsedCommand =
   | { kind: 'help' }
   | { kind: 'bind'; projectName: string; workspacePath: string; options: BindCommandOptions }
   | { kind: 'guide'; prompt: string }
+  | { kind: 'sendfile'; request: string }
+  | { kind: 'sendfile'; index: number }
   | { kind: 'autopilot'; scope: 'help' }
   | { kind: 'autopilot'; scope: 'server'; action: 'on' | 'off' | 'clear' | 'status' }
   | { kind: 'autopilot'; scope: 'server'; action: 'concurrency'; parallelism: number }
@@ -30,7 +32,7 @@ export type ParsedCommand =
   | { kind: 'cancel' }
   | { kind: 'reset' }
   | { kind: 'queue'; action: 'show' }
-  | { kind: 'queue'; action: 'insert'; index: number };
+  | { kind: 'queue'; action: 'insert' | 'remove'; index: number };
 
 function readValue(tokens: string[], flag: string): string {
   const value = tokens.shift();
@@ -73,12 +75,25 @@ function parseAutopilotParallelism(value: string): number {
 
 function parseQueueIndex(value: string): number {
   if (!/^\d+$/.test(value)) {
-    throw new Error('用法：!queue insert <队列序号>，例如 1、2、3。');
+    throw new Error('用法：!queue insert <队列序号> 或 !queue remove <队列序号>，例如 1、2、3。');
   }
 
   const parsed = Number.parseInt(value, 10);
   if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error('用法：!queue insert <队列序号>，例如 1、2、3。');
+    throw new Error('用法：!queue insert <队列序号> 或 !queue remove <队列序号>，例如 1、2、3。');
+  }
+
+  return parsed;
+}
+
+function parseSendFileIndex(value: string): number {
+  if (!/^\d+$/.test(value)) {
+    throw new Error('用法：!sendfile <文件名|相对路径|绝对路径|候选序号>');
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error('用法：!sendfile <文件名|相对路径|绝对路径|候选序号>');
   }
 
   return parsed;
@@ -255,7 +270,34 @@ export function parseCommand(content: string, prefix: string): ParsedCommand {
         };
       }
 
-      throw new Error('用法：!queue 或 !queue insert <队列序号>');
+      if (action === 'remove' || action === 'rm' || action === 'delete' || action === 'del' || action === 'drop') {
+        return {
+          kind: 'queue',
+          action: 'remove',
+          index: parseQueueIndex(readValue(tokens, '!queue remove')),
+        };
+      }
+
+      throw new Error('用法：!queue | !queue insert <队列序号> | !queue remove <队列序号>');
+    }
+    case 'sendfile': {
+      const rawTarget = body.slice('sendfile'.length).trim();
+
+      if (!rawTarget) {
+        throw new Error('用法：!sendfile <文件名|相对路径|绝对路径|候选序号>');
+      }
+
+      if (/^\d+$/.test(rawTarget)) {
+        return {
+          kind: 'sendfile',
+          index: parseSendFileIndex(rawTarget),
+        };
+      }
+
+      return {
+        kind: 'sendfile',
+        request: rawTarget,
+      };
     }
     case 'autopilot':
       return parseAutopilotCommand(body);

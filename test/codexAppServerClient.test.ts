@@ -13,6 +13,7 @@ import { cleanupDir, createWorkspace, makeTempDir, waitFor } from './helpers/tes
 const fakeAppServerCommand = path.resolve('test/fixtures/fake-codex-app-server.mjs');
 const hangingAppServerCommand = path.resolve('test/fixtures/fake-codex-app-server-initialize-hang.mjs');
 const fakeWsAppServerCommand = path.resolve('test/fixtures/fake-codex-app-server-ws.mjs');
+const fakeWsStartupTimeoutMs = 2_000;
 
 function makeConfig(rootDir: string, codexCommand = fakeAppServerCommand): AppConfig {
   return {
@@ -479,7 +480,7 @@ test('app-server client can use websocket transport when configured', async () =
     codexAppServerStartupTimeoutMs?: number;
   };
   config.codexAppServerTransport = 'ws';
-  config.codexAppServerStartupTimeoutMs = 500;
+  config.codexAppServerStartupTimeoutMs = fakeWsStartupTimeoutMs;
   const client = new CodexAppServerClient(config as AppConfig);
   const events: string[] = [];
 
@@ -523,7 +524,7 @@ test('app-server client preserves recent child stderr when websocket transport c
     codexAppServerStartupTimeoutMs?: number;
   };
   config.codexAppServerTransport = 'ws';
-  config.codexAppServerStartupTimeoutMs = 500;
+  config.codexAppServerStartupTimeoutMs = fakeWsStartupTimeoutMs;
   const client = new CodexAppServerClient(config as AppConfig);
 
   try {
