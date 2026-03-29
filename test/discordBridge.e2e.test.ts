@@ -1249,6 +1249,38 @@ test('bridge retries zero-exit incomplete turns instead of failing immediately',
   await cleanupDir(rootDir);
 });
 
+test('bridge retries generic diagnostic failures by building a recovery prompt from interrupted state', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-recoverable-diagnostic-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-recoverable-diagnostic-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-recoverable-diagnostic', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[recoverable-diagnostic] please recover this task'));
+    await waitFor(() => findSent(rootChannel, /recoverable diagnostic ok/), 15_000);
+
+    const logFiles = (await readdir(logDir)).sort();
+    const payloads = await Promise.all(logFiles.map(async (fileName) => JSON.parse(await readFile(path.join(logDir, fileName), 'utf8')) as {
+      prompt: string;
+    }));
+
+    assert.ok(payloads.length >= 2);
+    assert.equal(payloads[0]!.prompt, '[recoverable-diagnostic] please recover this task');
+    assert.match(payloads[1]!.prompt, /自动重试恢复/);
+    assert.match(payloads[1]!.prompt, /不要从头重复已经完成的步骤/);
+    assert.match(payloads[1]!.prompt, /\[recoverable-diagnostic\] please recover this task/);
+    assert.ok(rootChannel.sent.some((message) => /正在自动恢复/.test(message.content)));
+    assert.ok(!rootChannel.sent.some((message) => /执行失败，exitCode=2 signal=null/.test(message.content)));
+  } finally {
+    delete process.env.FAKE_CODEX_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge falls back to a fresh session after both fresh-start and resumed retry fail', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-fresh-resume-stale-');
   const workspace = await createWorkspace(rootDir);

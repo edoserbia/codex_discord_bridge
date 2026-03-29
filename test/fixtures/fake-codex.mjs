@@ -104,6 +104,7 @@ const scenario = (() => {
   if (prompt.includes('[json-stale-session]')) return 'json-stale-session';
   if (prompt.includes('[zero-exit-no-turn]')) return 'zero-exit-no-turn';
   if (prompt.includes('[flaky-exit]')) return 'flaky-exit';
+  if (prompt.includes('[recoverable-diagnostic]')) return 'recoverable-diagnostic';
   if (prompt.includes('[fail]')) return 'fail';
   if (prompt.includes('[invalid-json]')) return 'invalid-json';
   if (prompt.includes('[command]')) return 'command';
@@ -229,6 +230,50 @@ if (scenario === 'zero-exit-no-turn') {
     await fs.writeFile(markerPath, prompt, 'utf8');
     console.error('WARNING: failed to clean up stale arg0 temp dirs: Permission denied (os error 13)');
     process.exit(0);
+  }
+}
+
+if (scenario === 'recoverable-diagnostic') {
+  const markerPath = path.join(process.cwd(), '.fake-codex-recoverable-diagnostic');
+
+  try {
+    await fs.access(markerPath);
+    await fs.rm(markerPath, { force: true });
+  } catch {
+    await fs.writeFile(markerPath, prompt, 'utf8');
+    event({
+      type: 'item.completed',
+      item: {
+        id: 'reason_retry_diag',
+        type: 'reasoning',
+        text: 'I will inspect the repo state, keep the completed progress, and continue from the interrupted point.',
+      },
+    });
+    event({
+      type: 'item.started',
+      item: {
+        id: 'todo_retry_diag',
+        type: 'todo_list',
+        items: [
+          { text: 'Inspect repo state', completed: true },
+          { text: 'Continue interrupted work', completed: false },
+        ],
+      },
+    });
+    event({ type: 'item.started', item: { id: 'cmd_retry_diag', type: 'command_execution', command: '/bin/zsh -lc "pwd"' } });
+    event({
+      type: 'item.completed',
+      item: {
+        id: 'cmd_retry_diag',
+        type: 'command_execution',
+        command: '/bin/zsh -lc "pwd"',
+        aggregated_output: `${process.cwd()}\n`,
+        exit_code: 0,
+        status: 'completed',
+      },
+    });
+    console.error('recoverable fake diagnostic failure');
+    process.exit(2);
   }
 }
 
@@ -644,6 +689,8 @@ const finalText = scenario === 'attachments'
     ? `plan ok; resumed=${args.mode === 'resume'}; cwd=${process.cwd()}`
     : scenario === 'subagent'
       ? 'subagent ok; helper agent coordinated successfully'
+    : scenario === 'recoverable-diagnostic'
+      ? `recoverable diagnostic ok; resumed=${args.mode === 'resume'}`
     : scenario === 'autopilot'
       ? [
         'Autopilot finished one low-risk task and validation passed.',
