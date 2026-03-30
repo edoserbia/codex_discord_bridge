@@ -300,7 +300,10 @@ export function isWithinAllowedRoots(targetPath: string, allowedRoots: string[])
     return true;
   }
 
-  return allowedRoots.some((root) => targetPath === root || targetPath.startsWith(`${root}${path.sep}`));
+  return allowedRoots.some((root) => {
+    const rootPrefix = root.endsWith(path.sep) ? root : `${root}${path.sep}`;
+    return targetPath === root || targetPath.startsWith(rootPrefix);
+  });
 }
 
 export function sanitizeInlineCode(value: string): string {
