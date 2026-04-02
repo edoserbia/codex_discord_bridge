@@ -577,7 +577,9 @@ export function formatSuccessReply(
   result: CodexRunResult,
   options: { finalMessage?: string } = {},
 ): string {
-  const finalMessage = options.finalMessage ?? result.agentMessages.at(-1) ?? '本轮已完成，但 Codex 没有返回文本消息。';
+  const finalMessage = options.finalMessage?.trim()
+    || result.agentMessages.at(-1)?.trim()
+    || '本轮已完成，但 Codex 没有返回文本消息。';
 
   return [
     `🤖 **${binding.projectName}** · ${requestedBy}`,

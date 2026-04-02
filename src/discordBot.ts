@@ -188,6 +188,8 @@ const AUTOPILOT_REQUESTED_BY = 'Autopilot';
 const AUTOPILOT_REQUESTED_BY_ID = 'autopilot';
 const FILE_SELECTION_TTL_MS = 10 * 60 * 1000;
 const DEFAULT_DISCORD_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const DISCORD_WRITE_RETRY_DELAYS_MS = [250, 1_000, 2_500] as const;
+const EMPTY_DISCORD_MESSAGE_FALLBACK = '（Codex 返回了空白消息，bridge 已拦截并保留执行结果。）';
 const execFileAsync = promisify(execFile);
 
 interface PendingRuntimeViewRefresh {
@@ -824,7 +826,7 @@ export class DiscordCodexBridge {
         await this.handleCommand(message, command);
       } catch (error) {
         const text = error instanceof Error ? error.message : String(error);
-        await message.reply(text);
+        await this.safeMessageReply(message, text);
       }
       return;
     }
@@ -906,11 +908,11 @@ export class DiscordCodexBridge {
       message.channel as { attachmentSizeLimit?: number } | null,
     );
     if (validationError) {
-      await message.reply(validationError);
+      await this.replyWithRetry(message, validationError);
       return;
     }
 
-    await message.reply({
+    await this.replyWithRetry(message, {
       content,
       files: [{ attachment: file.absolutePath, name: file.name }],
     });
@@ -971,12 +973,12 @@ export class DiscordCodexBridge {
           candidates: result.candidates,
           expiresAtMs: Date.now() + FILE_SELECTION_TTL_MS,
         });
-        await message.reply(formatFileCandidates(result.candidates, { commandPrefix: this.config.commandPrefix }));
+        await this.replyWithRetry(message, formatFileCandidates(result.candidates, { commandPrefix: this.config.commandPrefix }));
         return;
       case 'denied':
       case 'missing':
         this.pendingFileSelections.delete(resolved.conversationId);
-        await message.reply(result.message);
+        await this.replyWithRetry(message, result.message);
         return;
     }
   }
@@ -989,13 +991,13 @@ export class DiscordCodexBridge {
     const pending = this.getPendingFileSelection(resolved.conversationId);
 
     if (!pending) {
-      await message.reply('当前没有待选择的文件候选列表。先发送自然语言请求，或使用 `!sendfile <文件名>`。');
+      await this.replyWithRetry(message, '当前没有待选择的文件候选列表。先发送自然语言请求，或使用 `!sendfile <文件名>`。');
       return;
     }
 
     const selected = pending.candidates[index - 1];
     if (!selected) {
-      await message.reply(`当前候选只有 ${pending.candidates.length} 个，请回复有效序号。`);
+      await this.replyWithRetry(message, `当前候选只有 ${pending.candidates.length} 个，请回复有效序号。`);
       return;
     }
 
@@ -1054,27 +1056,144 @@ export class DiscordCodexBridge {
     }
   }
 
+  private describeDiscordError(error: unknown): string {
+    const parts: string[] = [];
+    const seen = new Set<unknown>();
+
+    const visit = (value: unknown, depth = 0): void => {
+      if (value == null || depth > 3 || seen.has(value)) {
+        return;
+      }
+
+      seen.add(value);
+
+      if (value instanceof Error) {
+        if (value.message) {
+          parts.push(value.message);
+        }
+        const code = (value as NodeJS.ErrnoException).code;
+        if (typeof code === 'string') {
+          parts.push(code);
+        }
+        visit((value as Error & { cause?: unknown }).cause, depth + 1);
+        return;
+      }
+
+      if (typeof value === 'object') {
+        const candidate = value as { message?: unknown; code?: unknown; cause?: unknown };
+        if (typeof candidate.message === 'string') {
+          parts.push(candidate.message);
+        }
+        if (typeof candidate.code === 'string') {
+          parts.push(candidate.code);
+        }
+        visit(candidate.cause, depth + 1);
+        return;
+      }
+
+      if (typeof value === 'string') {
+        parts.push(value);
+      }
+    };
+
+    visit(error);
+    return uniqueStrings(parts.map((item) => item.trim()).filter(Boolean)).join(' | ') || String(error);
+  }
+
+  private isRetryableDiscordWriteError(error: unknown): boolean {
+    return /(ECONNRESET|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|UND_ERR|timeout|other side closed|socket hang up|Client network socket disconnected|secure TLS connection was established|fetch failed)/i
+      .test(this.describeDiscordError(error));
+  }
+
+  private isMissingDiscordMessageError(error: unknown): boolean {
+    return /(Unknown Message|10008|Message .* not found|\bnot found\b)/i.test(this.describeDiscordError(error));
+  }
+
+  private async waitForDiscordRetry(delayMs: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+
+  private async withDiscordWriteRetry<T>(label: string, operation: () => Promise<T>): Promise<T> {
+    const maxAttempts = DISCORD_WRITE_RETRY_DELAYS_MS.length + 1;
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+
+        if (!this.isRetryableDiscordWriteError(error) || attempt >= maxAttempts) {
+          throw error;
+        }
+
+        const delayMs = DISCORD_WRITE_RETRY_DELAYS_MS[attempt - 1] ?? DISCORD_WRITE_RETRY_DELAYS_MS.at(-1) ?? 250;
+        console.warn(
+          `[discord-view] transient ${label} failure attempt=${attempt}/${maxAttempts} error=${this.describeDiscordError(error)}; retrying in ${delayMs}ms`,
+        );
+        await this.waitForDiscordRetry(delayMs);
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error(`${label} failed`);
+  }
+
+  private async replyWithRetry(
+    message: { id: string; reply: (content: SendPayload) => Promise<unknown> },
+    content: SendPayload,
+  ): Promise<SendableMessage> {
+    const result = await this.withDiscordWriteRetry(`reply message=${message.id}`, async () => message.reply(content));
+    return result as SendableMessage;
+  }
+
+  private async sendWithRetry(channel: SendableChannel, content: SendPayload): Promise<SendableMessage> {
+    const result = await this.withDiscordWriteRetry(`send channel=${channel.id}`, async () => channel.send(content));
+    return result as SendableMessage;
+  }
+
+  private async editWithRetry(message: SendableMessage, content: string): Promise<SendableMessage> {
+    const result = await this.withDiscordWriteRetry(`edit message=${message.id}`, async () => message.edit(content));
+    return result as SendableMessage;
+  }
+
+  private async fetchChannelMessageWithRetry(channel: SendableChannel, messageId: string): Promise<SendableMessage | null> {
+    try {
+      const result = await this.withDiscordWriteRetry(`fetch message=${messageId}`, async () => channel.messages.fetch(messageId));
+      return result as SendableMessage;
+    } catch (error) {
+      if (this.isMissingDiscordMessageError(error)) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private normalizeDiscordTextChunks(content: string): string[] {
+    const chunks = splitIntoDiscordChunks(content, 1800).filter((chunk) => chunk.trim().length > 0);
+    return chunks.length > 0 ? chunks : [EMPTY_DISCORD_MESSAGE_FALLBACK];
+  }
+
   private async safeMessageReply(message: Message, content: string): Promise<void> {
-    await message.reply(content).catch((error) => {
+    await this.replyWithRetry(message, content).catch((error) => {
       this.logBridgeError(`reply message=${message.id}`, error);
     });
   }
 
   private async replyWithChunks(message: Message, content: string): Promise<void> {
-    const chunks = splitIntoDiscordChunks(content, 1800);
+    const chunks = this.normalizeDiscordTextChunks(content);
     const [firstChunk, ...remainingChunks] = chunks;
 
     if (firstChunk) {
-      await message.reply(firstChunk);
+      await this.replyWithRetry(message, firstChunk);
     }
 
     for (const chunk of remainingChunks) {
-      await (message.channel as SendableChannel).send(chunk);
+      await this.sendWithRetry(message.channel as SendableChannel, chunk);
     }
   }
 
   private async sendDriverStatusNotice(channel: SendableChannel, text: string): Promise<void> {
-    await channel.send(`${formatClockTimestamp(new Date())} ${text}`).catch((error) => {
+    await this.sendWithRetry(channel, `${formatClockTimestamp(new Date())} ${text}`).catch((error) => {
       this.logBridgeError(`driver-status channel=${channel.id}`, error);
     });
   }
@@ -3442,24 +3561,24 @@ export class DiscordCodexBridge {
     const progressMessageId = activeRun.progressMessageId;
 
     if (!progressMessageId) {
-      const originalMessage = await channel.messages.fetch(activeRun.task.messageId).catch(() => null);
+      const originalMessage = await this.fetchChannelMessageWithRetry(channel, activeRun.task.messageId);
       const created = originalMessage
-        ? await originalMessage.reply(content)
-        : await channel.send(content);
+        ? await this.replyWithRetry(originalMessage, content)
+        : await this.sendWithRetry(channel, content);
       activeRun.progressMessageId = created.id;
       return;
     }
 
-    const existing = await channel.messages.fetch(progressMessageId).catch(() => null);
+    const existing = await this.fetchChannelMessageWithRetry(channel, progressMessageId);
 
     if (!existing) {
-      const created = await channel.send(content);
+      const created = await this.sendWithRetry(channel, content);
       activeRun.progressMessageId = created.id;
       return;
     }
 
     if (existing.content !== content) {
-      await existing.edit(content);
+      await this.editWithRetry(existing, content);
     }
   }
 
@@ -3481,42 +3600,42 @@ export class DiscordCodexBridge {
     const statusMessageId = session.statusMessageId;
 
     if (!statusMessageId) {
-      const created = await channel.send(content);
+      const created = await this.sendWithRetry(channel, content);
       await this.store.updateSession(session.conversationId, { statusMessageId: created.id }, session.bindingChannelId);
       return;
     }
 
-    const existing = await channel.messages.fetch(statusMessageId).catch(() => null);
+    const existing = await this.fetchChannelMessageWithRetry(channel, statusMessageId);
 
     if (!existing) {
-      const created = await channel.send(content);
+      const created = await this.sendWithRetry(channel, content);
       await this.store.updateSession(session.conversationId, { statusMessageId: created.id }, session.bindingChannelId);
       return;
     }
 
     if (existing.content !== content) {
-      await existing.edit(content);
+      await this.editWithRetry(existing, content);
     }
   }
 
   private async replyToOriginalMessage(channel: SendableChannel, messageId: string, content: SendPayload): Promise<void> {
-    const originalMessage = await channel.messages.fetch(messageId).catch(() => null);
+    const originalMessage = await this.fetchChannelMessageWithRetry(channel, messageId);
 
     if (typeof content !== 'string') {
       if (originalMessage) {
-        await originalMessage.reply(content);
+        await this.replyWithRetry(originalMessage, content);
         return;
       }
 
-      await channel.send(content);
+      await this.sendWithRetry(channel, content);
       return;
     }
 
-    const chunks = splitIntoDiscordChunks(content, 1800);
+    const chunks = this.normalizeDiscordTextChunks(content);
 
     if (!originalMessage) {
       for (const chunk of chunks) {
-        await channel.send(chunk);
+        await this.sendWithRetry(channel, chunk);
       }
       return;
     }
@@ -3524,11 +3643,11 @@ export class DiscordCodexBridge {
     const [firstChunk, ...remainingChunks] = chunks;
 
     if (firstChunk) {
-      await originalMessage.reply(firstChunk);
+      await this.replyWithRetry(originalMessage, firstChunk);
     }
 
     for (const chunk of remainingChunks) {
-      await channel.send(chunk);
+      await this.sendWithRetry(channel, chunk);
     }
   }
 
