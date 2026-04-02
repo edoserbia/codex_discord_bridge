@@ -12,7 +12,7 @@ const initializeDelayMs = Number.parseInt(process.env.FAKE_CODEX_APP_SERVER_INIT
 const stdinProtocol = process.env.FAKE_CODEX_APP_SERVER_STDIN_PROTOCOL ?? 'auto';
 const stdoutProtocol = process.env.FAKE_CODEX_APP_SERVER_STDOUT_PROTOCOL ?? 'content-length';
 
-void logStartup();
+const startupLogged = logStartup();
 
 process.stdin.on('data', (chunk) => {
   buffer = Buffer.concat([buffer, chunk]);
@@ -102,7 +102,8 @@ function handle(message) {
 }
 
 async function handleAsync(message) {
-  void logRequest(message);
+  await startupLogged;
+  await logRequest(message);
 
   switch (message.method) {
     case 'initialize':
