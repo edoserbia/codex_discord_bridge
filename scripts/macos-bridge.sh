@@ -17,6 +17,7 @@ SECRET_ENV_FILE="${CODEX_TUNNING_SECRETS_FILE:-${SECRET_DIR}/secrets.env}"
 TOKEN_ENV_KEY='CODEX_TUNNING_DISCORD_BOT_TOKEN'
 BRIDGE_PROXY_ENV_KEY='CODEX_DISCORD_BRIDGE_PROXY'
 BRIDGE_CA_CERT_ENV_KEY='CODEX_DISCORD_BRIDGE_CA_CERT'
+BRIDGE_PROXY_FORCE_ENV_KEY='CODEX_DISCORD_BRIDGE_PROXY_FORCE'
 LEGACY_BRIDGE_PROXY_ENV_KEY='OPENCLAW_DISCORD_PROXY'
 LEGACY_BRIDGE_CA_CERT_ENV_KEY='OPENCLAW_DISCORD_CA_CERT'
 DEFAULT_DISCORD_PROXY_CANDIDATE='http://127.0.0.1:7890'
@@ -529,6 +530,19 @@ read_bridge_ca_cert_value() {
   read_env_value_first_non_empty "${BRIDGE_CA_CERT_ENV_KEY}" "${LEGACY_BRIDGE_CA_CERT_ENV_KEY}"
 }
 
+bridge_proxy_force_enabled() {
+  local raw
+  raw="$(read_env_value "${BRIDGE_PROXY_FORCE_ENV_KEY}" || true)"
+  case "$(printf '%s' "${raw}" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes|y|on)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 get_bridge_proxy_candidate() {
   printf '%s' "${CODEX_DISCORD_BRIDGE_PROXY_CANDIDATE:-${DEFAULT_DISCORD_PROXY_CANDIDATE}}"
 }
@@ -588,6 +602,22 @@ auto_configure_bridge_proxy() {
   migrate_legacy_bridge_proxy_env_keys
   current_proxy="$(read_env_value "${BRIDGE_PROXY_ENV_KEY}" || true)"
   proxy_candidate="$(get_bridge_proxy_candidate)"
+
+  if bridge_proxy_force_enabled; then
+    if [[ -n "${current_proxy}" ]]; then
+      print_info "检测到 bridge 代理强制模式，继续使用：${current_proxy}"
+      return 0
+    fi
+
+    if [[ -n "${proxy_candidate}" ]]; then
+      persist_bridge_proxy_value "${proxy_candidate}"
+      print_info "检测到 bridge 代理强制模式，已固定使用：${proxy_candidate}"
+      return 0
+    fi
+
+    print_warn "检测到 bridge 代理强制模式，但未配置 ${BRIDGE_PROXY_ENV_KEY} 或候选代理地址"
+    return 0
+  fi
 
   if [[ -n "${current_proxy}" ]]; then
     if probe_discord_reachability "${current_proxy}"; then
@@ -791,16 +821,29 @@ validate_required_env() {
 
 maybe_export_proxy() {
   local proxy=''
+  local injected=0
+  local injected_keys=()
   proxy="$(read_bridge_proxy_value || true)"
+  unset CODEX_TUNNING_DISCORD_PROXY_INJECTED || true
+  unset CODEX_TUNNING_DISCORD_PROXY_INJECTED_KEYS || true
   if [[ -z "${HTTP_PROXY:-}" && -n "${proxy}" ]]; then
     export HTTP_PROXY="${proxy}"
     export http_proxy="${proxy}"
+    injected=1
+    injected_keys+=('HTTP_PROXY' 'http_proxy')
     print_info "已注入 HTTP proxy: ${proxy}"
   fi
   if [[ -z "${HTTPS_PROXY:-}" && -n "${proxy}" ]]; then
     export HTTPS_PROXY="${proxy}"
     export https_proxy="${proxy}"
+    injected=1
+    injected_keys+=('HTTPS_PROXY' 'https_proxy')
     print_info "已注入 HTTPS proxy: ${proxy}"
+  fi
+  if [[ "${injected}" == '1' ]]; then
+    export CODEX_TUNNING_DISCORD_PROXY_INJECTED='1'
+    export CODEX_TUNNING_DISCORD_PROXY_INJECTED_KEYS
+    CODEX_TUNNING_DISCORD_PROXY_INJECTED_KEYS="$(IFS=,; printf '%s' "${injected_keys[*]}")"
   fi
 }
 

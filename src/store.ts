@@ -48,6 +48,7 @@ export class JsonStateStore {
               conversationId,
               queue: Array.isArray(runtime.queue) ? runtime.queue : [],
               activeRun: runtime.activeRun ?? undefined,
+              pendingReplies: Array.isArray(runtime.pendingReplies) ? runtime.pendingReplies : [],
             } satisfies ChannelRuntime,
           ]),
         ),

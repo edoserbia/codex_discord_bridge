@@ -13,6 +13,7 @@ import type {
   RunningAppServerTurn,
 } from './types.js';
 
+import { buildCodexChildEnv } from './codexChildEnv.js';
 import { isIgnorableCodexStderrLine, normalizeCodexDiagnosticLine } from './codexDiagnostics.js';
 import { resolveCodexConfigEntries } from './codexRunner.js';
 import { uniqueStrings } from './utils.js';
@@ -1166,35 +1167,6 @@ async function reserveLocalPort(): Promise<number> {
 
 async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function buildCodexChildEnv(workspacePath: string): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    PWD: workspacePath,
-  };
-
-  const blockedExactKeys = new Set([
-    'CODEX_CI',
-    'CODEX_SHELL',
-    'CODEX_THREAD_ID',
-  ]);
-
-  for (const key of Object.keys(env)) {
-    if (key.startsWith('CODEX_TUNNING_')) {
-      continue;
-    }
-
-    if (key === 'CODEX_HOME' || key === 'CODEX_CONFIG_HOME') {
-      continue;
-    }
-
-    if (blockedExactKeys.has(key) || key.startsWith('CODEX_INTERNAL_')) {
-      delete env[key];
-    }
-  }
-
-  return env;
 }
 
 function terminateChild(child: ReturnType<typeof spawn>): void {

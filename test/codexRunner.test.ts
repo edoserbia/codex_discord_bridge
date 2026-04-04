@@ -75,6 +75,64 @@ test('runner handles simple execution and thread creation', async () => {
   await cleanupDir(rootDir);
 });
 
+test('runner does not forward bridge-managed proxy env vars into codex child processes', async () => {
+  const rootDir = await makeTempDir('codex-runner-proxy-env-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-codex-logs');
+  const previousEnv = {
+    FAKE_CODEX_LOG_DIR: process.env.FAKE_CODEX_LOG_DIR,
+    HTTP_PROXY: process.env.HTTP_PROXY,
+    HTTPS_PROXY: process.env.HTTPS_PROXY,
+    ALL_PROXY: process.env.ALL_PROXY,
+    http_proxy: process.env.http_proxy,
+    https_proxy: process.env.https_proxy,
+    all_proxy: process.env.all_proxy,
+    CODEX_TUNNING_DISCORD_PROXY_INJECTED: process.env.CODEX_TUNNING_DISCORD_PROXY_INJECTED,
+    CODEX_TUNNING_DISCORD_PROXY_INJECTED_KEYS: process.env.CODEX_TUNNING_DISCORD_PROXY_INJECTED_KEYS,
+  };
+
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+  process.env.HTTP_PROXY = 'http://127.0.0.1:7890';
+  process.env.HTTPS_PROXY = 'http://127.0.0.1:7890';
+  process.env.ALL_PROXY = 'socks5://127.0.0.1:7891';
+  process.env.http_proxy = 'http://127.0.0.1:7890';
+  process.env.https_proxy = 'http://127.0.0.1:7890';
+  process.env.all_proxy = 'socks5://127.0.0.1:7891';
+  process.env.CODEX_TUNNING_DISCORD_PROXY_INJECTED = '1';
+  process.env.CODEX_TUNNING_DISCORD_PROXY_INJECTED_KEYS = 'HTTP_PROXY,HTTPS_PROXY,http_proxy,https_proxy';
+
+  try {
+    const runner = new CodexRunner(makeConfig(rootDir));
+    const binding = makeBinding(workspace);
+    const result = await runner.start(binding, { prompt: 'proxy isolation check', imagePaths: [], extraAddDirs: [] }, undefined).done;
+
+    assert.equal(result.success, true);
+
+    const logFiles = await readdir(logDir);
+    assert.ok(logFiles.length > 0);
+    const payload = JSON.parse(await readFile(path.join(logDir, logFiles.sort().at(-1)!), 'utf8')) as {
+      env: Record<string, string | undefined>;
+    };
+
+    assert.equal(payload.env.CODEX_TUNNING_DISCORD_PROXY_INJECTED, '1');
+    assert.equal(payload.env.HTTP_PROXY, undefined);
+    assert.equal(payload.env.HTTPS_PROXY, undefined);
+    assert.equal(payload.env.ALL_PROXY, 'socks5://127.0.0.1:7891');
+    assert.equal(payload.env.http_proxy, undefined);
+    assert.equal(payload.env.https_proxy, undefined);
+    assert.equal(payload.env.all_proxy, 'socks5://127.0.0.1:7891');
+  } finally {
+    for (const [key, value] of Object.entries(previousEnv)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+    await cleanupDir(rootDir);
+  }
+});
+
 test('runner surfaces reasoning and todo list updates', async () => {
   const rootDir = await makeTempDir('codex-runner-plan-');
   const workspace = await createWorkspace(rootDir);

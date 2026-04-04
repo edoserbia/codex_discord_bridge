@@ -5,6 +5,7 @@ import readline from 'node:readline';
 import type { AppConfig } from './config.js';
 import type { ChannelBinding, CodexDriverMode, CodexRunInput, CodexRunResult, CollabAgentState, CollabAgentStatus, CollabToolCall, CollabToolName, CollabToolStatus, CommandRecord, PlanItem } from './types.js';
 
+import { buildCodexChildEnv } from './codexChildEnv.js';
 import { normalizeCodexDiagnosticLine } from './codexDiagnostics.js';
 import { uniqueStrings } from './utils.js';
 
@@ -357,35 +358,6 @@ export class CodexRunner implements CodexExecutionDriver {
     execArgs.push('-');
     return [...globalArgs, ...execArgs];
   }
-}
-
-function buildCodexChildEnv(workspacePath: string): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    PWD: workspacePath,
-  };
-
-  const blockedExactKeys = new Set([
-    'CODEX_CI',
-    'CODEX_SHELL',
-    'CODEX_THREAD_ID',
-  ]);
-
-  for (const key of Object.keys(env)) {
-    if (key.startsWith('CODEX_TUNNING_')) {
-      continue;
-    }
-
-    if (key === 'CODEX_HOME' || key === 'CODEX_CONFIG_HOME') {
-      continue;
-    }
-
-    if (blockedExactKeys.has(key) || key.startsWith('CODEX_INTERNAL_')) {
-      delete env[key];
-    }
-  }
-
-  return env;
 }
 
 export function resolveCodexConfigEntries(extraConfig: string[]): string[] {

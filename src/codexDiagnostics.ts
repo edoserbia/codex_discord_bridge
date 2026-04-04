@@ -78,6 +78,12 @@ function looksLikeAbruptIncompleteTurn(result: CodexRunResult): boolean {
     && (result.exitCode === 0 || result.exitCode === 1 || result.exitCode === null);
 }
 
+function looksLikeSilentResumeFailure(result: CodexRunResult, diagnosticLines: string[]): boolean {
+  return result.usedResume
+    && looksLikeAbruptIncompleteTurn(result)
+    && diagnosticLines.length === 0;
+}
+
 export function diagnoseCodexFailure(
   result: CodexRunResult,
   cancellationReason?: CancellationReason,
@@ -93,7 +99,8 @@ export function diagnoseCodexFailure(
   }
 
   const hasStaleSessionSignal = diagnosticLines.some((line) => STALE_SESSION_FAILURE_PATTERNS.some((pattern) => pattern.test(line)));
-  if (hasStaleSessionSignal && looksLikeAbruptIncompleteTurn(result)) {
+  if ((hasStaleSessionSignal && looksLikeAbruptIncompleteTurn(result))
+    || looksLikeSilentResumeFailure(result, diagnosticLines)) {
     return {
       retryable: true,
       kind: 'stale-session',
