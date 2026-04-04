@@ -18,6 +18,10 @@ function makeConfig(rootDir: string, codexCommand = fakeCodexCommand): AppConfig
     commandPrefix: '!',
     dataDir: path.join(rootDir, 'data'),
     codexCommand,
+    codexMaxAttempts: 10,
+    codexRateLimitMaxAttempts: 0,
+    codexRateLimitBaseDelayMs: 5_000,
+    codexRateLimitMaxDelayMs: 60_000,
     allowedWorkspaceRoots: [rootDir],
     adminUserIds: new Set(),
     defaultCodex: {

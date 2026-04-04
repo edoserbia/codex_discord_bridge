@@ -1302,6 +1302,95 @@ test('bridge keeps the last known Codex thread after exhausting transient retrie
   }
 });
 
+test('bridge backs off and keeps retrying app-server 429 failures until the task succeeds', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-app-rate-limit-twice-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-app-rate-limit-twice-logs');
+  process.env.FAKE_CODEX_APP_SERVER_LOG_DIR = logDir;
+  const { bridge, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeAppServerCommand,
+    driverMode: 'app-server',
+    codexRateLimitBaseDelayMs: 200,
+    codexRateLimitMaxDelayMs: 400,
+    codexRateLimitMaxAttempts: 20,
+  });
+  const rootChannel = new FakeChannel('channel-app-rate-limit-twice', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+
+    const startedAt = Date.now();
+    await dispatch(bridge, createUserMessage(rootChannel, '[app-rate-limit-twice] please keep going'));
+    await waitFor(() => findSent(rootChannel, /app-server ok: \[app-rate-limit-twice\] please keep going/), 15_000);
+    await waitFor(() => !(bridge as any).getDashboardData().some((entry: any) => entry.binding.channelId === rootChannel.id
+      && entry.conversations.some((conversation: any) => conversation.conversationId === rootChannel.id
+        && ['starting', 'running'].includes(conversation.status))), 15_000);
+
+    const elapsedMs = Date.now() - startedAt;
+    assert.ok(elapsedMs >= 500, `expected backoff to delay retries, got ${elapsedMs}ms`);
+    assert.ok(rootChannel.sent.some((message) => /429|Too Many Requests|限流/.test(message.content)));
+    assert.ok(!rootChannel.sent.some((message) => /执行失败/.test(message.content)));
+
+    const logFiles = (await readdir(logDir)).sort();
+    const payloads = await Promise.all(logFiles.map(async (fileName) => JSON.parse(await readFile(path.join(logDir, fileName), 'utf8')) as {
+      method: string;
+      params?: { input?: Array<{ text?: string }> };
+    }));
+    const turnStarts = payloads.filter((payload) => payload.method === 'turn/start'
+      && String(payload.params?.input?.[0]?.text ?? '').includes('[app-rate-limit-twice]'));
+    assert.equal(turnStarts.length, 3);
+  } finally {
+    await (bridge as any).stop?.();
+    delete process.env.FAKE_CODEX_APP_SERVER_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge does not fail the Discord task while app-server keeps returning 429 rate limits', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-app-rate-limit-permanent-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-app-rate-limit-permanent-logs');
+  process.env.FAKE_CODEX_APP_SERVER_LOG_DIR = logDir;
+  const { bridge, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeAppServerCommand,
+    driverMode: 'app-server',
+    codexRateLimitBaseDelayMs: 200,
+    codexRateLimitMaxDelayMs: 400,
+    codexRateLimitMaxAttempts: 0,
+  });
+  const rootChannel = new FakeChannel('channel-app-rate-limit-permanent', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[app-rate-limit-permanent] please keep going'));
+
+    await waitFor(async () => {
+      const files = await readdir(logDir).catch(() => []);
+      return files.length >= 3;
+    }, 10_000);
+    await new Promise((resolve) => setTimeout(resolve, 700));
+
+    assert.ok(!rootChannel.sent.some((message) => /执行失败/.test(message.content)));
+    assert.ok(rootChannel.sent.some((message) => /429|Too Many Requests|限流/.test(message.content)));
+    assert.ok((bridge as any).getDashboardData().some((entry: any) => entry.binding.channelId === rootChannel.id
+      && entry.conversations.some((conversation: any) => conversation.conversationId === rootChannel.id
+        && ['starting', 'running'].includes(conversation.status))));
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!cancel', { userId: 'admin-user' }));
+    await waitFor(() => !(bridge as any).getDashboardData().some((entry: any) => entry.binding.channelId === rootChannel.id
+      && entry.conversations.some((conversation: any) => conversation.conversationId === rootChannel.id
+        && ['starting', 'running'].includes(conversation.status))), 10_000);
+  } finally {
+    await (bridge as any).stop?.();
+    delete process.env.FAKE_CODEX_APP_SERVER_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge defers the final reply when Discord writes fail and flushes it after recovery', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-deferred-reply-');
   const workspace = await createWorkspace(rootDir);

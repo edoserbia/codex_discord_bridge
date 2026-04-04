@@ -17,10 +17,13 @@ const TRANSIENT_CODEX_FAILURE_PATTERNS = [
   /timed? out/i,
   /temporarily unavailable/i,
   /reconnecting\.\.\./i,
+  /\b5\d\d\b/,
+];
+
+const RATE_LIMIT_CODEX_FAILURE_PATTERNS = [
   /rate limit/i,
   /too many requests/i,
   /\b429\b/,
-  /\b5\d\d\b/,
 ];
 
 const STALE_SESSION_FAILURE_PATTERNS = [
@@ -30,7 +33,7 @@ const STALE_SESSION_FAILURE_PATTERNS = [
   /resume.*failed/i,
 ];
 
-export type CodexFailureKind = 'none' | 'unexpected-empty-exit' | 'transient' | 'stale-session' | 'diagnostic';
+export type CodexFailureKind = 'none' | 'unexpected-empty-exit' | 'transient' | 'rate-limit' | 'stale-session' | 'diagnostic';
 
 export interface CodexFailureDiagnosis {
   retryable: boolean;
@@ -81,6 +84,7 @@ function looksLikeAbruptIncompleteTurn(result: CodexRunResult): boolean {
 function looksLikeSilentResumeFailure(result: CodexRunResult, diagnosticLines: string[]): boolean {
   return result.usedResume
     && looksLikeAbruptIncompleteTurn(result)
+    && result.exitCode !== 0
     && diagnosticLines.length === 0;
 }
 
@@ -104,6 +108,15 @@ export function diagnoseCodexFailure(
     return {
       retryable: true,
       kind: 'stale-session',
+      diagnosticLines,
+    };
+  }
+
+  const hasRateLimitSignal = diagnosticLines.some((line) => RATE_LIMIT_CODEX_FAILURE_PATTERNS.some((pattern) => pattern.test(line)));
+  if (hasRateLimitSignal && !result.turnCompleted) {
+    return {
+      retryable: true,
+      kind: 'rate-limit',
       diagnosticLines,
     };
   }

@@ -22,6 +22,10 @@ export interface AppConfig {
   commandPrefix: string;
   dataDir: string;
   codexCommand: string;
+  codexMaxAttempts: number;
+  codexRateLimitMaxAttempts: number;
+  codexRateLimitBaseDelayMs: number;
+  codexRateLimitMaxDelayMs: number;
   codexDriverMode?: CodexDriverMode | undefined;
   codexAppServerTransport?: AppServerTransport | undefined;
   codexAppServerStartupTimeoutMs?: number | undefined;
@@ -80,6 +84,11 @@ function parseInteger(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function parseMinimumInteger(value: string | undefined, fallback: number, minimum: number): number {
+  const parsed = parseInteger(value, fallback);
+  return parsed >= minimum ? parsed : fallback;
+}
+
 function parseSandboxMode(value: string | undefined, fallback: SandboxMode): SandboxMode {
   if (value === 'read-only' || value === 'workspace-write' || value === 'danger-full-access') {
     return value;
@@ -128,6 +137,10 @@ export function loadConfig(): AppConfig {
     commandPrefix: process.env.COMMAND_PREFIX?.trim() || '!',
     dataDir: path.resolve(process.env.DATA_DIR ?? './data'),
     codexCommand: process.env.CODEX_COMMAND?.trim() || 'codex',
+    codexMaxAttempts: parseMinimumInteger(process.env.CODEX_MAX_ATTEMPTS, 10, 1),
+    codexRateLimitMaxAttempts: parseMinimumInteger(process.env.CODEX_RATE_LIMIT_MAX_ATTEMPTS, 0, 0),
+    codexRateLimitBaseDelayMs: parseMinimumInteger(process.env.CODEX_RATE_LIMIT_BASE_DELAY_MS, 5_000, 0),
+    codexRateLimitMaxDelayMs: parseMinimumInteger(process.env.CODEX_RATE_LIMIT_MAX_DELAY_MS, 60_000, 0),
     codexDriverMode: parseCodexDriverMode(process.env.CODEX_DRIVER_MODE?.trim(), 'app-server'),
     codexAppServerTransport: parseAppServerTransport(process.env.CODEX_APP_SERVER_TRANSPORT?.trim(), 'auto'),
     codexAppServerStartupTimeoutMs: parseInteger(process.env.CODEX_APP_SERVER_STARTUP_TIMEOUT_MS, 10_000),

@@ -199,6 +199,52 @@ async function handleAsync(message) {
         return;
       }
 
+      if (prompt.includes('[app-rate-limit-twice]')) {
+        const markerPath = path.join(process.cwd(), '.fake-app-server-rate-limit-twice');
+        let count = 0;
+
+        try {
+          count = Number(await fs.readFile(markerPath, 'utf8')) || 0;
+        } catch {}
+
+        if (count < 2) {
+          await fs.writeFile(markerPath, String(count + 1), 'utf8');
+          notify('error', {
+            message: 'exceeded retry limit, last status: 429 Too Many Requests',
+          });
+          setTimeout(() => {
+            if (!activeTurns.has(turnId)) {
+              return;
+            }
+            activeTurns.delete(turnId);
+            notify('turn/completed', {
+              threadId,
+              turn: { id: turnId, status: 'failed' },
+            });
+          }, 20);
+          return;
+        }
+
+        await fs.rm(markerPath, { force: true });
+      }
+
+      if (prompt.includes('[app-rate-limit-permanent]')) {
+        notify('error', {
+          message: 'exceeded retry limit, last status: 429 Too Many Requests',
+        });
+        setTimeout(() => {
+          if (!activeTurns.has(turnId)) {
+            return;
+          }
+          activeTurns.delete(turnId);
+          notify('turn/completed', {
+            threadId,
+            turn: { id: turnId, status: 'failed' },
+          });
+        }, 20);
+        return;
+      }
+
       if (prompt.includes('[app-plan]')) {
         notify('turn/plan/updated', {
           threadId,
