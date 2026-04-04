@@ -1221,6 +1221,117 @@ test('bridge retries transient Codex JSON stream failures on the same session an
   await cleanupDir(rootDir);
 });
 
+test('bridge keeps retrying repeated transient stream failures on the same thread before giving up', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-json-transient-twice-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-json-transient-twice-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-json-transient-twice', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[json-transient-twice] please finish this task'));
+    await waitFor(() => findSent(rootChannel, /ok: \[json-transient-twice\] please finish this task/), 15_000);
+
+    const session = store.getSession(rootChannel.id);
+    assert.ok(session?.codexThreadId);
+    assert.ok(rootChannel.sent.some((message) => /Codex 连接中断，bridge 正在继续当前会话并自动重试/.test(message.content)));
+    assert.ok(!rootChannel.sent.some((message) => /放弃当前会话并改用全新会话重试/.test(message.content)));
+
+    const logFiles = (await readdir(logDir)).sort();
+    const payloads = await Promise.all(logFiles.map(async (fileName) => JSON.parse(await readFile(path.join(logDir, fileName), 'utf8')) as {
+      args: { mode: string };
+    }));
+    assert.deepEqual(payloads.slice(0, 3).map((payload) => payload.args.mode), ['exec', 'resume', 'resume']);
+  } finally {
+    delete process.env.FAKE_CODEX_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge keeps the same thread across ten transient retries before succeeding', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-json-transient-nine-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-json-transient-nine-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-json-transient-nine', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[json-transient-nine] please finish this task'));
+    await waitFor(() => findSent(rootChannel, /ok: \[json-transient-nine\] please finish this task/), 20_000);
+
+    const session = store.getSession(rootChannel.id);
+    assert.ok(session?.codexThreadId);
+    assert.ok(!rootChannel.sent.some((message) => /放弃当前会话并改用全新会话重试/.test(message.content)));
+
+    const logFiles = (await readdir(logDir)).sort();
+    const payloads = await Promise.all(logFiles.map(async (fileName) => JSON.parse(await readFile(path.join(logDir, fileName), 'utf8')) as {
+      args: { mode: string };
+    }));
+    assert.deepEqual(payloads.slice(0, 10).map((payload) => payload.args.mode), ['exec', 'resume', 'resume', 'resume', 'resume', 'resume', 'resume', 'resume', 'resume', 'resume']);
+  } finally {
+    await (bridge as any).stop?.();
+    delete process.env.FAKE_CODEX_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge keeps the last known Codex thread after exhausting transient retries', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-json-transient-permanent-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-json-transient-permanent', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[json-transient-permanent] please finish this task'));
+    await waitFor(() => findSent(rootChannel, /执行失败/), 20_000);
+
+    const session = store.getSession(rootChannel.id);
+    assert.ok(session?.codexThreadId);
+    assert.ok(!rootChannel.sent.some((message) => /放弃当前会话并改用全新会话重试/.test(message.content)));
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge defers the final reply when Discord writes fail and flushes it after recovery', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-deferred-reply-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-deferred-reply', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+
+    const originalSend = rootChannel.send.bind(rootChannel);
+    const failUntil = Date.now() + 5_000;
+    rootChannel.send = async (payload: any): Promise<any> => {
+      if (Date.now() < failUntil) {
+        const error = new Error('socket hang up') as Error & { code?: string };
+        error.code = 'ECONNRESET';
+        throw error;
+      }
+      return originalSend(payload);
+    };
+
+    await dispatch(bridge, createUserMessage(rootChannel, 'deferred reply test'));
+    await waitFor(() => rootChannel.sent.some((message) => /🤖 \*\*api\*\*/.test(message.content) && /ok: deferred reply test/.test(message.content)), 20_000);
+    await waitFor(() => (((store.getRuntimeState(rootChannel.id) as any)?.pendingReplies?.length ?? 0) === 0), 20_000);
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge drops a stale resumed Codex session and retries with a fresh session', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-resume-stale-');
   const workspace = await createWorkspace(rootDir);

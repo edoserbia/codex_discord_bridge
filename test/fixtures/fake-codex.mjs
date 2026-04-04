@@ -101,6 +101,9 @@ const scenario = (() => {
   if (prompt.includes('[resume-stale]')) return 'resume-stale';
   if (prompt.includes('[fresh-then-resume-stale]')) return 'fresh-then-resume-stale';
   if (prompt.includes('[json-transient]')) return 'json-transient';
+  if (prompt.includes('[json-transient-twice]')) return 'json-transient-twice';
+  if (prompt.includes('[json-transient-nine]')) return 'json-transient-nine';
+  if (prompt.includes('[json-transient-permanent]')) return 'json-transient-permanent';
   if (prompt.includes('[json-stale-session]')) return 'json-stale-session';
   if (prompt.includes('[zero-exit-no-turn]')) return 'zero-exit-no-turn';
   if (prompt.includes('[flaky-exit]')) return 'flaky-exit';
@@ -131,10 +134,18 @@ if (logDir) {
     cwd: process.cwd(),
     env: {
       PWD: process.env.PWD,
+      HTTP_PROXY: process.env.HTTP_PROXY,
+      HTTPS_PROXY: process.env.HTTPS_PROXY,
+      ALL_PROXY: process.env.ALL_PROXY,
+      http_proxy: process.env.http_proxy,
+      https_proxy: process.env.https_proxy,
+      all_proxy: process.env.all_proxy,
       CODEX_CI: process.env.CODEX_CI,
       CODEX_SHELL: process.env.CODEX_SHELL,
       CODEX_THREAD_ID: process.env.CODEX_THREAD_ID,
       CODEX_INTERNAL_ORIGINATOR_OVERRIDE: process.env.CODEX_INTERNAL_ORIGINATOR_OVERRIDE,
+      CODEX_TUNNING_DISCORD_PROXY_INJECTED: process.env.CODEX_TUNNING_DISCORD_PROXY_INJECTED,
+      CODEX_TUNNING_DISCORD_PROXY_INJECTED_KEYS: process.env.CODEX_TUNNING_DISCORD_PROXY_INJECTED_KEYS,
       CODEX_TUNNING_SECRETS_FILE: process.env.CODEX_TUNNING_SECRETS_FILE,
     },
   }, null, 2));
@@ -214,6 +225,49 @@ if (scenario === 'json-transient') {
     event({ type: 'turn.failed', error: { message: 'stream disconnected before completion: error sending request for url (https://example.invalid/v1/responses)' } });
     process.exit(1);
   }
+}
+
+if (scenario === 'json-transient-twice') {
+  const markerPath = path.join(process.cwd(), '.fake-codex-json-transient-twice');
+  let count = 0;
+
+  try {
+    count = Number(await fs.readFile(markerPath, 'utf8')) || 0;
+  } catch {}
+
+  if (count < 2) {
+    await fs.writeFile(markerPath, String(count + 1), 'utf8');
+    event({ type: 'error', message: 'Reconnecting... 1/5 (stream disconnected before completion: error sending request for url (https://example.invalid/v1/responses))' });
+    event({ type: 'error', message: 'Reconnecting... 2/5 (stream disconnected before completion: error sending request for url (https://example.invalid/v1/responses))' });
+    event({ type: 'turn.failed', error: { message: 'stream disconnected before completion: error sending request for url (https://example.invalid/v1/responses)' } });
+    process.exit(1);
+  }
+
+  await fs.rm(markerPath, { force: true });
+}
+
+if (scenario === 'json-transient-nine') {
+  const markerPath = path.join(process.cwd(), '.fake-codex-json-transient-nine');
+  let count = 0;
+
+  try {
+    count = Number(await fs.readFile(markerPath, 'utf8')) || 0;
+  } catch {}
+
+  if (count < 9) {
+    await fs.writeFile(markerPath, String(count + 1), 'utf8');
+    event({ type: 'error', message: 'Reconnecting... 1/5 (stream disconnected before completion: error sending request for url (https://example.invalid/v1/responses))' });
+    event({ type: 'turn.failed', error: { message: 'stream disconnected before completion: error sending request for url (https://example.invalid/v1/responses)' } });
+    process.exit(1);
+  }
+
+  await fs.rm(markerPath, { force: true });
+}
+
+if (scenario === 'json-transient-permanent') {
+  event({ type: 'error', message: 'Reconnecting... 1/5 (stream disconnected before completion: error sending request for url (https://example.invalid/v1/responses))' });
+  event({ type: 'turn.failed', error: { message: 'stream disconnected before completion: error sending request for url (https://example.invalid/v1/responses)' } });
+  process.exit(1);
 }
 
 if (scenario === 'json-stale-session' && args.mode === 'resume') {

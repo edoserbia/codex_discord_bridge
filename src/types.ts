@@ -189,10 +189,35 @@ export interface ActiveRunState {
   signal?: NodeJS.Signals | null | undefined;
 }
 
+export type DeferredSendFile =
+  | string
+  | {
+    attachment: string;
+    name?: string | undefined;
+  };
+
+export type DeferredSendPayload =
+  | string
+  | {
+    content?: string | undefined;
+    files?: DeferredSendFile[] | undefined;
+  };
+
+export interface DeferredDiscordReply {
+  id: string;
+  messageId: string;
+  content: DeferredSendPayload;
+  createdAt: string;
+  retryCount: number;
+  lastError?: string | undefined;
+  attachmentDir?: string | undefined;
+}
+
 export interface ChannelRuntime {
   conversationId: string;
   queue: PromptTask[];
   activeRun?: ActiveRunState | undefined;
+  pendingReplies?: DeferredDiscordReply[] | undefined;
 }
 
 export interface CodexRunInput {

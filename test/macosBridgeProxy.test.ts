@@ -137,6 +137,72 @@ migrate_legacy_bridge_proxy_env_keys`,
   }
 });
 
+test('macos bridge proxy export marks bridge-managed proxy injection for child process filtering', async () => {
+  const rootDir = await makeTempDir('codex-bridge-macos-proxy-export-');
+  const envFile = path.join(rootDir, '.env');
+
+  try {
+    await writeFile(envFile, 'CODEX_DISCORD_BRIDGE_PROXY=http://127.0.0.1:7890\n', 'utf8');
+
+    const output = await runBash(
+      `source "${scriptPath}"
+ENV_FILE="${envFile}"
+unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy ALL_PROXY all_proxy CODEX_TUNNING_DISCORD_PROXY_INJECTED
+maybe_export_proxy
+printf 'HTTP_PROXY=%s\\n' "$HTTP_PROXY"
+printf 'HTTPS_PROXY=%s\\n' "$HTTPS_PROXY"
+printf 'CODEX_TUNNING_DISCORD_PROXY_INJECTED=%s\\n' "$CODEX_TUNNING_DISCORD_PROXY_INJECTED"
+printf 'CODEX_TUNNING_DISCORD_PROXY_INJECTED_KEYS=%s\\n' "$CODEX_TUNNING_DISCORD_PROXY_INJECTED_KEYS"`,
+      {},
+    );
+
+    assert.match(output, /^HTTP_PROXY=http:\/\/127\.0\.0\.1:7890$/m);
+    assert.match(output, /^HTTPS_PROXY=http:\/\/127\.0\.0\.1:7890$/m);
+    assert.match(output, /^CODEX_TUNNING_DISCORD_PROXY_INJECTED=1$/m);
+    assert.match(output, /^CODEX_TUNNING_DISCORD_PROXY_INJECTED_KEYS=HTTP_PROXY,http_proxy,HTTPS_PROXY,https_proxy$/m);
+  } finally {
+    await cleanupDir(rootDir);
+  }
+});
+
+test('macos bridge proxy force mode keeps the configured 7890 proxy even when direct access works', async () => {
+  const rootDir = await makeTempDir('codex-bridge-macos-proxy-force-');
+  const envFile = path.join(rootDir, '.env');
+  const server = await startStaticServer({
+    '/gateway': {
+      body: '{}',
+      contentType: 'application/json',
+    },
+  });
+
+  try {
+    await writeFile(
+      envFile,
+      [
+        'CODEX_DISCORD_BRIDGE_PROXY=http://127.0.0.1:7890',
+        'CODEX_DISCORD_BRIDGE_PROXY_FORCE=1',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const output = await runBash(
+      `source "${scriptPath}"
+ENV_FILE="${envFile}"
+CODEX_DISCORD_BRIDGE_PROBE_URL="${server.origin}/gateway"
+CODEX_DISCORD_BRIDGE_PROBE_TIMEOUT_SECONDS=2
+auto_configure_bridge_proxy
+printf 'proxy=%s\\n' "$(read_env_value CODEX_DISCORD_BRIDGE_PROXY || true)"`,
+      {},
+    );
+
+    assert.match(output, /^proxy=http:\/\/127\.0\.0\.1:7890$/m);
+  } finally {
+    await server.close();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('macos bridge restart uses launchctl kickstart for installed launchd services', async () => {
   const output = await runBash(
     `source "${scriptPath}"

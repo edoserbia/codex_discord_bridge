@@ -55,6 +55,8 @@ import type {
   ConversationSessionState,
   DashboardBinding,
   DashboardConversation,
+  DeferredDiscordReply,
+  DeferredSendPayload,
   PromptTask,
 } from './types.js';
 
@@ -181,8 +183,9 @@ interface ResolvedConversation {
   channel: SendableChannel;
 }
 
-const MAX_CODEX_ATTEMPTS = 3;
+const MAX_CODEX_ATTEMPTS = 10;
 const MIN_RUNTIME_VIEW_REFRESH_INTERVAL_MS = 300;
+const DEFERRED_REPLY_RETRY_DELAY_MS = 3_000;
 const AUTOPILOT_THREAD_AUTO_ARCHIVE_MINUTES: ThreadAutoArchiveDuration = 1440;
 const AUTOPILOT_REQUESTED_BY = 'Autopilot';
 const AUTOPILOT_REQUESTED_BY_ID = 'autopilot';
@@ -380,6 +383,7 @@ export class DiscordCodexBridge {
   private readonly pendingRuntimeViewRefreshes = new Map<string, PendingRuntimeViewRefresh>();
   private readonly lastRuntimeViewRefreshAt = new Map<string, number>();
   private readonly pendingRuntimeStateSaves = new Map<string, NodeJS.Timeout>();
+  private readonly pendingDeferredReplyFlushes = new Map<string, NodeJS.Timeout>();
   private readonly activeAutopilotProjects = new Set<string>();
   private readonly autopilotBoardSnapshots = new Map<string, AutopilotProjectState['board']>();
   private readonly pendingFileSelections = new Map<string, PendingFileSelection>();
@@ -425,6 +429,11 @@ export class DiscordCodexBridge {
       clearTimeout(timer);
     }
     this.pendingRuntimeStateSaves.clear();
+
+    for (const timer of this.pendingDeferredReplyFlushes.values()) {
+      clearTimeout(timer);
+    }
+    this.pendingDeferredReplyFlushes.clear();
 
     await this.runner.stop?.();
     await this.client.destroy();
@@ -645,7 +654,8 @@ export class DiscordCodexBridge {
     let runtime = this.runtimes.get(conversationId);
 
     if (!runtime) {
-      runtime = this.store.getRuntimeState(conversationId) ?? { conversationId, queue: [] };
+      runtime = this.store.getRuntimeState(conversationId) ?? { conversationId, queue: [], pendingReplies: [] };
+      runtime.pendingReplies ??= [];
       this.runtimes.set(conversationId, runtime);
     }
 
@@ -709,7 +719,7 @@ export class DiscordCodexBridge {
   private async persistRuntimeState(conversationId: string): Promise<void> {
     const runtime = this.runtimes.get(conversationId);
 
-    if (!runtime || (!runtime.activeRun && runtime.queue.length === 0)) {
+    if (!runtime || (!runtime.activeRun && runtime.queue.length === 0 && (runtime.pendingReplies?.length ?? 0) === 0)) {
       await this.store.removeRuntimeState(conversationId);
       return;
     }
@@ -754,6 +764,7 @@ export class DiscordCodexBridge {
   private async recoverPersistedRuntimes(): Promise<void> {
     for (const persisted of this.store.listRuntimeStates()) {
       const runtime: ChannelRuntime = structuredClone(persisted);
+      runtime.pendingReplies ??= [];
       const conversationId = runtime.conversationId;
       const bindingChannelId = runtime.activeRun?.task.bindingChannelId
         ?? runtime.queue.at(0)?.bindingChannelId
@@ -799,6 +810,7 @@ export class DiscordCodexBridge {
 
       const session = await this.store.ensureSession(binding.channelId, conversationId);
       await this.refreshRuntimeViews(channel, binding, session, runtime, conversationId !== binding.channelId);
+      this.scheduleDeferredReplyFlush(conversationId, 0);
 
       if (runtime.queue.length > 0) {
         this.startProcessQueue(conversationId);
@@ -842,6 +854,8 @@ export class DiscordCodexBridge {
     if (!resolved) {
       return;
     }
+
+    this.scheduleDeferredReplyFlush(resolved.conversationId, 0);
 
     const prompt = message.content.trim();
     const attachments = extractMessageAttachments(message);
@@ -1229,6 +1243,8 @@ export class DiscordCodexBridge {
       await this.refreshRuntimeViews(channel, binding, session, runtime, conversationId !== activeRun.task.bindingChannelId);
       await this.safeReplyToOriginalMessage(
         channel,
+        runtime,
+        activeRun.task,
         activeRun.task.messageId,
         `❌ **${binding.projectName}** · ${activeRun.task.requestedBy}\n\nBridge 内部错误，任务已中断。\n\n诊断信息：\n\`\`\`\n${truncate(errorMessage, 900)}\n\`\`\``,
       );
@@ -3054,7 +3070,7 @@ export class DiscordCodexBridge {
       const suppressReply = !result.success && (cancellationReason === 'guidance' || cancellationReason === 'binding_reset' || cancellationReason === 'reset' || cancellationReason === 'unbind');
       let nextSession = this.store.getSession(conversationId) ?? currentSession;
 
-      if (!result.success && failureDiagnosis.retryable) {
+      if (!result.success && failureDiagnosis.kind === 'stale-session') {
         nextSession = await this.store.updateSession(conversationId, { codexThreadId: undefined }, currentTask.bindingChannelId);
       }
 
@@ -3091,6 +3107,8 @@ export class DiscordCodexBridge {
           : formatFailureReply(binding, currentTask.requestedBy, result);
         await this.safeReplyToOriginalMessage(
           channel,
+          runtime,
+          currentTask,
           currentTask.messageId,
           replyPayload,
         );
@@ -3104,9 +3122,18 @@ export class DiscordCodexBridge {
       this.activeJobs.delete(conversationId);
       runtime.activeRun = undefined;
       this.scheduleRuntimeStateSave(conversationId, true);
-      await removeAttachmentDir(currentTask.attachmentDir).catch(() => undefined);
+      const shouldKeepAttachmentDir = Boolean(
+        currentTask.attachmentDir
+        && (runtime.pendingReplies ?? []).some((item) => item.attachmentDir === currentTask.attachmentDir),
+      );
+      if (!shouldKeepAttachmentDir) {
+        await removeAttachmentDir(currentTask.attachmentDir).catch(() => undefined);
+      }
       const nextSession = this.store.getSession(conversationId) ?? currentSession;
       await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
+      if ((runtime.pendingReplies?.length ?? 0) > 0) {
+        this.scheduleDeferredReplyFlush(conversationId, 0);
+      }
 
       if (currentTask.origin === 'autopilot') {
         this.activeAutopilotProjects.delete(currentTask.bindingChannelId);
@@ -3251,9 +3278,9 @@ export class DiscordCodexBridge {
       case 'transient':
         return attempt >= 2
           ? {
-              latestActivity: 'Codex 连接连续中断，bridge 正在放弃当前会话并改用全新会话重试',
-              timeline: '🧹 Codex 连接连续中断，bridge 正在放弃当前会话并改用全新会话重试',
-              resetThreadBeforeRetry: true,
+              latestActivity: 'Codex 连接连续中断，bridge 正在继续当前会话并再次自动重试',
+              timeline: '🔁 Codex 连接连续中断，bridge 正在继续当前会话并再次自动重试',
+              resetThreadBeforeRetry: false,
             }
           : {
               latestActivity: 'Codex 连接中断，bridge 正在继续当前会话并自动重试',
@@ -3264,9 +3291,9 @@ export class DiscordCodexBridge {
       case 'none':
         return attempt >= 2
           ? {
-              latestActivity: 'Codex 连续失败，bridge 正在放弃当前会话并改用全新会话自动恢复',
-              timeline: '🧹 Codex 连续失败，bridge 正在放弃当前会话并改用全新会话自动恢复',
-              resetThreadBeforeRetry: true,
+              latestActivity: 'Codex 连续失败，bridge 正在继续当前会话并再次自动恢复',
+              timeline: '🔁 Codex 连续失败，bridge 正在继续当前会话并再次自动恢复',
+              resetThreadBeforeRetry: false,
             }
           : {
               latestActivity: 'Codex 执行失败，bridge 正在基于当前工作区状态自动恢复',
@@ -3277,9 +3304,9 @@ export class DiscordCodexBridge {
       default:
         return attempt >= 2
           ? {
-              latestActivity: 'Codex 异常退出且未完成当前轮次，bridge 正在改用全新会话重试',
-              timeline: '🧹 Codex 异常退出且未完成当前轮次，bridge 正在改用全新会话重试',
-              resetThreadBeforeRetry: true,
+              latestActivity: 'Codex 异常退出且未完成当前轮次，bridge 正在继续当前会话并再次重试',
+              timeline: '🔁 Codex 异常退出且未完成当前轮次，bridge 正在继续当前会话并再次重试',
+              resetThreadBeforeRetry: false,
             }
           : {
               latestActivity: 'Codex 异常退出，bridge 正在自动重试一次',
@@ -3532,13 +3559,166 @@ export class DiscordCodexBridge {
     }
   }
 
-  private async safeReplyToOriginalMessage(channel: SendableChannel, messageId: string, content: SendPayload): Promise<void> {
+  private async safeReplyToOriginalMessage(
+    channel: SendableChannel,
+    runtime: ChannelRuntime,
+    task: PromptTask,
+    messageId: string,
+    content: SendPayload,
+  ): Promise<void> {
     try {
       await this.replyToOriginalMessage(channel, messageId, content);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.warn(`[discord-view] failed to reply to original message id=${messageId} error=${message}`);
+
+      if (this.isRetryableDiscordWriteError(error)) {
+        this.deferOriginalReply(runtime, task, messageId, content, message);
+      }
     }
+  }
+
+  private deferOriginalReply(
+    runtime: ChannelRuntime,
+    task: PromptTask,
+    messageId: string,
+    content: SendPayload,
+    errorMessage: string,
+  ): void {
+    const pendingReplies = runtime.pendingReplies ?? [];
+    pendingReplies.push({
+      id: randomUUID(),
+      messageId,
+      content: this.serializeDeferredSendPayload(content),
+      createdAt: new Date().toISOString(),
+      retryCount: 0,
+      lastError: errorMessage,
+      attachmentDir: task.attachmentDir,
+    });
+    runtime.pendingReplies = pendingReplies;
+    this.scheduleRuntimeStateSave(runtime.conversationId, true);
+    this.scheduleDeferredReplyFlush(runtime.conversationId);
+  }
+
+  private scheduleDeferredReplyFlush(conversationId: string, delayMs = DEFERRED_REPLY_RETRY_DELAY_MS): void {
+    const existingTimer = this.pendingDeferredReplyFlushes.get(conversationId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    const timer = setTimeout(() => {
+      this.pendingDeferredReplyFlushes.delete(conversationId);
+      void this.flushDeferredReplies(conversationId).catch((error) => {
+        this.logBridgeError(`deferredReplyFlush conversation=${conversationId}`, error);
+      });
+    }, Math.max(0, delayMs));
+    timer.unref?.();
+    this.pendingDeferredReplyFlushes.set(conversationId, timer);
+  }
+
+  private async flushDeferredReplies(conversationId: string): Promise<void> {
+    const runtime = this.runtimes.get(conversationId);
+    const pendingReplies = runtime?.pendingReplies ?? [];
+
+    if (!runtime || pendingReplies.length === 0) {
+      return;
+    }
+
+    const channel = await this.fetchChannel(conversationId);
+    if (!channel) {
+      this.scheduleDeferredReplyFlush(conversationId);
+      return;
+    }
+
+    for (const pendingReply of [...pendingReplies]) {
+      try {
+        await this.replyToOriginalMessage(channel, pendingReply.messageId, this.deserializeDeferredSendPayload(pendingReply.content));
+        runtime.pendingReplies = (runtime.pendingReplies ?? []).filter((item) => item.id !== pendingReply.id);
+        await this.cleanupDeferredReplyAttachmentDir(runtime, pendingReply);
+        this.scheduleRuntimeStateSave(conversationId, true);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+
+        if (!this.isRetryableDiscordWriteError(error)) {
+          console.warn(`[discord-view] dropping deferred reply conversation=${conversationId} id=${pendingReply.id} error=${message}`);
+          runtime.pendingReplies = (runtime.pendingReplies ?? []).filter((item) => item.id !== pendingReply.id);
+          await this.cleanupDeferredReplyAttachmentDir(runtime, pendingReply);
+          this.scheduleRuntimeStateSave(conversationId, true);
+          continue;
+        }
+
+        const existing = (runtime.pendingReplies ?? []).find((item) => item.id === pendingReply.id);
+        if (existing) {
+          existing.retryCount += 1;
+          existing.lastError = message;
+        }
+
+        this.scheduleRuntimeStateSave(conversationId, true);
+        this.scheduleDeferredReplyFlush(conversationId);
+        return;
+      }
+    }
+  }
+
+  private async cleanupDeferredReplyAttachmentDir(runtime: ChannelRuntime, pendingReply: DeferredDiscordReply): Promise<void> {
+    const attachmentDir = pendingReply.attachmentDir?.trim();
+    if (!attachmentDir) {
+      return;
+    }
+
+    const stillReferenced = (runtime.pendingReplies ?? []).some((item) => item.attachmentDir === attachmentDir);
+    if (stillReferenced) {
+      return;
+    }
+
+    await removeAttachmentDir(attachmentDir).catch(() => undefined);
+  }
+
+  private serializeDeferredSendPayload(content: SendPayload): DeferredSendPayload {
+    if (typeof content === 'string') {
+      return content;
+    }
+
+    return {
+      content: content.content,
+      files: content.files?.map((file) => (typeof file === 'string'
+        ? file
+        : file.name
+          ? {
+            attachment: file.attachment,
+            name: file.name,
+          }
+          : {
+            attachment: file.attachment,
+          })),
+    };
+  }
+
+  private deserializeDeferredSendPayload(content: DeferredSendPayload): SendPayload {
+    if (typeof content === 'string') {
+      return content;
+    }
+
+    const payload: Exclude<SendPayload, string> = {};
+
+    if (typeof content.content === 'string') {
+      payload.content = content.content;
+    }
+
+    if (content.files) {
+      payload.files = content.files.map((file) => (typeof file === 'string'
+        ? file
+        : file.name
+          ? {
+            attachment: file.attachment,
+            name: file.name,
+          }
+          : {
+            attachment: file.attachment,
+          }));
+    }
+
+    return payload;
   }
 
   private async refreshProgressMessage(
