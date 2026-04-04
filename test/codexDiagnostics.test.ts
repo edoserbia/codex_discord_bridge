@@ -92,7 +92,7 @@ test('diagnostics classifies transient Codex stream failures from structured eve
   assert.equal(diagnosis.kind, 'transient');
 });
 
-test('diagnostics classifies surfaced 429 retry exhaustion as transient', () => {
+test('diagnostics classifies surfaced 429 retry exhaustion as rate-limit', () => {
   const diagnosis = diagnoseCodexFailure({
     success: false,
     exitCode: null,
@@ -107,7 +107,7 @@ test('diagnostics classifies surfaced 429 retry exhaustion as transient', () => 
   });
 
   assert.equal(diagnosis.retryable, true);
-  assert.equal(diagnosis.kind, 'transient');
+  assert.equal(diagnosis.kind, 'rate-limit');
 });
 
 test('diagnostics classifies stale resume failures separately from generic exits', () => {

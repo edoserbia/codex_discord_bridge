@@ -200,3 +200,50 @@ test('loadConfig respects explicit CODEX_DRIVER_MODE override', { concurrency: f
     await cleanupDir(rootDir);
   }
 });
+
+test('loadConfig exposes configurable retry limits and 429 backoff settings', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-config-retry-tuning-');
+  const secretFile = path.join(rootDir, 'secrets.env');
+  await fs.writeFile(secretFile, 'CODEX_TUNNING_DISCORD_BOT_TOKEN="secret-token-from-file"\n', 'utf8');
+
+  const previous = {
+    CODEX_TUNNING_SECRETS_FILE: process.env.CODEX_TUNNING_SECRETS_FILE,
+    CODEX_TUNNING_DISCORD_BOT_TOKEN: process.env.CODEX_TUNNING_DISCORD_BOT_TOKEN,
+    DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
+    DISCORD_TOKEN: process.env.DISCORD_TOKEN,
+    DATA_DIR: process.env.DATA_DIR,
+    WEB_ENABLED: process.env.WEB_ENABLED,
+    CODEX_MAX_ATTEMPTS: process.env.CODEX_MAX_ATTEMPTS,
+    CODEX_RATE_LIMIT_MAX_ATTEMPTS: process.env.CODEX_RATE_LIMIT_MAX_ATTEMPTS,
+    CODEX_RATE_LIMIT_BASE_DELAY_MS: process.env.CODEX_RATE_LIMIT_BASE_DELAY_MS,
+    CODEX_RATE_LIMIT_MAX_DELAY_MS: process.env.CODEX_RATE_LIMIT_MAX_DELAY_MS,
+  };
+
+  delete process.env.CODEX_TUNNING_DISCORD_BOT_TOKEN;
+  delete process.env.DISCORD_BOT_TOKEN;
+  delete process.env.DISCORD_TOKEN;
+  process.env.CODEX_TUNNING_SECRETS_FILE = secretFile;
+  process.env.DATA_DIR = rootDir;
+  process.env.WEB_ENABLED = 'false';
+  process.env.CODEX_MAX_ATTEMPTS = '12';
+  process.env.CODEX_RATE_LIMIT_MAX_ATTEMPTS = '60';
+  process.env.CODEX_RATE_LIMIT_BASE_DELAY_MS = '1500';
+  process.env.CODEX_RATE_LIMIT_MAX_DELAY_MS = '45000';
+
+  try {
+    const config = loadConfig();
+    assert.equal(config.codexMaxAttempts, 12);
+    assert.equal(config.codexRateLimitMaxAttempts, 60);
+    assert.equal(config.codexRateLimitBaseDelayMs, 1_500);
+    assert.equal(config.codexRateLimitMaxDelayMs, 45_000);
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+    await cleanupDir(rootDir);
+  }
+});

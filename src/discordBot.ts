@@ -183,7 +183,6 @@ interface ResolvedConversation {
   channel: SendableChannel;
 }
 
-const MAX_CODEX_ATTEMPTS = 10;
 const MIN_RUNTIME_VIEW_REFRESH_INTERVAL_MS = 300;
 const DEFERRED_REPLY_RETRY_DELAY_MS = 3_000;
 const AUTOPILOT_THREAD_AUTO_ARCHIVE_MINUTES: ThreadAutoArchiveDuration = 1440;
@@ -194,6 +193,10 @@ const DEFAULT_DISCORD_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const DISCORD_WRITE_RETRY_DELAYS_MS = [250, 1_000, 2_500] as const;
 const EMPTY_DISCORD_MESSAGE_FALLBACK = '（Codex 返回了空白消息，bridge 已拦截并保留执行结果。）';
 const execFileAsync = promisify(execFile);
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 interface PendingRuntimeViewRefresh {
   channel: SendableChannel;
@@ -334,7 +337,7 @@ function shouldAutoRetryFailedRun(
     return false;
   }
 
-  if (failureKind === 'transient' || failureKind === 'stale-session' || failureKind === 'unexpected-empty-exit') {
+  if (failureKind === 'transient' || failureKind === 'rate-limit' || failureKind === 'stale-session' || failureKind === 'unexpected-empty-exit') {
     return true;
   }
 
@@ -2979,6 +2982,7 @@ export class DiscordCodexBridge {
         const attemptSession = this.store.getSession(conversationId) ?? currentSession;
         const shouldResumeOnPreferredDriver = !attemptSession.driver || attemptSession.driver === preferredDriverMode;
         const existingThreadId = shouldResumeOnPreferredDriver ? attemptSession.codexThreadId : undefined;
+        const attemptLimit = this.getAttemptLimitForFailureKind(pendingRetryKind);
 
         if (attemptsUsed > 1 && runtime.activeRun && pendingRetryKind) {
           const retryDescription = this.describeRetry(pendingRetryKind, attemptsUsed - 1);
@@ -3021,7 +3025,7 @@ export class DiscordCodexBridge {
           fallbackActive: startedInFallback,
         }, currentTask.bindingChannelId);
         pendingRecoveryNotice = Boolean(attemptSession.fallbackActive) && job.driverMode === 'app-server';
-        this.logCodexAttemptStart(binding, currentTask, conversationId, attemptsUsed, job.pid, existingThreadId);
+        this.logCodexAttemptStart(binding, currentTask, conversationId, attemptsUsed, attemptLimit, job.pid, existingThreadId);
 
         await channel.sendTyping().catch(() => undefined);
         await this.refreshRuntimeViews(channel, binding, currentSession, runtime, isThreadConversation);
@@ -3035,10 +3039,21 @@ export class DiscordCodexBridge {
           cancellationReason,
           failureDiagnosis.kind,
         );
+        const retryLimit = this.getAttemptLimitForFailureKind(failureDiagnosis.kind);
+        const canRetryAgain = shouldAutoRetry && this.shouldRetryAgain(attemptsUsed, failureDiagnosis.kind);
 
-        this.logCodexAttemptExit(binding, currentTask, conversationId, attemptsUsed, result, shouldAutoRetry, failureDiagnosis.kind);
+        this.logCodexAttemptExit(
+          binding,
+          currentTask,
+          conversationId,
+          attemptsUsed,
+          retryLimit,
+          result,
+          canRetryAgain,
+          failureDiagnosis.kind,
+        );
 
-        if (shouldAutoRetry && attemptsUsed < MAX_CODEX_ATTEMPTS) {
+        if (canRetryAgain) {
           pendingRetryKind = failureDiagnosis.kind;
           let nextSession = this.store.getSession(conversationId) ?? attemptSession;
           const retryDescription = this.describeRetry(failureDiagnosis.kind, attemptsUsed);
@@ -3059,6 +3074,16 @@ export class DiscordCodexBridge {
 
           this.scheduleRuntimeStateSave(conversationId, true);
           await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
+          await this.waitBeforeRetry(
+            conversationId,
+            runtime,
+            channel,
+            binding,
+            nextSession,
+            isThreadConversation,
+            failureDiagnosis.kind,
+            attemptsUsed,
+          );
           continue;
         }
 
@@ -3275,6 +3300,18 @@ export class DiscordCodexBridge {
           timeline: '🧹 检测到 Codex 会话可能损坏，bridge 正在丢弃当前会话并重试',
           resetThreadBeforeRetry: true,
         };
+      case 'rate-limit':
+        return attempt >= 2
+          ? {
+              latestActivity: 'Codex 遇到连续 429 限流，bridge 会继续保留当前任务并再次重试',
+              timeline: '⏳ Codex 遇到连续 429 限流，bridge 会继续保留当前任务并再次重试',
+              resetThreadBeforeRetry: false,
+            }
+          : {
+              latestActivity: 'Codex 遇到 429 限流，bridge 会继续保留当前任务并自动重试',
+              timeline: '⏳ Codex 遇到 429 限流，bridge 会继续保留当前任务并自动重试',
+              resetThreadBeforeRetry: false,
+            };
       case 'transient':
         return attempt >= 2
           ? {
@@ -3316,11 +3353,69 @@ export class DiscordCodexBridge {
     }
   }
 
+  private getAttemptLimitForFailureKind(kind: ReturnType<typeof diagnoseCodexFailure>['kind'] | undefined): number | null {
+    if (kind === 'rate-limit') {
+      return this.config.codexRateLimitMaxAttempts > 0
+        ? this.config.codexRateLimitMaxAttempts
+        : null;
+    }
+
+    return this.config.codexMaxAttempts;
+  }
+
+  private formatAttemptLimit(limit: number | null): string {
+    return limit === null ? '∞' : String(limit);
+  }
+
+  private shouldRetryAgain(attempt: number, kind: ReturnType<typeof diagnoseCodexFailure>['kind']): boolean {
+    const limit = this.getAttemptLimitForFailureKind(kind);
+    return limit === null || attempt < limit;
+  }
+
+  private getRetryDelayMs(kind: ReturnType<typeof diagnoseCodexFailure>['kind'], attempt: number): number {
+    if (kind !== 'rate-limit') {
+      return 0;
+    }
+
+    const baseDelayMs = Math.max(0, this.config.codexRateLimitBaseDelayMs);
+    const maxDelayMs = Math.max(baseDelayMs, this.config.codexRateLimitMaxDelayMs);
+    if (baseDelayMs === 0 || maxDelayMs === 0) {
+      return 0;
+    }
+
+    return Math.min(maxDelayMs, baseDelayMs * (2 ** Math.max(0, attempt - 1)));
+  }
+
+  private async waitBeforeRetry(
+    conversationId: string,
+    runtime: ChannelRuntime,
+    channel: SendableChannel,
+    binding: ChannelBinding,
+    session: ConversationSessionState,
+    isThreadConversation: boolean,
+    kind: ReturnType<typeof diagnoseCodexFailure>['kind'],
+    attempt: number,
+  ): Promise<void> {
+    const delayMs = this.getRetryDelayMs(kind, attempt);
+    if (delayMs <= 0 || !runtime.activeRun) {
+      return;
+    }
+
+    this.touchActiveRun(runtime.activeRun);
+    runtime.activeRun.status = runtime.activeRun.status === 'cancelled' ? 'cancelled' : 'starting';
+    runtime.activeRun.latestActivity = `上游返回 429 限流，bridge 将在 ${formatDurationMs(delayMs)} 后继续重试，当前任务不会结束`;
+    this.pushRunTimeline(runtime, `⏱️ 上游返回 429 限流，等待 ${formatDurationMs(delayMs)} 后继续重试`);
+    this.scheduleRuntimeStateSave(conversationId, true);
+    await this.refreshRuntimeViews(channel, binding, session, runtime, isThreadConversation);
+    await sleep(delayMs);
+  }
+
   private logCodexAttemptStart(
     binding: ChannelBinding,
     task: PromptTask,
     conversationId: string,
     attempt: number,
+    attemptLimit: number | null,
     pid: number | undefined,
     existingThreadId: string | undefined,
   ): void {
@@ -3330,7 +3425,7 @@ export class DiscordCodexBridge {
         `project=${binding.projectName}`,
         `conversation=${conversationId}`,
         `task=${task.id.slice(0, 8)}`,
-        `attempt=${attempt}/${MAX_CODEX_ATTEMPTS}`,
+        `attempt=${attempt}/${this.formatAttemptLimit(attemptLimit)}`,
         `pid=${pid ?? 'null'}`,
         `resume=${existingThreadId ? 'true' : 'false'}`,
         `thread=${existingThreadId ?? 'new'}`,
@@ -3343,6 +3438,7 @@ export class DiscordCodexBridge {
     task: PromptTask,
     conversationId: string,
     attempt: number,
+    attemptLimit: number | null,
     result: CodexRunResult,
     retryable: boolean,
     retryKind: ReturnType<typeof diagnoseCodexFailure>['kind'],
@@ -3360,7 +3456,7 @@ export class DiscordCodexBridge {
         `project=${binding.projectName}`,
         `conversation=${conversationId}`,
         `task=${task.id.slice(0, 8)}`,
-        `attempt=${attempt}/${MAX_CODEX_ATTEMPTS}`,
+        `attempt=${attempt}/${this.formatAttemptLimit(attemptLimit)}`,
         `exitCode=${result.exitCode ?? 'null'}`,
         `signal=${result.signal ?? 'null'}`,
         `turnCompleted=${result.turnCompleted}`,

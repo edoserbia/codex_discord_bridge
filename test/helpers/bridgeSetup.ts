@@ -21,6 +21,10 @@ export async function createBridgeTestRig(options: {
   codexCommand?: string;
   driverMode?: 'legacy-exec' | 'app-server';
   appServerStartupTimeoutMs?: number;
+  codexMaxAttempts?: number;
+  codexRateLimitMaxAttempts?: number;
+  codexRateLimitBaseDelayMs?: number;
+  codexRateLimitMaxDelayMs?: number;
   webEnabled?: boolean;
   webPort?: number;
   webBind?: string;
@@ -39,6 +43,10 @@ export async function createBridgeTestRig(options: {
     codexCommand: options.codexCommand ?? 'codex',
     codexDriverMode: options.driverMode ?? 'legacy-exec',
     codexAppServerStartupTimeoutMs: options.appServerStartupTimeoutMs,
+    codexMaxAttempts: options.codexMaxAttempts ?? 10,
+    codexRateLimitMaxAttempts: options.codexRateLimitMaxAttempts ?? 0,
+    codexRateLimitBaseDelayMs: options.codexRateLimitBaseDelayMs ?? 5_000,
+    codexRateLimitMaxDelayMs: options.codexRateLimitMaxDelayMs ?? 60_000,
     allowedWorkspaceRoots: [options.rootDir],
     adminUserIds: new Set(['admin-user']),
     defaultCodex: {
@@ -57,6 +65,10 @@ export async function createBridgeTestRig(options: {
     },
   } as AppConfig & {
     codexAppServerStartupTimeoutMs?: number;
+    codexMaxAttempts?: number;
+    codexRateLimitMaxAttempts?: number;
+    codexRateLimitBaseDelayMs?: number;
+    codexRateLimitMaxDelayMs?: number;
   };
 
   const store = new JsonStateStore(path.join(config.dataDir, 'state.json'));
