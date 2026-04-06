@@ -14,7 +14,7 @@
 
 服务标签：
 
-- `com.codex-tunning.codex-discord-bridge-.b1adc197d7`
+- `<launch-agent-label>`
 
 ## 排查过程
 
@@ -31,9 +31,9 @@
 5. 手动修复并验证：
    - 将 plist 权限修正为 `644`
    - 执行：
-     - `launchctl bootout gui/$(id -u)/com.codex-tunning.codex-discord-bridge-.b1adc197d7`
-     - `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.codex-tunning.codex-discord-bridge-.b1adc197d7.plist`
-     - `launchctl kickstart -k gui/$(id -u)/com.codex-tunning.codex-discord-bridge-.b1adc197d7`
+     - `launchctl bootout gui/$(id -u)/<launch-agent-label>`
+     - `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/<launch-agent-label>.plist`
+     - `launchctl kickstart -k gui/$(id -u)/<launch-agent-label>`
    - 结果：服务恢复为 `launchctl：已加载` / `进程状态：运行中`
 
 ## 根因判断
@@ -105,6 +105,6 @@ cd /path/to/codex-discord-bridge
 
 1. 若再次出现“已安装但未加载”，优先检查：
    - plist 权限是否仍为 `644`
-   - `launchctl print gui/$(id -u)/com.codex-tunning.codex-discord-bridge-.b1adc197d7`
+   - `launchctl print gui/$(id -u)/<launch-agent-label>`
 2. 尽量使用项目脚本启动/停止，不手工改 LaunchAgent 文件。
 3. 如果未来要继续改动 macOS 启动逻辑，先回看本文档与提交 `644194b`。

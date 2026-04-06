@@ -46,7 +46,7 @@ The migration will not:
 At design time, the repository inspection found:
 
 - `codex-discord-bridge` has 13 bound workspaces in `data/state.json`
-- Most bound repositories already point at the self-hosted GitLab host `<git-host>`
+- Most bound repositories already point at the configured self-hosted GitLab host
 - There are still inconsistent cases:
   - `/path/to/project-a` uses a GitLab URL but the remote name is `gitee`
   - `/path/to/project-b` still points to real Gitee over HTTPS
@@ -93,7 +93,7 @@ Scan the following stable sources:
 
 Discovery must extract:
 
-- absolute filesystem paths under `/Users/<user>/work` or `~/.openclaw`
+- absolute filesystem paths under the allowed workspace roots or `~/.openclaw`
 - repository URLs such as `git@...` or `https://...`
 
 ### Project root normalization
