@@ -8,11 +8,15 @@
 
 - 新增 Discord 双向文件传输说明：上传附件镜像到绑定目录 `inbox/`，支持自然语言“把 report.pdf 发给我”、`!sendfile` 候选选择，以及 Codex 通过 `BRIDGE_SEND_FILE` 协议主动回传单个文件。
 - 新增文档化说明 `!web`、`--skip-git-check`、启动自动恢复、`app-server` / `legacy-exec` 驱动切换和管理员权限边界。
+- 新增 `!status` 的完整 Resume ID 恢复入口，以及 `bridgectl session status/send/resume` 的本机续聊文档说明。
+- 新增 transcript 落盘与 Discord 同步说明：本机续聊产生的用户/助手消息会同步回 Discord transcript，并持久化到 `data/transcripts/*.jsonl`。
 
 ### Changed
 
 - README、`docs/QUICKSTART.md`、`docs/DEPLOYMENT.md`、`docs/MACOS-deploy.md` 已统一到当前实际行为：文件收发、代理自动探测、LaunchAgent 原子重启、任务恢复、Web 链接和管理员判定都已补齐。
 - Git 文档默认口径改为自建 GitLab；新增 `docs/GIT.md`，旧 `docs/GITEE.md` 改为兼容提示入口。
+- `bridgectl` 的文档安装方式已统一更新为当前行为：`setup` / `deploy` / `install-service` 自动安装到 PATH，不再要求手动 `npm link`。
+- 本机 `session resume` 的终端交互文档已补齐，包括多行粘贴整段发送、`/status` 和 `/exit` 的使用方式。
 
 ### Fixed
 

@@ -199,22 +199,28 @@ cd /path/to/codex-discord-bridge
 ./scripts/macos-bridge.sh install-service --mode daemon
 ./scripts/macos-bridge.sh uninstall-service --mode daemon
 ./scripts/macos-bridge.sh deploy
-./scripts/bridgectl autopilot status
-./scripts/bridgectl autopilot project status --project api
+bridgectl autopilot status
+bridgectl autopilot project status --project api
+bridgectl session status <Resume ID>
+bridgectl session resume <Resume ID>
 ```
 
-如果你希望在任意目录直接使用 `bridgectl`，可以在 bridge 仓库里执行一次：
+如果你想显式走仓库内脚本，也可以：
 
 ```bash
-npm run build
-npm link
+./scripts/bridgectl autopilot status
+./scripts/bridgectl session resume <Resume ID>
 ```
+
+`setup` / `deploy` / `install-service` 都会自动把 `bridgectl` 安装到用户 PATH 目录中，默认优先使用 `~/bin`。如果当前终端还没刷新 PATH，执行一次 `rehash` 或新开一个终端窗口即可。
 
 之后即可在任意已绑定项目目录中执行：
 
 ```bash
 bridgectl autopilot project status
 bridgectl autopilot project run
+bridgectl session status <Resume ID>
+bridgectl session resume <Resume ID>
 ```
 
 项目定位规则：
@@ -223,6 +229,15 @@ bridgectl autopilot project run
 - `--project <绑定项目名>` 次之
 - 两者都不传时按当前工作目录匹配绑定项目
 - 匹配不到或匹配多个时直接报错，不猜
+
+`bridgectl session resume <Resume ID>` 的交互方式：
+
+- 普通单行输入：按一次 `Enter` 发送
+- 多行粘贴：整段粘贴后不会立即拆成多次发送；粘贴完成后再按一次 `Enter` 才会整段发出
+- `/status`：查看当前 Resume ID 对应会话状态
+- `/exit`：退出本地续聊模式
+
+通过这条命令发出的用户内容和助手回复，会同步回 Discord transcript，因此 Discord 侧记录仍然完整。
 
 ## 六、部署脚本会做什么
 
@@ -347,6 +362,8 @@ git branch -u origin/main main
 7. 执行构建
 8. 询问你是否安装为 macOS 自启动服务
 
+另外，`setup` / `deploy` / `install-service` 都会自动把 `bridgectl` 安装到用户 PATH 目录中，默认优先使用 `~/bin`。
+
 ### 4. 部署过程中你需要准备并填写的信息
 
 部署脚本会提示你输入或确认这些值：
@@ -408,6 +425,12 @@ Discord bot connected as <bot-name>#<discriminator>
 
 ```bash
 ./scripts/macos-bridge.sh open
+```
+
+你也可以顺手确认本机 CLI 是否可用：
+
+```bash
+bridgectl autopilot status
 ```
 
 ### 7. 第一次在 Discord 里验证
@@ -825,6 +848,14 @@ Web 面板可以用来：
 !unbind    解绑当前主频道
 !projects  查看当前服务器中的项目绑定
 ```
+
+其中 `!status` 会返回完整 Resume ID 和一条可直接复制的本机命令：
+
+```text
+bridgectl session resume <Resume ID>
+```
+
+这让你可以从 Discord 把当前会话无缝接回到本机终端继续。
 
 ### 管理员怎么识别
 

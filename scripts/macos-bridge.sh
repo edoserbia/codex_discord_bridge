@@ -170,6 +170,144 @@ augment_launch_path() {
     "/sbin")"
 }
 
+path_contains_dir() {
+  local path_value="${1:-}" target_dir="${2:-}" part=''
+  [[ -n "${target_dir}" ]] || return 1
+  IFS=':' read -r -a _path_parts <<< "${path_value}"
+  for part in "${_path_parts[@]}"; do
+    [[ -n "${part}" ]] || continue
+    if [[ "${part}" == "${target_dir}" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+shell_path_literal_for_dir() {
+  local target_dir="$1"
+  if [[ "${target_dir}" == "${HOME}" ]]; then
+    printf '$HOME'
+    return 0
+  fi
+
+  if [[ "${target_dir}" == "${HOME}/"* ]]; then
+    printf '$HOME/%s' "${target_dir#"${HOME}/"}"
+    return 0
+  fi
+
+  printf '%s' "${target_dir}"
+}
+
+append_block_if_missing() {
+  local file_path="$1" marker="$2" block="$3" last_char=''
+  mkdir -p "$(dirname "${file_path}")"
+  touch "${file_path}"
+
+  if grep -Fq "${marker}" "${file_path}"; then
+    return 0
+  fi
+
+  if [[ -s "${file_path}" ]]; then
+    last_char="$(tail -c 1 "${file_path}" 2>/dev/null || true)"
+    if [[ -n "${last_char}" ]]; then
+      printf '\n' >> "${file_path}"
+    fi
+  fi
+
+  printf '%s\n' "${block}" >> "${file_path}"
+}
+
+persist_shell_path_entry() {
+  local file_path="$1" install_dir="$2" path_literal='' marker='' block=''
+  path_literal="$(shell_path_literal_for_dir "${install_dir}")"
+  marker='# >>> codex-discord-bridge bridgectl >>>'
+  printf -v block '%s\n' \
+    '# >>> codex-discord-bridge bridgectl >>>' \
+    "if [ -d \"${path_literal}\" ]; then" \
+    '  case ":$PATH:" in' \
+    "    *\":${path_literal}:\"*) ;;" \
+    "    *) export PATH=\"${path_literal}:\$PATH\" ;;" \
+    '  esac' \
+    'fi' \
+    '# <<< codex-discord-bridge bridgectl <<<'
+  append_block_if_missing "${file_path}" "${marker}" "${block}"
+}
+
+ensure_bridgectl_dir_on_shell_path() {
+  local install_dir="$1"
+  persist_shell_path_entry "${HOME}/.zprofile" "${install_dir}"
+  persist_shell_path_entry "${HOME}/.zshrc" "${install_dir}"
+
+  if ! path_contains_dir "${PATH:-}" "${install_dir}"; then
+    export PATH="$(join_unique_path "${install_dir}" "${PATH:-}")"
+  fi
+}
+
+resolve_bridgectl_install_dir() {
+  local candidate='' parent=''
+  for candidate in \
+    "${CODEX_TUNNING_INSTALL_BIN_DIR:-}" \
+    "${HOME}/bin" \
+    "${HOME}/.local/bin"
+  do
+    [[ -n "${candidate}" ]] || continue
+    parent="$(dirname "${candidate}")"
+    if [[ -d "${candidate}" && -w "${candidate}" ]]; then
+      printf '%s' "${candidate}"
+      return 0
+    fi
+    if [[ ! -e "${candidate}" && -d "${parent}" && -w "${parent}" ]]; then
+      printf '%s' "${candidate}"
+      return 0
+    fi
+  done
+
+  print_error '找不到可写的 bridgectl 安装目录；可设置 CODEX_TUNNING_INSTALL_BIN_DIR 覆盖默认位置。'
+  return 1
+}
+
+verify_bridgectl_command_install() {
+  local expected_path="$1" discovered=''
+  if [[ ! -x '/bin/zsh' ]]; then
+    print_warn '未检测到 /bin/zsh，跳过 bridgectl 新 shell 可发现性验证。'
+    return 0
+  fi
+
+  discovered="$(env HOME="${HOME}" PATH='/usr/bin:/bin' /bin/zsh -lic 'command -v bridgectl' 2>/dev/null | tail -n 1 | tr -d '\r\n')" || return 1
+  [[ "${discovered}" == "${expected_path}" ]]
+}
+
+install_bridgectl_command() {
+  local install_dir='' wrapper_path='' bridgectl_source=''
+  install_dir="$(resolve_bridgectl_install_dir)"
+  wrapper_path="${install_dir}/bridgectl"
+  bridgectl_source="${SCRIPT_DIR}/bridgectl"
+
+  mkdir -p "${install_dir}"
+  if [[ -L "${wrapper_path}" ]]; then
+    rm -f "${wrapper_path}"
+  fi
+  cat > "${wrapper_path}" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+exec "${bridgectl_source}" "\$@"
+EOF
+  chmod +x "${wrapper_path}"
+
+  ensure_bridgectl_dir_on_shell_path "${install_dir}"
+  hash -r 2>/dev/null || true
+
+  print_info "已安装 bridgectl 命令：${wrapper_path}"
+  if verify_bridgectl_command_install "${wrapper_path}"; then
+    print_info '新的 zsh 会话已可直接使用 bridgectl'
+    print_info '当前终端若仍提示找不到 bridgectl，可执行 rehash 或重新打开终端。'
+    return 0
+  fi
+
+  print_error 'bridgectl 已写入，但新的 zsh 会话仍无法发现该命令。'
+  return 1
+}
+
 is_running() {
   local pid=''
 
@@ -1423,6 +1561,7 @@ run_setup() {
   (cd "${ROOT_DIR}" && npm run check)
   print_header '构建'
   (cd "${ROOT_DIR}" && npm run build)
+  install_bridgectl_command
 
   local admin_id web_port default_sandbox
   admin_id="$(read_env_value 'DISCORD_ADMIN_USER_IDS' || true)"

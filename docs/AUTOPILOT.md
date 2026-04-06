@@ -147,7 +147,11 @@ Autopilot · api
 
 ### 4.7 在本机 CLI 控制同一套 Autopilot
 
-如果 bridge 服务已经在本机运行，也可以直接在终端里执行：
+如果 bridge 服务已经在本机运行，也可以直接在终端里执行。
+
+`setup` / `deploy` / `install-service` 会自动安装 `bridgectl` 到 PATH；如果当前终端还没刷新 PATH，执行一次 `rehash` 或新开一个终端窗口即可。
+
+然后直接执行：
 
 ```bash
 bridgectl autopilot status
@@ -167,6 +171,7 @@ bridgectl autopilot project run --project api
 - 匹配不到或匹配多个时直接报错，不猜
 
 CLI 复用的是运行中的 bridge 服务和同一套 Autopilot 状态，不会直接改 `state.json`。
+如果你不想依赖 PATH，也可以退回到 `./scripts/bridgectl ...`。
 
 ## 5. 命令总表
 

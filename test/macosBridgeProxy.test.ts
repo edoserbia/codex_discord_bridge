@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { readFile, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import test from 'node:test';
@@ -268,4 +268,104 @@ run_restart`,
 
   assert.match(output, /^stop$/m);
   assert.match(output, /^start$/m);
+});
+
+test('macos bridge setup installs the bridgectl command as part of setup', async () => {
+  const output = await runBash(
+    `source "${scriptPath}"
+run_doctor() { :; }
+ensure_env_file() { :; }
+migrate_project_token_to_secret_env() { :; }
+should_prompt_for_configuration() { return 1; }
+auto_configure_bridge_proxy() { :; }
+validate_required_env() { :; }
+augment_launch_path() { :; }
+install_bridgectl_command() { echo install-bridgectl; }
+npm() { echo "npm:$*"; }
+read_env_value() { return 1; }
+run_setup`,
+    {},
+  );
+
+  assert.match(output, /^install-bridgectl$/m);
+});
+
+test('macos bridge command installer persists a PATH entry and makes bridgectl discoverable in a fresh shell', async () => {
+  const rootDir = await makeTempDir('codex-bridge-macos-command-install-');
+  const homeDir = path.join(rootDir, 'home');
+  const binDir = path.join(homeDir, 'bin');
+
+  try {
+    await mkdir(binDir, { recursive: true });
+
+    const output = await runBash(
+      `export HOME="${homeDir}"
+export PATH="/usr/bin:/bin"
+source "${scriptPath}"
+install_bridgectl_command
+printf 'wrapper=%s\\n' "\${HOME}/bin/bridgectl"
+printf 'zprofile=%s\\n' "\${HOME}/.zprofile"
+printf 'zshrc=%s\\n' "\${HOME}/.zshrc"`,
+      {},
+    );
+
+    assert.match(output, new RegExp(`^wrapper=${binDir.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}/bridgectl$`, 'm'));
+
+    const wrapperPath = path.join(binDir, 'bridgectl');
+    const zprofilePath = path.join(homeDir, '.zprofile');
+    const zshrcPath = path.join(homeDir, '.zshrc');
+    const wrapperContents = await readFile(wrapperPath, 'utf8');
+    const zprofileContents = await readFile(zprofilePath, 'utf8');
+    const zshrcContents = await readFile(zshrcPath, 'utf8');
+
+    assert.match(wrapperContents, /scripts\/bridgectl/);
+    assert.match(zprofileContents, /\$HOME\/bin/);
+    assert.match(zshrcContents, /\$HOME\/bin/);
+
+    const { stdout } = await execFileAsync('/bin/zsh', ['-lic', 'command -v bridgectl'], {
+      cwd: path.resolve('.'),
+      env: {
+        ...process.env,
+        HOME: homeDir,
+        PATH: '/usr/bin:/bin',
+      },
+    });
+
+    assert.equal(stdout.trim(), wrapperPath);
+  } finally {
+    await cleanupDir(rootDir);
+  }
+});
+
+test('macos bridge command installer replaces an existing bridgectl symlink without overwriting its target', async () => {
+  const rootDir = await makeTempDir('codex-bridge-macos-command-symlink-');
+  const homeDir = path.join(rootDir, 'home');
+  const binDir = path.join(homeDir, 'bin');
+  const installPath = path.join(binDir, 'bridgectl');
+  const symlinkTargetPath = path.join(rootDir, 'existing-target.sh');
+
+  try {
+    await mkdir(binDir, { recursive: true });
+    await writeFile(symlinkTargetPath, '#!/usr/bin/env bash\necho legacy-target\n', 'utf8');
+    await symlink(symlinkTargetPath, installPath);
+
+    await runBash(
+      `export HOME="${homeDir}"
+export PATH="/usr/bin:/bin"
+export CODEX_TUNNING_INSTALL_BIN_DIR="${binDir}"
+source "${scriptPath}"
+install_bridgectl_command`,
+      {},
+    );
+
+    const installStat = await lstat(installPath);
+    const installContents = await readFile(installPath, 'utf8');
+    const targetContents = await readFile(symlinkTargetPath, 'utf8');
+
+    assert.equal(installStat.isSymbolicLink(), false);
+    assert.match(installContents, /scripts\/bridgectl/);
+    assert.equal(targetContents, '#!/usr/bin/env bash\necho legacy-target\n');
+  } finally {
+    await cleanupDir(rootDir);
+  }
 });

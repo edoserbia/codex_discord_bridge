@@ -17,6 +17,7 @@
 - 运行日志：`/path/to/codex-discord-bridge/logs/codex-discord-bridge.log`
 - PID 文件：`/path/to/codex-discord-bridge/.run/codex-discord-bridge.pid`
 - 状态文件：`/path/to/codex-discord-bridge/data/state.json`
+- Transcript 日志：`/path/to/codex-discord-bridge/data/transcripts/*.jsonl`
 - 上传附件缓存：`/path/to/codex-discord-bridge/data/attachments/`
 - Web 面板：`http://127.0.0.1:3769`
 - LaunchAgent plist：`~/Library/LaunchAgents/<label>.plist`
@@ -37,6 +38,8 @@ cd /path/to/codex-discord-bridge
 2. `setup`
 3. 交互式询问是否安装 launchd 自启动服务
 4. 若未安装 launchd，则直接 `start`
+
+同时，`setup` / `deploy` / `install-service` 会自动安装 `bridgectl` 到用户 PATH 目录中，默认优先使用 `~/bin`，并把 PATH 片段写入 `~/.zprofile` 与 `~/.zshrc`。
 
 ## 日常管理命令
 
@@ -159,6 +162,23 @@ bridgectl autopilot project status --project api
 ```
 
 CLI 通过这个 Web 控制面连接正在运行的 bridge 服务；如果配置了 `WEB_AUTH_TOKEN`，CLI 会默认复用它，也可以用 `CODEX_DISCORD_BRIDGE_WEB_AUTH_TOKEN` 临时覆盖。
+
+如果你想从本机接回 Discord 当前会话，也可以使用：
+
+```bash
+bridgectl session status <Resume ID>
+bridgectl session send <Resume ID> "hello"
+bridgectl session resume <Resume ID>
+```
+
+其中 `Resume ID` 可通过 Discord 里的 `!status` 获取。
+
+`bridgectl session resume <Resume ID>` 的交互方式：
+
+- 普通输入：按一次 `Enter` 发送
+- 多行粘贴：整段粘贴后不会被拆成多次发送；粘贴完成后再按一次 `Enter` 才会整段发送
+- `/status`：查看当前本机会话状态
+- `/exit`：退出本地续聊模式
 
 ## 驱动与恢复行为
 
@@ -295,8 +315,17 @@ cat ~/.codex-tunning/secrets.env
 - 线程：独立任务会话
 - 绑定、会话、消息状态：持久化到 `data/state.json`
 - 当前运行中的可恢复快照也会落盘，用于服务重启后的自动恢复
+- 本机续聊和 Discord 消息的 transcript 事件会落盘到 `data/transcripts/*.jsonl`
 - 附件缓存：位于 `data/attachments/`
 - Discord 上传的文件会同步镜像到当前绑定项目目录下的 `inbox/`
+
+如果你在 Discord 当前线程执行 `!status`，返回里会包含完整 Resume ID 和一条可直接复制的本机命令：
+
+```text
+bridgectl session resume <Resume ID>
+```
+
+这条命令继续的仍然是同一个 bridge 会话，不会绕过 bridge 直接新开一条独立 Codex 对话；因此 transcript 记录和 Discord 展示会保持一致。
 
 ## 文件收发规则
 

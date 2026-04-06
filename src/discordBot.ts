@@ -57,7 +57,10 @@ import type {
   DashboardConversation,
   DeferredDiscordReply,
   DeferredSendPayload,
+  LocalSessionSendResult,
   PromptTask,
+  SessionLookupResult,
+  TranscriptEvent,
 } from './types.js';
 
 import { buildPromptWithAttachments, downloadAttachments, extractMessageAttachments, removeAttachmentDir } from './attachments.js';
@@ -90,9 +93,12 @@ import {
   formatQueue,
   formatStatus,
   formatSuccessReply,
+  formatTranscriptBody,
+  formatTranscriptHeader,
   formatWebAccessLinks,
 } from './formatters.js';
 import { JsonStateStore } from './store.js';
+import { TranscriptStore } from './transcriptStore.js';
 import { cloneCodexOptions, formatClockTimestamp, formatDurationMs, isWithinAllowedRoots, normalizeAllowedRoots, resolveDirectoryPath, resolveExistingDirectory, splitIntoDiscordChunks, summarizeReasoningText, truncate, uniqueStrings } from './utils.js';
 import { buildWebAccessUrls } from './webAccess.js';
 
@@ -209,6 +215,11 @@ interface PendingRuntimeViewRefresh {
 interface PendingFileSelection {
   candidates: FileTransferCandidate[];
   expiresAtMs: number;
+}
+
+interface PendingLocalSessionTurn {
+  resolve: (result: LocalSessionSendResult) => void;
+  reject: (error: Error) => void;
 }
 
 interface AutopilotControlResult {
@@ -380,6 +391,7 @@ export class DiscordCodexBridge {
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
   });
 
+  private readonly transcriptStore: TranscriptStore;
   private readonly runtimes = new Map<string, ChannelRuntime>();
   private readonly activeJobs = new Map<string, RunningCodexJob>();
   private readonly runtimeViewFlushes = new Map<string, Promise<void>>();
@@ -390,6 +402,7 @@ export class DiscordCodexBridge {
   private readonly activeAutopilotProjects = new Set<string>();
   private readonly autopilotBoardSnapshots = new Map<string, AutopilotProjectState['board']>();
   private readonly pendingFileSelections = new Map<string, PendingFileSelection>();
+  private readonly pendingLocalSessionTurns = new Map<string, PendingLocalSessionTurn>();
   private autopilotTicker: NodeJS.Timeout | undefined;
   private autopilotTickInFlight = false;
 
@@ -398,6 +411,7 @@ export class DiscordCodexBridge {
     private readonly store: JsonStateStore,
     private readonly runner: CodexExecutionDriver,
   ) {
+    this.transcriptStore = new TranscriptStore(this.config.dataDir);
     this.client.once('clientReady', () => {
       console.log(`Discord bot connected as ${this.client.user?.tag ?? 'unknown-user'}`);
     });
@@ -636,6 +650,99 @@ export class DiscordCodexBridge {
       const conversations = this.store.listSessions(binding.channelId).map((session) => this.buildDashboardConversation(session));
       return { binding, conversations };
     });
+  }
+
+  getSessionByCodexThreadId(codexThreadId: string): SessionLookupResult | undefined {
+    const normalizedThreadId = codexThreadId.trim();
+    if (!normalizedThreadId) {
+      return undefined;
+    }
+
+    const session = this.store.listSessions().find((candidate) => candidate.codexThreadId === normalizedThreadId);
+    if (!session) {
+      return undefined;
+    }
+
+    const binding = this.store.getBinding(session.bindingChannelId);
+    if (!binding) {
+      return undefined;
+    }
+
+    const runtime = this.getRuntime(session.conversationId);
+    return {
+      conversationId: session.conversationId,
+      bindingChannelId: session.bindingChannelId,
+      projectName: binding.projectName,
+      workspacePath: binding.workspacePath,
+      codexThreadId: normalizedThreadId,
+      driver: session.driver,
+      fallbackActive: session.fallbackActive,
+      lastRunAt: session.lastRunAt,
+      lastPromptBy: session.lastPromptBy,
+      status: runtime.activeRun?.status ?? 'idle',
+      queueLength: runtime.queue.length,
+      resumeCommand: `bridgectl session resume ${normalizedThreadId}`,
+    };
+  }
+
+  async sendLocalSessionMessage(codexThreadId: string, prompt: string): Promise<LocalSessionSendResult> {
+    const normalizedThreadId = codexThreadId.trim();
+    const normalizedPrompt = prompt.trim();
+
+    if (!normalizedThreadId) {
+      throw new Error('codexThreadId 不能为空。');
+    }
+
+    if (!normalizedPrompt) {
+      throw new Error('prompt 不能为空。');
+    }
+
+    const resolved = this.getSessionByCodexThreadId(normalizedThreadId);
+    if (!resolved) {
+      throw new Error(`找不到 Resume ID 对应的会话：${normalizedThreadId}`);
+    }
+
+    const binding = this.store.getBinding(resolved.bindingChannelId);
+    if (!binding) {
+      throw new Error(`找不到会话对应的项目绑定：${resolved.bindingChannelId}`);
+    }
+
+    const channel = await this.fetchChannel(resolved.conversationId);
+    if (!channel) {
+      throw new Error(`找不到 Resume ID 对应的 Discord 会话频道：${resolved.conversationId}`);
+    }
+
+    const runtime = this.getRuntime(resolved.conversationId);
+    const taskId = randomUUID();
+    const task: PromptTask = {
+      id: taskId,
+      prompt: normalizedPrompt,
+      effectivePrompt: normalizedPrompt,
+      rootPrompt: normalizedPrompt,
+      rootEffectivePrompt: normalizedPrompt,
+      requestedBy: 'bridgectl',
+      requestedById: 'local-resume',
+      messageId: `local-${taskId}`,
+      enqueuedAt: new Date().toISOString(),
+      bindingChannelId: resolved.bindingChannelId,
+      conversationId: resolved.conversationId,
+      attachments: [],
+      attachmentDir: undefined,
+      extraAddDirs: [],
+      origin: 'local-resume',
+      priority: 'normal',
+    };
+
+    const pendingResult = new Promise<LocalSessionSendResult>((resolve, reject) => {
+      this.pendingLocalSessionTurns.set(taskId, { resolve, reject });
+    });
+
+    runtime.queue.push(task);
+    this.scheduleRuntimeStateSave(resolved.conversationId, true);
+    const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
+    await this.safeRefreshStatusPanel(channel, binding, session, runtime, resolved.conversationId !== resolved.bindingChannelId);
+    this.startProcessQueue(resolved.conversationId);
+    return pendingResult;
   }
 
   private buildDashboardConversation(session: ConversationSessionState): DashboardConversation {
@@ -1073,6 +1180,139 @@ export class DiscordCodexBridge {
     }
   }
 
+  private getVisibleAssistantMessage(result: CodexRunResult): string {
+    const finalMessage = result.agentMessages.at(-1) ?? '';
+    const directive = extractBridgeFileSendDirective(finalMessage);
+    return directive.cleanText.trim()
+      || directive.caption?.trim()
+      || finalMessage.trim()
+      || '本轮已完成，但 Codex 没有返回文本消息。';
+  }
+
+  private getTranscriptSourceForTask(task: PromptTask): TranscriptEvent['source'] {
+    if (task.origin === 'local-resume') {
+      return 'local-resume';
+    }
+
+    if (task.origin === 'autopilot') {
+      return 'bridge';
+    }
+
+    return 'discord';
+  }
+
+  private async recordTranscriptForCompletedTask(
+    channel: SendableChannel,
+    binding: ChannelBinding,
+    session: ConversationSessionState,
+    task: PromptTask,
+    result: CodexRunResult,
+  ): Promise<ConversationSessionState> {
+    if (task.origin === 'autopilot') {
+      return session;
+    }
+
+    const codexThreadId = result.codexThreadId ?? session.codexThreadId;
+    const source = this.getTranscriptSourceForTask(task);
+    const prompt = task.prompt.trim();
+
+    if (prompt) {
+      await this.transcriptStore.appendEvent(task.conversationId, {
+        codexThreadId,
+        role: 'user',
+        source,
+        content: prompt,
+      });
+    }
+
+    if (result.success) {
+      await this.transcriptStore.appendEvent(task.conversationId, {
+        codexThreadId,
+        role: 'assistant',
+        source,
+        content: this.getVisibleAssistantMessage(result),
+      });
+    } else {
+      const errorMessage = filterDiagnosticStderr(result.stderr).slice(-3).join('\n').trim()
+        || `执行失败，exitCode=${result.exitCode ?? 'null'} signal=${result.signal ?? 'null'}`;
+      await this.transcriptStore.appendEvent(task.conversationId, {
+        codexThreadId,
+        role: 'system',
+        source: 'bridge',
+        content: errorMessage,
+      });
+    }
+
+    return this.syncTranscriptMessages(channel, binding, session);
+  }
+
+  private async syncTranscriptMessages(
+    channel: SendableChannel,
+    binding: ChannelBinding,
+    session: ConversationSessionState,
+  ): Promise<ConversationSessionState> {
+    const events = await this.transcriptStore.listEvents(session.conversationId);
+    const headerContent = formatTranscriptHeader(binding, session, events.length);
+    const bodyChunks = splitIntoDiscordChunks(formatTranscriptBody(events), 1800);
+    const nextMessageIds: string[] = [];
+    let nextSession = session;
+
+    const header = await this.upsertTranscriptMessage(channel, session.transcriptHeaderMessageId, headerContent);
+    if (header.id !== session.transcriptHeaderMessageId) {
+      nextSession = await this.store.updateSession(session.conversationId, {
+        transcriptHeaderMessageId: header.id,
+      }, session.bindingChannelId);
+    }
+
+    const existingBodyMessageIds = nextSession.transcriptMessageIds ?? [];
+    for (let index = 0; index < bodyChunks.length; index += 1) {
+      const message = await this.upsertTranscriptMessage(channel, existingBodyMessageIds[index], bodyChunks[index]!);
+      nextMessageIds.push(message.id);
+    }
+
+    nextSession = await this.store.updateSession(session.conversationId, {
+      transcriptMessageIds: nextMessageIds,
+      lastTranscriptEventAt: events.at(-1)?.createdAt,
+    }, session.bindingChannelId);
+    return nextSession;
+  }
+
+  private async upsertTranscriptMessage(
+    channel: SendableChannel,
+    messageId: string | undefined,
+    content: string,
+  ): Promise<SendableMessage> {
+    const existing = messageId ? await this.fetchChannelMessageWithRetry(channel, messageId) : undefined;
+
+    if (!existing) {
+      return this.sendWithRetry(channel, content);
+    }
+
+    if (existing.content !== content) {
+      await this.editWithRetry(existing, content);
+    }
+
+    return existing;
+  }
+
+  private settleLocalSessionTurn(
+    taskId: string,
+    result: LocalSessionSendResult | Error,
+  ): void {
+    const pending = this.pendingLocalSessionTurns.get(taskId);
+    if (!pending) {
+      return;
+    }
+
+    this.pendingLocalSessionTurns.delete(taskId);
+    if (result instanceof Error) {
+      pending.reject(result);
+      return;
+    }
+
+    pending.resolve(result);
+  }
+
   private describeDiscordError(error: unknown): string {
     const parts: string[] = [];
     const seen = new Set<unknown>();
@@ -1244,13 +1484,19 @@ export class DiscordCodexBridge {
 
     if (binding && session && channel) {
       await this.refreshRuntimeViews(channel, binding, session, runtime, conversationId !== activeRun.task.bindingChannelId);
-      await this.safeReplyToOriginalMessage(
-        channel,
-        runtime,
-        activeRun.task,
-        activeRun.task.messageId,
-        `❌ **${binding.projectName}** · ${activeRun.task.requestedBy}\n\nBridge 内部错误，任务已中断。\n\n诊断信息：\n\`\`\`\n${truncate(errorMessage, 900)}\n\`\`\``,
-      );
+      if (activeRun.task.origin === 'user') {
+        await this.safeReplyToOriginalMessage(
+          channel,
+          runtime,
+          activeRun.task,
+          activeRun.task.messageId,
+          `❌ **${binding.projectName}** · ${activeRun.task.requestedBy}\n\nBridge 内部错误，任务已中断。\n\n诊断信息：\n\`\`\`\n${truncate(errorMessage, 900)}\n\`\`\``,
+        );
+      }
+    }
+
+    if (activeRun.task.origin === 'local-resume') {
+      this.settleLocalSessionTurn(activeRun.task.id, new Error(errorMessage));
     }
 
     runtime.activeRun = undefined;
@@ -3124,9 +3370,17 @@ export class DiscordCodexBridge {
         );
       }
 
+      await this.safeRefreshProgressMessage(channel, binding, runtime);
+      nextSession = await this.recordTranscriptForCompletedTask(
+        channel,
+        binding,
+        nextSession,
+        currentTask,
+        result,
+      );
       await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       this.scheduleRuntimeStateSave(conversationId, true);
-      if (!suppressReply && currentTask.origin !== 'autopilot') {
+      if (!suppressReply && currentTask.origin === 'user') {
         const replyPayload = result.success
           ? await this.buildSuccessReplyPayload(channel, binding, currentTask, result)
           : formatFailureReply(binding, currentTask.requestedBy, result);
@@ -3137,6 +3391,18 @@ export class DiscordCodexBridge {
           currentTask.messageId,
           replyPayload,
         );
+      }
+
+      if (currentTask.origin === 'local-resume') {
+        this.settleLocalSessionTurn(currentTask.id, {
+          ok: result.success,
+          conversationId,
+          bindingChannelId: currentTask.bindingChannelId,
+          projectName: binding.projectName,
+          codexThreadId: result.codexThreadId ?? nextSession.codexThreadId ?? '',
+          assistantMessage: result.success ? this.getVisibleAssistantMessage(result) : undefined,
+          errorMessage: result.success ? undefined : formatFailureReply(binding, currentTask.requestedBy, result),
+        });
       }
 
       if (currentTask.origin === 'autopilot') {
