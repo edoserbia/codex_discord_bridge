@@ -73,6 +73,9 @@ export interface ConversationSessionState {
   driver?: CodexDriverMode | undefined;
   fallbackActive?: boolean | undefined;
   statusMessageId?: string | undefined;
+  transcriptHeaderMessageId?: string | undefined;
+  transcriptMessageIds?: string[] | undefined;
+  lastTranscriptEventAt?: string | undefined;
   lastRunAt?: string | undefined;
   lastPromptBy?: string | undefined;
   updatedAt: string;
@@ -112,7 +115,7 @@ export interface PromptTask {
   attachments: AttachmentRef[];
   attachmentDir?: string | undefined;
   extraAddDirs: string[];
-  origin: 'user' | 'autopilot';
+  origin: 'user' | 'autopilot' | 'local-resume';
   priority?: 'normal' | 'recovery' | undefined;
   recovery?: {
     source: 'retry' | 'restart';
@@ -296,4 +299,42 @@ export interface DashboardConversation {
 export interface DashboardBinding {
   binding: ChannelBinding;
   conversations: DashboardConversation[];
+}
+
+export type TranscriptEventRole = 'user' | 'assistant' | 'system';
+export type TranscriptEventSource = 'discord' | 'local-resume' | 'bridge';
+
+export interface TranscriptEvent {
+  id: string;
+  conversationId: string;
+  codexThreadId?: string | undefined;
+  role: TranscriptEventRole;
+  source: TranscriptEventSource;
+  content: string;
+  createdAt: string;
+}
+
+export interface SessionLookupResult {
+  conversationId: string;
+  bindingChannelId: string;
+  projectName: string;
+  workspacePath: string;
+  codexThreadId: string;
+  driver?: CodexDriverMode | undefined;
+  fallbackActive?: boolean | undefined;
+  lastRunAt?: string | undefined;
+  lastPromptBy?: string | undefined;
+  status: RunStatus | 'idle';
+  queueLength: number;
+  resumeCommand: string;
+}
+
+export interface LocalSessionSendResult {
+  ok: boolean;
+  conversationId: string;
+  bindingChannelId: string;
+  projectName: string;
+  codexThreadId: string;
+  assistantMessage?: string | undefined;
+  errorMessage?: string | undefined;
 }

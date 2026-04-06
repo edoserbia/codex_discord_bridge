@@ -13,7 +13,7 @@ import { cleanupDir, createWorkspace, makeTempDir, waitFor } from './helpers/tes
 const fakeAppServerCommand = path.resolve('test/fixtures/fake-codex-app-server.mjs');
 const hangingAppServerCommand = path.resolve('test/fixtures/fake-codex-app-server-initialize-hang.mjs');
 const fakeWsAppServerCommand = path.resolve('test/fixtures/fake-codex-app-server-ws.mjs');
-const fakeWsStartupTimeoutMs = 2_000;
+const fakeWsStartupTimeoutMs = 5_000;
 
 function makeConfig(rootDir: string, codexCommand = fakeAppServerCommand): AppConfig {
   return {

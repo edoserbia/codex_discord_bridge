@@ -87,6 +87,57 @@ export class AdminWebServer {
         return;
       }
 
+      const sessionLookupMatch = request.method === 'GET'
+        ? url.pathname.match(/^\/api\/sessions\/by-codex-thread\/([^/]+)$/)
+        : null;
+
+      if (sessionLookupMatch) {
+        const session = this.bridge.getSessionByCodexThreadId(decodeURIComponent(sessionLookupMatch[1]!));
+        if (!session) {
+          this.sendJson(response, 404, {
+            ok: false,
+            message: '找不到对应的 Resume ID。',
+          });
+          return;
+        }
+
+        this.sendJson(response, 200, session);
+        return;
+      }
+
+      const sessionSendMatch = request.method === 'POST'
+        ? url.pathname.match(/^\/api\/sessions\/by-codex-thread\/([^/]+)\/send$/)
+        : null;
+
+      if (sessionSendMatch) {
+        const payload = await this.readJsonBody(request) as {
+          prompt?: string;
+        };
+        const prompt = payload.prompt?.trim();
+        if (!prompt) {
+          this.sendJson(response, 400, {
+            ok: false,
+            message: 'prompt 是必填项。',
+          });
+          return;
+        }
+
+        try {
+          const result = await this.bridge.sendLocalSessionMessage(
+            decodeURIComponent(sessionSendMatch[1]!),
+            prompt,
+          );
+          this.sendJson(response, result.ok ? 200 : 502, result);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.sendJson(response, 404, {
+            ok: false,
+            message,
+          });
+        }
+        return;
+      }
+
       if (request.method === 'POST' && url.pathname === '/api/autopilot/command') {
         const payload = await this.readJsonBody(request) as {
           commandText?: string;

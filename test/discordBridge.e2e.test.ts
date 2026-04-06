@@ -13,6 +13,7 @@ const fakeFallbackCommand = path.resolve('test/fixtures/fake-codex-app-server-fa
 const fakeAppServerWrapperCommand = path.resolve('test/fixtures/fake-codex-app-server-wrapper.mjs');
 const fakeTurnFallbackCommand = path.resolve('test/fixtures/fake-codex-app-server-turn-fallback.mjs');
 const fakeInitializeHangCommand = path.resolve('test/fixtures/fake-codex-app-server-initialize-hang.mjs');
+const AUTOPILOT_FINISH_TIMEOUT_MS = 40_000;
 
 async function dispatch(bridge: unknown, message: unknown): Promise<void> {
   await (bridge as any).handleMessage(message as any);
@@ -142,6 +143,115 @@ test('bridge status defaults to app-server for a fresh app-server session before
 
     await waitFor(() => rootChannel.sent.some((message) => /Codex Bridge 状态面板/.test(message.content)), 15_000);
     assert.ok(rootChannel.sent.some((message) => /驱动：app-server/.test(message.content)));
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge status shows that no resume id exists before the first Codex turn', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-status-no-resume-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeCodexCommand,
+  });
+  const rootChannel = new FakeChannel('channel-status-no-resume', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '!status', { userId: 'admin-user' }));
+
+    await waitFor(() => rootChannel.sent.some((message) => /Codex Bridge 状态面板/.test(message.content)), 15_000);
+    assert.ok(rootChannel.sent.some((message) => /Resume ID：尚未建立/.test(message.content)));
+    assert.ok(rootChannel.sent.some((message) => /先发送一条普通消息/.test(message.content)));
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge status shows the full resume id and ready-to-run local command after a successful turn', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-status-resume-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeCodexCommand,
+  });
+  const rootChannel = new FakeChannel('channel-status-resume', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, 'first prompt'));
+    await waitFor(() => findSent(rootChannel, /ok: first prompt/), 15_000);
+
+    const session = store.getSession(rootChannel.id);
+    assert.ok(session?.codexThreadId);
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!status', { userId: 'admin-user' }));
+    await waitFor(() => rootChannel.sent.some((message) => session?.codexThreadId && message.content.includes(session.codexThreadId)), 15_000);
+
+    assert.ok(rootChannel.sent.some((message) => session?.codexThreadId && message.content.includes(`Resume ID：\`${session.codexThreadId}\``)));
+    assert.ok(rootChannel.sent.some((message) => session?.codexThreadId && message.content.includes(`bridgectl session resume ${session.codexThreadId}`)));
+    assert.ok(rootChannel.sent.some((message) => /来源会话：`channel-status-resume`/.test(message.content)));
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge persists transcript events and mirrors local-resume replies into Discord transcript messages', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-transcript-sync-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeCodexCommand,
+  });
+  const rootChannel = new FakeChannel('channel-transcript-sync', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, 'first prompt'));
+    await waitFor(() => findSent(rootChannel, /ok: first prompt/), 15_000);
+
+    const codexThreadId = store.getSession(rootChannel.id)?.codexThreadId;
+    assert.ok(codexThreadId);
+
+    const sendResult = await (bridge as any).sendLocalSessionMessage(codexThreadId, 'hello from local resume');
+    assert.equal(sendResult?.ok, true);
+    assert.match(sendResult?.assistantMessage ?? '', /ok: hello from local resume/);
+
+    await waitFor(() => rootChannel.sent.some((message) => /🧾 \*\*会话记录\*\*/.test(message.content)), 15_000);
+    assert.ok(rootChannel.sent.some((message) => /hello from local resume/.test(message.content)));
+    assert.ok(rootChannel.sent.some((message) => /ok: hello from local resume/.test(message.content)));
+
+    const transcriptPath = path.join(rootDir, 'data', 'transcripts', `${rootChannel.id}.jsonl`);
+    const transcriptLines = (await readFile(transcriptPath, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as {
+        role: string;
+        source: string;
+        content: string;
+        codexThreadId: string;
+      });
+
+    assert.equal(transcriptLines.length, 4);
+    assert.deepEqual(
+      transcriptLines.map((entry) => ({ role: entry.role, source: entry.source })),
+      [
+        { role: 'user', source: 'discord' },
+        { role: 'assistant', source: 'discord' },
+        { role: 'user', source: 'local-resume' },
+        { role: 'assistant', source: 'local-resume' },
+      ],
+    );
+    assert.ok(transcriptLines.every((entry) => entry.codexThreadId === codexThreadId));
+    assert.match(transcriptLines[3]!.content, /ok: hello from local resume/);
   } finally {
     await (bridge as any).stop?.();
     await cleanupDir(rootDir);
@@ -927,7 +1037,7 @@ test('project-level autopilot run command triggers an immediate run and refreshe
 
   assert.ok(rootChannel.sent.some((message) => /已触发当前项目立即执行 1 次 Autopilot/.test(message.content)));
   await waitFor(() => autopilotThread.sent.some((message) => /Autopilot 已启动/.test(message.content)), 20_000);
-  await waitFor(() => autopilotThread.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 25_000);
+  await waitFor(() => autopilotThread.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), AUTOPILOT_FINISH_TIMEOUT_MS);
   assert.ok(store.getAutopilotProject(rootChannel.id)?.lastRunAt);
   assert.ok(autopilotThread.sent.some((message) => /看板变化：/.test(message.content)));
   assert.ok(autopilotThread.sent.some((message) => /新增 DONE · 补齐会话恢复相关测试/.test(message.content)));
@@ -999,7 +1109,7 @@ test('autopilot respects a single-slot concurrency setting and posts timestamped
   await (bridge as any).runAutopilotTick();
 
   assert.ok(!threadB.sent.some((message) => /Autopilot 已启动/.test(message.content)));
-  await waitFor(() => threadA.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 25_000);
+  await waitFor(() => threadA.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), AUTOPILOT_FINISH_TIMEOUT_MS);
   assert.ok(threadA.sent.some((message) => /\[\d{2}:\d{2}\]/.test(message.content)));
   await waitFor(() => threadA.sent.some((message) => /Codex 实时进度/.test(message.content)), 15_000);
   await waitFor(() => threadA.sent.some((message) => /当前命令：/.test(message.content)), 15_000);
@@ -1009,7 +1119,7 @@ test('autopilot respects a single-slot concurrency setting and posts timestamped
 
   await (bridge as any).runAutopilotTick();
   await waitFor(() => threadB.sent.some((message) => /Autopilot 已启动/.test(message.content)), 20_000);
-  await waitFor(() => threadB.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 25_000);
+  await waitFor(() => threadB.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), AUTOPILOT_FINISH_TIMEOUT_MS);
   await cleanupDir(rootDir);
 });
 
@@ -1046,8 +1156,8 @@ test('autopilot uses configurable parallelism and does not block or get blocked 
   await waitFor(() => threadA.sent.some((message) => /Autopilot 已启动/.test(message.content)), 20_000);
   await waitFor(() => threadB.sent.some((message) => /Autopilot 已启动/.test(message.content)), 20_000);
   await waitFor(() => rootChannelA.sent.some((message) => /ok: \[slow\] manual root task/.test(message.content)), 15_000);
-  await waitFor(() => threadA.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 25_000);
-  await waitFor(() => threadB.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), 25_000);
+  await waitFor(() => threadA.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), AUTOPILOT_FINISH_TIMEOUT_MS);
+  await waitFor(() => threadB.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), AUTOPILOT_FINISH_TIMEOUT_MS);
   assert.equal(store.getAutopilotService('guild-1')?.parallelism, 2);
   await cleanupDir(rootDir);
 });

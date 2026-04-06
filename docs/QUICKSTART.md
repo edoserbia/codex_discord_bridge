@@ -50,6 +50,8 @@ cd /path/to/codex-discord-bridge
 sudo ./scripts/install-service.sh --mode daemon
 ```
 
+无论是 `deploy`、`setup` 还是 `install-service`，当前脚本都会自动安装 `bridgectl` 并补全 PATH。默认会放到 `~/bin`；如果当前终端还没刷新 PATH，执行一次 `rehash` 或新开一个终端窗口即可。
+
 ## 3. 确认服务已启动
 
 ```bash
@@ -123,6 +125,13 @@ sudo ./scripts/install-service.sh --mode daemon
 !projects
 ```
 
+`!status` 不只是“看看状态”。它会同时返回：
+
+- 当前会话的完整 Resume ID
+- 一条可直接复制的本机命令：`bridgectl session resume <Resume ID>`
+
+这样你可以把 Discord 里的会话直接接回到本机终端继续。
+
 `!guide` 的语义是“插入中途引导，再继续原任务”，不是直接丢弃当前复杂任务。
 
 管理员判定规则：
@@ -141,7 +150,35 @@ sudo ./scripts/install-service.sh --mode daemon
 
 如果忘了命令，直接发 `!help`，返回内容里已经包含自然语言发文件和 `!sendfile` 的完整用法。
 
-## 7. 最快开启 Autopilot
+## 7. 从本机终端接回当前会话
+
+先在 Discord 当前频道或线程发送：
+
+```text
+!status
+```
+
+然后复制返回里的命令：
+
+```bash
+bridgectl session resume <Resume ID>
+```
+
+进入后这样使用：
+
+- 普通提问：直接输入，按一次 `Enter`
+- 多行文档或大段 prompt：整段粘贴进去，等粘贴完成后再按一次 `Enter`，会整段只发送一次
+- 查看当前会话状态：输入 `/status`
+- 退出本地续聊：输入 `/exit`
+
+如果你只想从脚本里发一次消息，也可以直接用：
+
+```bash
+bridgectl session status <Resume ID>
+bridgectl session send <Resume ID> "hello"
+```
+
+## 8. 最快开启 Autopilot
 
 绑定成功后，发送：
 
@@ -175,8 +212,6 @@ sudo ./scripts/install-service.sh --mode daemon
 如果你在桌面端本机操作，也可以直接用 CLI 控制同一套 Autopilot：
 
 ```bash
-npm run build
-npm link
 bridgectl autopilot project status --project api
 bridgectl autopilot project run --project api
 ```
@@ -195,7 +230,7 @@ npm run cli -- autopilot project status --project api
 - 两者都不传时，按当前工作目录匹配绑定项目
 - 匹配不到或匹配多个时会报错，不会自动猜测
 
-## 8. 文件收发
+## 9. 文件收发
 
 - 图片附件会自动透传给 `codex -i`
 - 所有上传文件都会镜像到当前绑定目录里的 `inbox/`
@@ -210,7 +245,7 @@ npm run cli -- autopilot project status --project api
 - 如果你要求 “生成 report.pdf 后直接发给我”，bridge 会把文件回传协议自动注入给 Codex，模型命中单个文件时会直接回传附件
 - 上传和发回文件时都会尽量保留原文件名；只有目标路径已存在同名文件时，才会在扩展名前追加随机后缀
 
-## 9. 常见问题
+## 10. 常见问题
 
 ### `!bind` 在线程里无效
 

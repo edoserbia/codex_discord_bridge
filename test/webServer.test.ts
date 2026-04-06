@@ -6,8 +6,8 @@ import { AdminWebServer } from '../src/webServer.js';
 import * as webServerModule from '../src/webServer.js';
 
 import { createBridgeTestRig } from './helpers/bridgeSetup.js';
-import { FakeChannel } from './helpers/fakeDiscord.js';
-import { cleanupDir, createWorkspace, makeTempDir } from './helpers/testUtils.js';
+import { FakeChannel, createUserMessage } from './helpers/fakeDiscord.js';
+import { cleanupDir, createWorkspace, makeTempDir, waitFor } from './helpers/testUtils.js';
 
 const fakeCodexCommand = path.resolve('test/fixtures/fake-codex.mjs');
 
@@ -217,6 +217,79 @@ test('web server executes autopilot commands through the local control API', { c
     assert.equal(cwdPayload.resolvedTarget?.projectName, 'web');
     assert.equal(cwdPayload.resolvedTarget?.mode, 'cwd');
     assert.match(cwdPayload.message, /Autopilot 项目状态：\*\*web\*\*/);
+  } finally {
+    await webServer.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('web server resolves and continues a session by codex thread id', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-web-session-api-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, config, store, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeCodexCommand,
+    webEnabled: true,
+    webPort: 0,
+    webAuthToken: 'secret-token',
+  });
+
+  const rootChannel = new FakeChannel('channel-session-api', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+  await bridge.bindChannel({
+    channelId: rootChannel.id,
+    guildId: rootChannel.guildId,
+    projectName: 'api',
+    workspacePath: workspace,
+  });
+
+  await (bridge as any).handleMessage(createUserMessage(rootChannel, 'first prompt'));
+  await waitFor(() => rootChannel.sent.some((message) => /ok: first prompt/.test(message.content)), 15_000);
+
+  const codexThreadId = store.getSession(rootChannel.id)?.codexThreadId;
+  assert.ok(codexThreadId);
+
+  const webServer = new AdminWebServer(config, bridge);
+  await webServer.start();
+
+  try {
+    const statusResponse = await fetch(`${webServer.getOrigin()}/api/sessions/by-codex-thread/${encodeURIComponent(codexThreadId!)}`, {
+      headers: { authorization: 'Bearer secret-token' },
+    });
+    assert.equal(statusResponse.status, 200);
+    const statusPayload = await statusResponse.json() as {
+      codexThreadId: string;
+      conversationId: string;
+      bindingChannelId: string;
+      projectName: string;
+      workspacePath: string;
+    };
+    assert.equal(statusPayload.codexThreadId, codexThreadId);
+    assert.equal(statusPayload.conversationId, rootChannel.id);
+    assert.equal(statusPayload.bindingChannelId, rootChannel.id);
+    assert.equal(statusPayload.projectName, 'api');
+    assert.equal(statusPayload.workspacePath, store.getBinding(rootChannel.id)?.workspacePath);
+
+    const sendResponse = await fetch(`${webServer.getOrigin()}/api/sessions/by-codex-thread/${encodeURIComponent(codexThreadId!)}/send`, {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer secret-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt: 'hello from web api',
+      }),
+    });
+    assert.equal(sendResponse.status, 200);
+    const sendPayload = await sendResponse.json() as {
+      ok: boolean;
+      assistantMessage: string;
+      codexThreadId: string;
+    };
+    assert.equal(sendPayload.ok, true);
+    assert.equal(sendPayload.codexThreadId, codexThreadId);
+    assert.match(sendPayload.assistantMessage, /ok: hello from web api/);
+    assert.equal(store.getSession(rootChannel.id)?.codexThreadId, codexThreadId);
   } finally {
     await webServer.stop();
     await cleanupDir(rootDir);

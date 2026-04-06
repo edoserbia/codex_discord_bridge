@@ -11,6 +11,7 @@ import type {
   DashboardBinding,
   PlanItem,
   PromptTask,
+  TranscriptEvent,
 } from './types.js';
 
 import { formatAutopilotBoardChanges, normalizeAutopilotParallelism, summarizeAutopilotBoard, stampAutopilotLine } from './autopilot.js';
@@ -418,7 +419,24 @@ export function formatStatus(
   preferredDriver: 'legacy-exec' | 'app-server' = 'legacy-exec',
 ): string {
   const driverLabel = formatDriverLabel(runtime.activeRun?.driverMode ?? session.driver ?? preferredDriver, session.fallbackActive);
+  const resumeId = session.codexThreadId?.trim();
+  const resumeLines = resumeId
+    ? [
+        '🔐 **Resume**',
+        `Resume ID：\`${resumeId}\``,
+        `本机继续：\`bridgectl session resume ${resumeId}\``,
+        `来源会话：\`${session.conversationId}\``,
+        '',
+      ]
+    : [
+        '🔐 **Resume**',
+        'Resume ID：尚未建立',
+        '先发送一条普通消息，等 bridge 建立 Codex 会话后再回来复制本机继续命令。',
+        `来源会话：\`${session.conversationId}\``,
+        '',
+      ];
   const lines = [
+    ...resumeLines,
     '🤖 **Codex Bridge 状态面板**',
     `项目：**${binding.projectName}**`,
     `目录：\`${binding.workspacePath}\``,
@@ -606,6 +624,59 @@ export function formatFailureReply(binding: ChannelBinding, requestedBy: string,
 
   lines.push('', '诊断信息：', '```', truncate(stderrTail, 900), '```', '', '如果是会话损坏，可发送 `!reset` 后重试。');
   return lines.join('\n');
+}
+
+function formatTranscriptRole(role: TranscriptEvent['role']): string {
+  switch (role) {
+    case 'user':
+      return '用户';
+    case 'assistant':
+      return '助手';
+    case 'system':
+      return '系统';
+    default:
+      return role;
+  }
+}
+
+function formatTranscriptSource(source: TranscriptEvent['source']): string {
+  switch (source) {
+    case 'discord':
+      return 'Discord';
+    case 'local-resume':
+      return '本机继续';
+    case 'bridge':
+      return 'Bridge';
+    default:
+      return source;
+  }
+}
+
+export function formatTranscriptHeader(
+  binding: ChannelBinding,
+  session: ConversationSessionState,
+  eventCount: number,
+): string {
+  const resumeId = session.codexThreadId?.trim() || '尚未建立';
+  return [
+    '🧾 **会话记录**',
+    `项目：**${binding.projectName}**`,
+    `Resume ID：\`${resumeId}\``,
+    `来源会话：\`${session.conversationId}\``,
+    `事件数：${eventCount}`,
+    '说明：这里会同步 Discord 和 `bridgectl session resume` 产生的完整对话。',
+  ].join('\n');
+}
+
+export function formatTranscriptBody(events: TranscriptEvent[]): string {
+  if (events.length === 0) {
+    return '（当前还没有会话记录）';
+  }
+
+  return events.map((event) => [
+    `${formatClockTimestamp(event.createdAt)} ${formatTranscriptRole(event.role)} · ${formatTranscriptSource(event.source)}`,
+    event.content.trim() || '（空内容）',
+  ].join('\n')).join('\n\n');
 }
 
 export function formatAutopilotEntryCard(
