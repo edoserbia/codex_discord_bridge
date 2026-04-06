@@ -94,8 +94,8 @@ Add a top Resume section ahead of the existing status details:
 
 ```text
 🔐 Resume
-Codex Resume ID: `019d4e61-b31b-7960-b5f9-e31ffee0fbf2`
-本机继续：`bridgectl session resume 019d4e61-b31b-7960-b5f9-e31ffee0fbf2`
+Codex Resume ID: `00000000-0000-0000-0000-000000000000`
+本机继续：`bridgectl session resume 00000000-0000-0000-0000-000000000000`
 来源会话：`channel-root`
 ```
 
@@ -167,7 +167,7 @@ Each line contains one event such as:
 {
   "id": "evt_123",
   "conversationId": "1489127511278358668",
-  "codexThreadId": "019d4e61-b31b-7960-b5f9-e31ffee0fbf2",
+  "codexThreadId": "00000000-0000-0000-0000-000000000000",
   "role": "assistant",
   "source": "local-resume",
   "content": "完整回复内容",

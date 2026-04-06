@@ -16,7 +16,7 @@ Automatically retry any non-user-initiated Codex failure up to three total attem
 
 ## Chosen Approach
 
-- Keep the existing retry loop in [discordBot.ts](/Users/mac/work/su/codex_tunning/src/discordBot.ts) as the single retry mechanism.
+- Keep the existing retry loop in `src/discordBot.ts` as the single retry mechanism.
 - Broaden the retry trigger from "diagnosed as retryable" to "failed for any non-user reason and attempts remain".
 - Continue using `buildRecoveryTask()` and `buildRecoveryPrompt()` for retry attempts, so retries can select between:
   - `continue-from-state` when the interrupted run has command output, reasoning, plan progress, subagent state, or other evidence that work already happened.

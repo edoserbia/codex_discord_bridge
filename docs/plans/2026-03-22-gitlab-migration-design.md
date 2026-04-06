@@ -13,7 +13,7 @@ This design covers two related but different migration surfaces.
 The migration must update Git remotes for:
 
 - All projects bound in `codex-discord-bridge` state at `data/state.json`
-- `/Users/mac/.openclaw` itself, because it is both a managed project and an OpenClaw state root
+- `~/.openclaw` itself, because it is both a managed project and an OpenClaw state root
 - Any additional current project roots discoverable from stable OpenClaw task and memory sources
 
 The migration must normalize these repositories to the user's self-hosted GitLab using environment-provided configuration.
@@ -46,14 +46,14 @@ The migration will not:
 At design time, the repository inspection found:
 
 - `codex-discord-bridge` has 13 bound workspaces in `data/state.json`
-- Most bound repositories already point at the self-hosted GitLab host `38.76.206.9`
+- Most bound repositories already point at the configured self-hosted GitLab host
 - There are still inconsistent cases:
-  - `/Users/mac/work/su/email_server` uses a GitLab URL but the remote name is `gitee`
-  - `/Users/mac/work/su/csq/202509-30w` still points to real Gitee over HTTPS
+  - `/path/to/project-a` uses a GitLab URL but the remote name is `gitee`
+  - `/path/to/project-b` still points to real Gitee over HTTPS
 - Two bound directories are not Git repositories yet:
-  - `/Users/mac/work/su/email_account_creator`
-  - `/Users/mac/work/su/codex_tmp`
-- `/Users/mac/.openclaw` is already a Git repository and must be migrated like any other managed repo
+  - `/path/to/project-c`
+  - `/path/to/project-d`
+- `~/.openclaw` is already a Git repository and must be migrated like any other managed repo
 - OpenClaw workspace `TOOLS.md` files are already mostly aligned to the self-hosted GitLab
 - OpenClaw vector memory databases currently show no `gitee` hits in `chunks.text`, so they likely need validation more than bulk rewrite
 
@@ -93,7 +93,7 @@ Scan the following stable sources:
 
 Discovery must extract:
 
-- absolute filesystem paths under `/Users/mac/work` or `/Users/mac/.openclaw`
+- absolute filesystem paths under the allowed workspace roots or `~/.openclaw`
 - repository URLs such as `git@...` or `https://...`
 
 ### Project root normalization
@@ -140,7 +140,7 @@ Repository naming should prefer continuity:
 
 - if a current remote already encodes a repository name, reuse it
 - otherwise use the directory basename
-- for `/Users/mac/.openclaw`, preserve its existing repository identity if a stable one already exists on GitLab
+- for `~/.openclaw`, preserve its existing repository identity if a stable one already exists on GitLab
 
 The migration must not fabricate names from project labels when a repository basename or remote-derived name is already available.
 
