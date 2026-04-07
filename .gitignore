@@ -1,6 +1,10 @@
 node_modules
 dist
 .env
+.codex
+.codex-plans
+.worktrees
 data
 logs
 .run
+docs/AUTOPILOT_BOARD.md
