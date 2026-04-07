@@ -58,9 +58,17 @@
 - 任务维度在线程里管理
 - 同一条会话既能在 Discord 里继续，也能在 Terminal 里继续
 
+## 平台支持
+
+| 平台 | 推荐安装方式 | 当前状态 |
+| --- | --- | --- |
+| macOS | `./scripts/macos-bridge.sh deploy` | 完整支持：交互式配置、`bridgectl` 安装、`launchd` 自启动 |
+| Linux | 手动 `npm ci` + `.env` + `npm run start` | 支持核心 bridge、Web 面板、Discord 绑定、`!status` 续聊和 `bridgectl`；不提供 `macos-bridge.sh` / `launchd` |
+| Windows（WSL） | 在 WSL 的 Bash 里按 Linux 步骤安装 | 推荐方案；工作区尽量放在 WSL Linux 文件系统内，例如 `/home/<user>/workspaces` |
+
 ## 运行要求
 
-- macOS
+- macOS，或 Linux / WSL
 - Node.js `>= 20.11`
 - 已安装并登录的 `codex` CLI
 - 一个可用的 Discord Bot
@@ -95,12 +103,33 @@ destructive_enabled = true
 
 ## 快速开始
 
+先选安装路线：
+
+- macOS：继续看下面这一节，或直接打开 [docs/MACOS-deploy.md](docs/MACOS-deploy.md)
+- Linux / WSL：直接打开 [docs/LINUX-WSL.md](docs/LINUX-WSL.md)
+- 如果你还没准备好 Discord Bot Token、用户 ID、Resume ID、频道 ID 这些值，先看 [docs/QUICKSTART.md](docs/QUICKSTART.md) 里的“先准备这些值”
+
 ### 1. 部署 bridge
+
+如果你在 macOS：
 
 ```bash
 cd /path/to/codex-discord-bridge
 ./scripts/macos-bridge.sh deploy
 ```
+
+如果你在 Linux / WSL，推荐按这条路线走：
+
+```bash
+cd /path/to/codex-discord-bridge
+npm ci
+cp .env.example .env
+npm run check
+npm run build
+npm run start
+```
+
+Linux / WSL 还需要手动创建 `~/.codex-tunning/secrets.env`、填写 `.env`、把 `bridgectl` 放进 Bash 的 `PATH`。完整步骤见 [docs/LINUX-WSL.md](docs/LINUX-WSL.md)。
 
 脚本会交互式提示你填写或确认：
 
@@ -120,13 +149,15 @@ cd /path/to/codex-discord-bridge
 
 ### 2. 安装并确认 `bridgectl`
 
-`setup`、`deploy`、`install-service` 会自动把 `bridgectl` 安装到用户 PATH 目录，默认优先使用 `~/bin`。如果当前终端还没刷新 PATH，执行一次：
+macOS 路线中，`setup`、`deploy`、`install-service` 会自动把 `bridgectl` 安装到用户 PATH 目录，默认优先使用 `~/bin`。如果当前终端还没刷新 PATH，执行一次：
 
 ```bash
 rehash
 ```
 
 或者直接新开一个终端窗口。
+
+Linux / WSL 路线中，需要手动把 `scripts/bridgectl` 链接到 `~/bin/bridgectl`，并把 `~/bin` 写入 Bash 的 `PATH`。完整步骤见 [docs/LINUX-WSL.md](docs/LINUX-WSL.md)。
 
 你也可以随时验证：
 
@@ -137,16 +168,31 @@ bridgectl --help
 
 ### 3. 启动和查看服务
 
+macOS：
+
 ```bash
 ./scripts/macos-bridge.sh status
 ./scripts/macos-bridge.sh logs
 ./scripts/macos-bridge.sh open
 ```
 
+Linux / WSL：
+
+```bash
+npm run start
+```
+
+Linux / WSL 默认就是在当前终端前台运行；日志直接看当前终端输出即可。Web 面板地址通常是：
+
+```text
+http://127.0.0.1:3769/?token=<YOUR_WEB_AUTH_TOKEN>
+```
+
 如果你想安装成开机或登录自启动服务，可以继续看：
 
 - [docs/QUICKSTART.md](docs/QUICKSTART.md)
 - [docs/MACOS-deploy.md](docs/MACOS-deploy.md)
+- [docs/LINUX-WSL.md](docs/LINUX-WSL.md)
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
 ## 日常使用
@@ -465,6 +511,7 @@ sudo ./scripts/uninstall-service.sh --mode daemon
 | --- | --- |
 | 5 分钟快速上手 | [docs/QUICKSTART.md](docs/QUICKSTART.md) |
 | macOS 部署、Bot 创建、自启动 | [docs/MACOS-deploy.md](docs/MACOS-deploy.md) |
+| Linux / WSL 安装、配置、运行 | [docs/LINUX-WSL.md](docs/LINUX-WSL.md) |
 | 运维、升级、日志、launchd、运行目录 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) |
 | Autopilot 使用与设计 | [docs/AUTOPILOT.md](docs/AUTOPILOT.md) |
 | Git 远端与推送说明 | [docs/GIT.md](docs/GIT.md) |
@@ -476,9 +523,10 @@ sudo ./scripts/uninstall-service.sh --mode daemon
 
 1. [README.md](README.md)
 2. [docs/QUICKSTART.md](docs/QUICKSTART.md)
-3. [docs/MACOS-deploy.md](docs/MACOS-deploy.md)
-4. [docs/AUTOPILOT.md](docs/AUTOPILOT.md)
-5. [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+3. macOS 用户继续看 [docs/MACOS-deploy.md](docs/MACOS-deploy.md)
+4. Linux / WSL 用户继续看 [docs/LINUX-WSL.md](docs/LINUX-WSL.md)
+5. [docs/AUTOPILOT.md](docs/AUTOPILOT.md)
+6. [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
 ## 开发
 

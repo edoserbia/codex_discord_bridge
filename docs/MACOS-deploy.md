@@ -39,6 +39,19 @@
 
 ## 三、这些信息要怎么获得
 
+先看总表：
+
+| 你需要的值 | 去哪里拿 | 填到哪里 | 用途 |
+| --- | --- | --- | --- |
+| Discord Bot Token | Discord Developer Portal → `Application` → `Bot` → `Reset Token` / `Copy` | `~/.codex-tunning/secrets.env` 的 `CODEX_TUNNING_DISCORD_BOT_TOKEN=...` | 让 bridge 登录 Discord |
+| Discord 用户 ID | Discord 打开 `Developer Mode` 后，右键你的头像或消息 → `Copy User ID` | 项目 `.env` 里的 `DISCORD_ADMIN_USER_IDS=...` | 获得管理员命令权限 |
+| 允许绑定的项目根目录 | 你自己这台 Mac 上准备暴露给 Discord 的目录 | 项目 `.env` 里的 `ALLOWED_WORKSPACE_ROOTS=...` | 限制 Discord 可访问范围 |
+| Web 面板 token | 你自己生成一串随机字符串，或让脚本生成 | 项目 `.env` 里的 `WEB_AUTH_TOKEN=...` | 保护本机 Web 面板 |
+| 代理地址（可选） | 你本机实际可用的 HTTP 代理，例如 `http://127.0.0.1:7890` | 项目 `.env` 里的 `CODEX_DISCORD_BRIDGE_PROXY=...` | 让 bridge 能稳定连接 Discord |
+| Resume ID | 在 Discord 当前频道或线程发送 `!status` | 不写入配置；直接用于 `bridgectl session resume <Resume ID>` | 把当前会话接回本机 |
+| 频道 ID / 线程 ID（可选） | Discord 打开 `Developer Mode` 后，右键频道或线程 → `Copy Channel ID` | 不写入配置；直接用于 `bridgectl ... --channel <频道ID>` | 从本机 CLI 精确指定绑定 |
+| 项目名（可选） | `!bind <project> ...` 的第一个参数，或发送 `!projects` 查看 | 不写入配置；直接用于 `bridgectl ... --project <项目名>` | 从本机 CLI 按项目定位 |
+
 ### 1. Discord Bot Token
 
 获取路径：

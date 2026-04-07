@@ -2,12 +2,29 @@
 
 这份文档面向“先跑起来再说”的场景，默认你已经具备：
 
-- 一台 macOS 机器
+- 一台 macOS、Linux 或 Windows（WSL）机器
 - 已安装并登录的 `codex` CLI
 - Node.js `>= 20.11`
 - 一个已经创建好的 Discord Bot
 
-如果你还没有创建 Discord Bot，请先看 `docs/MACOS-deploy.md`。
+如果你还没有创建 Discord Bot，请先看 [docs/MACOS-deploy.md](./MACOS-deploy.md) 里“Discord Bot 怎么创建”和“把 Bot 授权进你的 Discord 服务器”这两节。
+
+先按平台选路线：
+
+- macOS：继续看这份文档
+- Linux / WSL：直接打开 [docs/LINUX-WSL.md](./LINUX-WSL.md)
+
+## 0. 先准备这些值
+
+| 你需要的值 | 去哪里拿 | 填到哪里 | 用途 |
+| --- | --- | --- | --- |
+| Discord Bot Token | Discord Developer Portal → `Bot` → `Reset Token` / `Copy` | `~/.codex-tunning/secrets.env` 的 `CODEX_TUNNING_DISCORD_BOT_TOKEN=...` | 让 bridge 登录 Discord |
+| Discord 用户 ID | Discord 打开 `Developer Mode` 后，右键你的头像或消息 → `Copy User ID` | `.env` 的 `DISCORD_ADMIN_USER_IDS=...` | 让你拥有管理员命令 |
+| 允许绑定的根目录 | 你自己本机上的实际项目目录 | `.env` 的 `ALLOWED_WORKSPACE_ROOTS=...` | 限制 Discord 可访问范围 |
+| Web 面板 token | 你自己生成一串随机字符串 | `.env` 的 `WEB_AUTH_TOKEN=...` | 保护本机 Web 面板 |
+| Resume ID | Discord 当前频道或线程发送 `!status` | 不写入配置；直接用于 `bridgectl session resume <Resume ID>` | 把当前会话接回本机 |
+| 频道 ID / 线程 ID（可选） | Discord 打开 `Developer Mode` 后，右键频道或线程 → `Copy Channel ID` | 不写入配置；直接用于 `bridgectl ... --channel <频道ID>` | 从本机 CLI 精确指定绑定 |
+| 项目名（可选） | `!bind <project> ...` 的第一个参数，或 `!projects` 输出 | 不写入配置；直接用于 `bridgectl ... --project <项目名>` | 从本机 CLI 按项目定位 |
 
 ## 1. 进入项目目录
 
@@ -16,6 +33,8 @@ cd /path/to/codex-discord-bridge
 ```
 
 ## 2. 一键部署
+
+这一节是 **macOS 的一键部署路径**。如果你在 Linux / WSL，请直接按 [docs/LINUX-WSL.md](./LINUX-WSL.md) 里的步骤做手动安装和启动。
 
 ```bash
 ./scripts/macos-bridge.sh deploy
