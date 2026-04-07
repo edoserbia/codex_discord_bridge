@@ -292,7 +292,7 @@ bridgectl session resume <Resume ID>
 http://127.0.0.1:7890
 ```
 
-## 八、在一台新 Mac 上，从 GitLab 拉下来之后怎么完整部署
+## 八、在一台新 Mac 上，从远程 Git 仓库拉下来之后怎么完整部署
 
 这部分就是“换一台全新的 macOS 机器”时，最推荐照着走的一条龙流程。
 
@@ -314,31 +314,31 @@ npm -v
 codex --version
 ```
 
-### 2. 从 GitLab 拉代码
+### 2. 从远程 Git 仓库拉代码
 
-如果你已经给这台 Mac 配好了 GitLab SSH Key，推荐直接用 SSH：
+如果你已经给这台 Mac 配好了目标平台的 SSH Key，推荐直接用 SSH：
 
 ```bash
-git clone git@<your-gitlab-host>:<namespace>/<repo>.git
+git clone git@<git-host>:<owner-or-namespace>/<repo>.git
 cd <你的仓库目录名>
 ```
 
 如果你还没有配 SSH Key，也可以先用 HTTPS：
 
 ```bash
-git clone https://<your-gitlab-host>/<namespace>/<repo>.git
+git clone https://<git-host>/<owner-or-namespace>/<repo>.git
 cd <你的仓库目录名>
 ```
 
 如果这是一个私有仓库：
 
-- 使用 SSH 时，要先把这台 Mac 的公钥加到 GitLab 账号
-- 使用 HTTPS 时，拉取时需要输入 GitLab 账号凭据
+- 使用 SSH 时，要先把这台 Mac 的公钥加到目标平台账号
+- 使用 HTTPS 时，拉取时需要输入对应平台凭据
 
-如果你手里拿到的是旧 Gitee 时代的本地工作区，推荐直接把 `origin` 改到当前 GitLab 仓库：
+如果你手里拿到的是旧工作区，推荐直接把 `origin` 改到当前标准远端：
 
 ```bash
-git remote set-url origin git@<your-gitlab-host>:<namespace>/<repo>.git
+git remote set-url origin git@<git-host>:<owner-or-namespace>/<repo>.git
 git fetch origin --prune
 git branch -u origin/main main
 ```
@@ -461,7 +461,7 @@ bridgectl autopilot status
 ./scripts/macos-bridge.sh configure
 ```
 
-如果你从 GitLab 拉了新版本，推荐更新流程：
+如果你从远程仓库拉了新版本，推荐更新流程：
 
 ```bash
 git pull
@@ -478,7 +478,7 @@ npm run build
 
 优先检查：
 
-- 这台 Mac 是否已经配置 GitLab SSH Key
+- 这台 Mac 是否已经配置目标平台 SSH Key
 - 私有仓库是否有访问权限
 - 是否需要改用 HTTPS 克隆
 

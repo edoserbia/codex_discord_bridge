@@ -467,9 +467,8 @@ sudo ./scripts/uninstall-service.sh --mode daemon
 | macOS 部署、Bot 创建、自启动 | [docs/MACOS-deploy.md](docs/MACOS-deploy.md) |
 | 运维、升级、日志、launchd、运行目录 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) |
 | Autopilot 使用与设计 | [docs/AUTOPILOT.md](docs/AUTOPILOT.md) |
-| Git / GitLab 使用说明 | [docs/GIT.md](docs/GIT.md) |
+| Git 远端与推送说明 | [docs/GIT.md](docs/GIT.md) |
 | 版本变更记录 | [docs/CHANGELOG.md](docs/CHANGELOG.md) |
-| 旧 Gitee 兼容说明 | [docs/GITEE.md](docs/GITEE.md) |
 | 运维故障记录 | [docs/ops/2026-03-26-launchagent-recovery.md](docs/ops/2026-03-26-launchagent-recovery.md) |
 | 历史设计与实施记录 | [docs/plans](docs/plans) |
 

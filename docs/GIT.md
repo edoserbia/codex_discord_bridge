@@ -1,11 +1,11 @@
-# Git / GitLab
+# Git Remote Workflow
 
-当前仓库的标准远端是你自建的 GitLab，不再以 Gitee 作为默认目标。
+这份文档面向通用 Git 托管场景，适用于 GitHub、GitLab、Gitea 或其他兼容 SSH / HTTPS 的远端。
 
 这份文档说明：
 
-- 如何把一个新的本地仓库接到 GitLab
-- 如何把旧的 Gitee / 其他远端迁到当前 GitLab
+- 如何把一个新的本地仓库接到远端平台
+- 如何把旧的远端迁到新的标准远端
 - 日常拉取、验证、提交和推送的推荐流程
 
 ## 1. 初始化本地 Git 仓库
@@ -22,18 +22,18 @@
 - 如果已经是 Git 仓库，则保留现状
 - 输出当前 `git status --short`
 
-## 2. 新仓库接入 GitLab
+## 2. 新仓库接入远端平台
 
-先在你的 GitLab 上创建目标仓库，然后在本地设置 `origin`：
+先在目标平台上创建仓库，然后在本地设置 `origin`：
 
 ```bash
-git remote add origin git@<your-gitlab-host>:<namespace>/<repo>.git
+git remote add origin git@<git-host>:<owner-or-namespace>/<repo>.git
 ```
 
 如果本地已经存在 `origin`，改成：
 
 ```bash
-git remote set-url origin git@<your-gitlab-host>:<namespace>/<repo>.git
+git remote set-url origin git@<git-host>:<owner-or-namespace>/<repo>.git
 ```
 
 确认当前远端：
@@ -42,7 +42,7 @@ git remote set-url origin git@<your-gitlab-host>:<namespace>/<repo>.git
 git remote -v
 ```
 
-## 3. 把旧 Gitee 远端迁到 GitLab
+## 3. 把旧远端迁到新的标准远端
 
 如果你拿到的是旧工作区，先看当前远端：
 
@@ -50,19 +50,19 @@ git remote -v
 git remote -v
 ```
 
-把 `origin` 改成 GitLab：
+把 `origin` 改成新的标准远端：
 
 ```bash
-git remote set-url origin git@<your-gitlab-host>:<namespace>/<repo>.git
+git remote set-url origin git@<git-host>:<owner-or-namespace>/<repo>.git
 git fetch origin --prune
 git branch -u origin/main main
 ```
 
-如果旧工作区把 GitLab 配在 `gitee` 这个远端名上，推荐统一回 `origin`：
+如果旧工作区把主远端放在别的远端名上，推荐统一回 `origin`：
 
 ```bash
-git remote rename gitee origin
-git remote set-url origin git@<your-gitlab-host>:<namespace>/<repo>.git
+git remote rename <old-remote> origin
+git remote set-url origin git@<git-host>:<owner-or-namespace>/<repo>.git
 ```
 
 ## 4. 首次推送
@@ -102,8 +102,4 @@ git push origin main
 - 推荐统一使用 `origin` 作为主远端名
 - 推荐使用 SSH 作为远端地址，减少凭据输入
 - `data/`、`logs/`、`.run/` 已被忽略，不应提交运行态数据
-- 如果你还保留旧 Gitee 远端，迁移完成后建议删除或重命名，避免误推错仓库
-
-## 7. 兼容说明
-
-仓库里仍然保留了 `docs/GITEE.md` 和 `scripts/create-gitee-repo.sh`，它们只用于历史兼容和旧流程参考，不再是当前推荐路径。
+- 如果你还保留旧远端名，迁移完成后建议删除或重命名，避免误推错仓库
