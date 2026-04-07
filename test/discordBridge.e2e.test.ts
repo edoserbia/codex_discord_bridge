@@ -258,6 +258,35 @@ test('bridge persists transcript events and mirrors local-resume replies into Di
   }
 });
 
+test('bridge does not mirror Discord-origin turns back into the channel transcript', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-transcript-no-discord-echo-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeCodexCommand,
+  });
+  const rootChannel = new FakeChannel('channel-transcript-no-discord-echo', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, 'discord-only prompt'));
+    await waitFor(() => findSent(rootChannel, /ok: discord-only prompt/), 15_000);
+
+    assert.equal(
+      rootChannel.sent.filter((message) => /ok: discord-only prompt/.test(message.content)).length,
+      1,
+    );
+    assert.equal(
+      rootChannel.sent.filter((message) => /🧾 \*\*会话记录\*\*/.test(message.content)).length,
+      0,
+    );
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge bind defaults match local full-access app-server execution settings', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-app-server-bind-defaults-');
   const workspace = await createWorkspace(rootDir);
@@ -491,6 +520,32 @@ test('bridge keeps streaming app-server deltas out of the process timeline while
     assert.match(progressMessage!.content, /- \[\d{2}:\d{2}\] ▶️ \/bin\/zsh -lc "pwd"/);
     assert.match(progressMessage!.content, /- \[\d{2}:\d{2}\] 🤝 /);
     assert.match(progressMessage!.content, /- \[\d{2}:\d{2}\] 🔄 本轮已完成/);
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge preserves the full final answer when app-server emits multiple agent message items in one turn', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-app-server-multi-agent-items-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeAppServerCommand,
+    driverMode: 'app-server',
+  });
+  const rootChannel = new FakeChannel('channel-app-server-multi-agent-items', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[app-multi-agent-items] preserve both parts'));
+
+    await waitFor(() => rootChannel.sent.some((message) => /🤖 \*\*api\*\*/.test(message.content)), 15_000);
+    const finalReply = rootChannel.sent.find((message) => /🤖 \*\*api\*\*/.test(message.content));
+    assert.ok(finalReply);
+    assert.match(finalReply.content, /first part of answer/);
+    assert.match(finalReply.content, /second part of answer/);
   } finally {
     await (bridge as any).stop?.();
     await cleanupDir(rootDir);

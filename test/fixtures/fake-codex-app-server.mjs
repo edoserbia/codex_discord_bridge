@@ -355,6 +355,19 @@ async function handleAsync(message) {
             delta,
           });
         }
+      } else if (prompt.includes('[app-multi-agent-items]')) {
+        notify('item/agentMessage/delta', {
+          threadId,
+          turnId,
+          itemId: `msg-a-${turnId}`,
+          delta: 'first part of answer\n\n',
+        });
+        notify('item/agentMessage/delta', {
+          threadId,
+          turnId,
+          itemId: `msg-b-${turnId}`,
+          delta: 'second part of answer',
+        });
       } else {
         notify('item/agentMessage/delta', {
           threadId,
