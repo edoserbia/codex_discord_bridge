@@ -166,7 +166,7 @@ Each line contains one event such as:
 ```json
 {
   "id": "evt_123",
-  "conversationId": "1489127511278358668",
+  "conversationId": "channel-root",
   "codexThreadId": "00000000-0000-0000-0000-000000000000",
   "role": "assistant",
   "source": "local-resume",

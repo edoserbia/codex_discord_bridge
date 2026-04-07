@@ -5,5 +5,5 @@ import { isWithinAllowedRoots } from '../src/utils.js';
 
 test('isWithinAllowedRoots treats slash as the global root allowlist entry', () => {
   assert.equal(isWithinAllowedRoots('/', ['/']), true);
-  assert.equal(isWithinAllowedRoots('/Users/<user>/work', ['/']), true);
+  assert.equal(isWithinAllowedRoots('/tmp/work', ['/']), true);
 });

@@ -306,10 +306,10 @@ test('web server builds concrete local and lan access urls instead of exposing 0
     port: 3769,
   }, {
     lo0: [{ family: 'IPv4', address: '127.0.0.1', internal: true }],
-    en0: [{ family: 'IPv4', address: '192.168.50.8', internal: false }],
+    en0: [{ family: 'IPv4', address: '198.51.100.8', internal: false }],
   }) ?? []) as Array<{ label: string; url: string }>;
 
   assert.ok(urls.some((entry) => entry.label === '本机' && entry.url === 'http://127.0.0.1:3769/?token=secret-token'));
-  assert.ok(urls.some((entry) => entry.label === '局域网' && entry.url === 'http://192.168.50.8:3769/?token=secret-token'));
+  assert.ok(urls.some((entry) => entry.label === '局域网' && entry.url === 'http://198.51.100.8:3769/?token=secret-token'));
   assert.ok(urls.every((entry) => !entry.url.includes('0.0.0.0')));
 });
