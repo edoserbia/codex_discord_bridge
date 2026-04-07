@@ -664,7 +664,7 @@ export function formatTranscriptHeader(
     `Resume ID：\`${resumeId}\``,
     `来源会话：\`${session.conversationId}\``,
     `事件数：${eventCount}`,
-    '说明：这里会同步 Discord 和 `bridgectl session resume` 产生的完整对话。',
+    '说明：这里只补充同步本机继续和 Bridge 侧产生、但当前频道里原本看不到的内容。',
   ].join('\n');
 }
 

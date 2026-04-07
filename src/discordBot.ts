@@ -1252,8 +1252,13 @@ export class DiscordCodexBridge {
     session: ConversationSessionState,
   ): Promise<ConversationSessionState> {
     const events = await this.transcriptStore.listEvents(session.conversationId);
-    const headerContent = formatTranscriptHeader(binding, session, events.length);
-    const bodyChunks = splitIntoDiscordChunks(formatTranscriptBody(events), 1800);
+    const mirroredEvents = events.filter((event) => event.source !== 'discord');
+    if (mirroredEvents.length === 0) {
+      return session;
+    }
+
+    const headerContent = formatTranscriptHeader(binding, session, mirroredEvents.length);
+    const bodyChunks = splitIntoDiscordChunks(formatTranscriptBody(mirroredEvents), 1800);
     const nextMessageIds: string[] = [];
     let nextSession = session;
 
@@ -1272,7 +1277,7 @@ export class DiscordCodexBridge {
 
     nextSession = await this.store.updateSession(session.conversationId, {
       transcriptMessageIds: nextMessageIds,
-      lastTranscriptEventAt: events.at(-1)?.createdAt,
+      lastTranscriptEventAt: mirroredEvents.at(-1)?.createdAt,
     }, session.bindingChannelId);
     return nextSession;
   }

@@ -29,6 +29,7 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
     const commandBuffers = new Map<string, AppServerCommandBuffer>();
     const completedCommandItemIds = new Set<string>();
     const agentMessageBuffers = new Map<string, string>();
+    const agentMessageItemOrder: string[] = [];
     const reasoningBuffers = new Map<string, string>();
     const agentMessages: string[] = [];
     const reasoning: string[] = [];
@@ -69,6 +70,18 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
       }
 
       commandBuffers.clear();
+    };
+
+    const buildVisibleAgentMessage = (): string => {
+      const parts = agentMessageItemOrder
+        .map((itemId) => agentMessageBuffers.get(itemId)?.trim() ?? '')
+        .filter((value) => value.length > 0);
+
+      if (parts.length === 0) {
+        return '';
+      }
+
+      return parts.join('\n\n');
     };
 
     const handleEvent = async (event: AppServerTurnEvent): Promise<void> => {
@@ -175,11 +188,16 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
           break;
         }
         case 'agent.message.delta': {
+          if (!agentMessageBuffers.has(event.itemId)) {
+            agentMessageItemOrder.push(event.itemId);
+          }
+
           const nextMessage = `${agentMessageBuffers.get(event.itemId) ?? ''}${event.delta}`;
           agentMessageBuffers.set(event.itemId, nextMessage);
-          if (agentMessages.at(-1) !== nextMessage) {
-            agentMessages.push(nextMessage);
-            await hooks.onAgentMessage?.(nextMessage);
+          const visibleMessage = buildVisibleAgentMessage();
+          if (visibleMessage && agentMessages.at(-1) !== visibleMessage) {
+            agentMessages.push(visibleMessage);
+            await hooks.onAgentMessage?.(visibleMessage);
           }
           break;
         }
