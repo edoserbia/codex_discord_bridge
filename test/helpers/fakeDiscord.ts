@@ -96,6 +96,10 @@ export class FakeChannel {
   addExistingMessage(message: FakeMessage): void {
     this.store.set(message.id, message);
   }
+
+  removeMessage(id: string): void {
+    this.store.delete(id);
+  }
 }
 
 interface FakeMessageInit {
@@ -122,6 +126,7 @@ export class FakeMessage {
   public readonly sentFiles: FakeSentFile[];
   public readonly reactions: string[] = [];
   public pinned = false;
+  public deleted = false;
 
   constructor(init: FakeMessageInit) {
     this.id = init.id ?? randomUUID();
@@ -151,6 +156,12 @@ export class FakeMessage {
 
   async pin(): Promise<any> {
     this.pinned = true;
+    return this as any;
+  }
+
+  async delete(): Promise<any> {
+    this.deleted = true;
+    this.channel.removeMessage(this.id);
     return this as any;
   }
 }

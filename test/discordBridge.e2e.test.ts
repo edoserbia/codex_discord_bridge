@@ -287,6 +287,142 @@ test('bridge does not mirror Discord-origin turns back into the channel transcri
   }
 });
 
+test('bridge clears stale transcript mirror messages when only Discord-origin events remain', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-transcript-clear-stale-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeCodexCommand,
+  });
+  const rootChannel = new FakeChannel('channel-transcript-clear-stale', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, 'first prompt'));
+    await waitFor(() => findSent(rootChannel, /ok: first prompt/), 15_000);
+
+    const codexThreadId = store.getSession(rootChannel.id)?.codexThreadId;
+    assert.ok(codexThreadId);
+
+    const sendResult = await (bridge as any).sendLocalSessionMessage(codexThreadId, 'hello from local resume');
+    assert.equal(sendResult?.ok, true);
+
+    await waitFor(() => rootChannel.sent.some((message) => /🧾 \*\*会话记录\*\*/.test(message.content)), 15_000);
+    const sessionWithTranscript = store.getSession(rootChannel.id);
+    assert.ok(sessionWithTranscript?.transcriptHeaderMessageId);
+    assert.ok((sessionWithTranscript?.transcriptMessageIds?.length ?? 0) > 0);
+
+    const staleHeaderId = sessionWithTranscript!.transcriptHeaderMessageId!;
+    const staleBodyIds = [...(sessionWithTranscript!.transcriptMessageIds ?? [])];
+    const transcriptPath = path.join(rootDir, 'data', 'transcripts', `${rootChannel.id}.jsonl`);
+    const discordOnlyLines = (await readFile(transcriptPath, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as { source: string })
+      .filter((entry) => entry.source === 'discord')
+      .map((entry) => JSON.stringify(entry))
+      .join('\n');
+    await writeFile(transcriptPath, `${discordOnlyLines}\n`, 'utf8');
+
+    await dispatch(bridge, createUserMessage(rootChannel, 'second discord prompt'));
+    await waitFor(() => findSent(rootChannel, /ok: second discord prompt/), 15_000);
+    await waitFor(() => {
+      const session = store.getSession(rootChannel.id);
+      return !session?.transcriptHeaderMessageId && (session?.transcriptMessageIds?.length ?? 0) === 0;
+    }, 15_000);
+
+    assert.equal(rootChannel.getMessage(staleHeaderId), undefined);
+    assert.ok(staleBodyIds.every((messageId) => rootChannel.getMessage(messageId) === undefined));
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge deletes surplus transcript body messages when mirrored transcript shrinks', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-transcript-shrink-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeCodexCommand,
+  });
+  const rootChannel = new FakeChannel('channel-transcript-shrink', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, 'first prompt'));
+    await waitFor(() => findSent(rootChannel, /ok: first prompt/), 15_000);
+
+    const session = store.getSession(rootChannel.id);
+    const codexThreadId = session?.codexThreadId;
+    assert.ok(codexThreadId);
+
+    const transcriptPath = path.join(rootDir, 'data', 'transcripts', `${rootChannel.id}.jsonl`);
+    const largeMirroredTranscript = [
+      {
+        id: 'event-local-large-user',
+        conversationId: rootChannel.id,
+        codexThreadId,
+        role: 'user',
+        source: 'local-resume',
+        content: 'large mirrored input',
+        createdAt: '2026-04-08T09:00:00.000Z',
+      },
+      {
+        id: 'event-local-large-assistant',
+        conversationId: rootChannel.id,
+        codexThreadId,
+        role: 'assistant',
+        source: 'local-resume',
+        content: `large mirrored output\n\n${'x'.repeat(2400)}`,
+        createdAt: '2026-04-08T09:00:01.000Z',
+      },
+    ].map((entry) => JSON.stringify(entry)).join('\n');
+    await writeFile(transcriptPath, `${largeMirroredTranscript}\n`, 'utf8');
+
+    await dispatch(bridge, createUserMessage(rootChannel, 'sync large transcript'));
+    await waitFor(() => findSent(rootChannel, /ok: sync large transcript/), 15_000);
+    await waitFor(() => (store.getSession(rootChannel.id)?.transcriptMessageIds?.length ?? 0) === 2, 15_000);
+
+    const sessionWithTwoBodies = store.getSession(rootChannel.id)!;
+    const staleBodyId = sessionWithTwoBodies.transcriptMessageIds![1]!;
+
+    const smallMirroredTranscript = [
+      {
+        id: 'event-local-small-user',
+        conversationId: rootChannel.id,
+        codexThreadId,
+        role: 'user',
+        source: 'local-resume',
+        content: 'small mirrored input',
+        createdAt: '2026-04-08T09:10:00.000Z',
+      },
+      {
+        id: 'event-local-small-assistant',
+        conversationId: rootChannel.id,
+        codexThreadId,
+        role: 'assistant',
+        source: 'local-resume',
+        content: 'small mirrored output',
+        createdAt: '2026-04-08T09:10:01.000Z',
+      },
+    ].map((entry) => JSON.stringify(entry)).join('\n');
+    await writeFile(transcriptPath, `${smallMirroredTranscript}\n`, 'utf8');
+
+    await dispatch(bridge, createUserMessage(rootChannel, 'sync small transcript'));
+    await waitFor(() => findSent(rootChannel, /ok: sync small transcript/), 15_000);
+    await waitFor(() => (store.getSession(rootChannel.id)?.transcriptMessageIds?.length ?? 0) === 1, 15_000);
+
+    assert.equal(rootChannel.getMessage(staleBodyId), undefined);
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge bind defaults match local full-access app-server execution settings', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-app-server-bind-defaults-');
   const workspace = await createWorkspace(rootDir);

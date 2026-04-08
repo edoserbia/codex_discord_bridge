@@ -114,6 +114,7 @@ type SendableMessage = {
   content: string;
   reply: (content: SendPayload) => Promise<SendableMessage>;
   edit: (content: string) => Promise<SendableMessage>;
+  delete?: () => Promise<unknown>;
   pin?: () => Promise<unknown>;
 };
 
@@ -1253,14 +1254,28 @@ export class DiscordCodexBridge {
   ): Promise<ConversationSessionState> {
     const events = await this.transcriptStore.listEvents(session.conversationId);
     const mirroredEvents = events.filter((event) => event.source !== 'discord');
+    let nextSession = session;
+
     if (mirroredEvents.length === 0) {
-      return session;
+      await this.deleteTranscriptMessages(channel, session);
+      if (
+        !session.transcriptHeaderMessageId
+        && (session.transcriptMessageIds?.length ?? 0) === 0
+        && !session.lastTranscriptEventAt
+      ) {
+        return session;
+      }
+
+      return this.store.updateSession(session.conversationId, {
+        transcriptHeaderMessageId: undefined,
+        transcriptMessageIds: [],
+        lastTranscriptEventAt: undefined,
+      }, session.bindingChannelId);
     }
 
     const headerContent = formatTranscriptHeader(binding, session, mirroredEvents.length);
     const bodyChunks = splitIntoDiscordChunks(formatTranscriptBody(mirroredEvents), 1800);
     const nextMessageIds: string[] = [];
-    let nextSession = session;
 
     const header = await this.upsertTranscriptMessage(channel, session.transcriptHeaderMessageId, headerContent);
     if (header.id !== session.transcriptHeaderMessageId) {
@@ -1275,11 +1290,38 @@ export class DiscordCodexBridge {
       nextMessageIds.push(message.id);
     }
 
+    for (const staleMessageId of existingBodyMessageIds.slice(bodyChunks.length)) {
+      await this.deleteTranscriptMessage(channel, staleMessageId);
+    }
+
     nextSession = await this.store.updateSession(session.conversationId, {
       transcriptMessageIds: nextMessageIds,
       lastTranscriptEventAt: mirroredEvents.at(-1)?.createdAt,
     }, session.bindingChannelId);
     return nextSession;
+  }
+
+  private async deleteTranscriptMessages(
+    channel: SendableChannel,
+    session: ConversationSessionState,
+  ): Promise<void> {
+    const messageIds = [
+      session.transcriptHeaderMessageId,
+      ...(session.transcriptMessageIds ?? []),
+    ].filter((messageId): messageId is string => Boolean(messageId));
+
+    for (const messageId of messageIds) {
+      await this.deleteTranscriptMessage(channel, messageId);
+    }
+  }
+
+  private async deleteTranscriptMessage(channel: SendableChannel, messageId: string): Promise<void> {
+    const existing = await this.fetchChannelMessageWithRetry(channel, messageId);
+    if (!existing || typeof existing.delete !== 'function') {
+      return;
+    }
+
+    await this.deleteWithRetry(existing);
   }
 
   private async upsertTranscriptMessage(
@@ -1416,6 +1458,13 @@ export class DiscordCodexBridge {
   private async editWithRetry(message: SendableMessage, content: string): Promise<SendableMessage> {
     const result = await this.withDiscordWriteRetry(`edit message=${message.id}`, async () => message.edit(content));
     return result as SendableMessage;
+  }
+
+  private async deleteWithRetry(message: SendableMessage): Promise<void> {
+    await this.withDiscordWriteRetry(`delete message=${message.id}`, async () => {
+      await message.delete?.();
+      return message;
+    });
   }
 
   private async fetchChannelMessageWithRetry(channel: SendableChannel, messageId: string): Promise<SendableMessage | null> {
