@@ -96,6 +96,11 @@ function appendTimelineLines(lines: string[], entries: string[], maxItems = 5): 
   }
 }
 
+function formatSectionDivider(label: string, fill: '-' | '='): string {
+  const segment = fill.repeat(16);
+  return `${segment} ${label} ${segment}`;
+}
+
 function formatTaskSummary(task: PromptTask, maxLength = 90): string {
   const prefix = task.recovery
     ? `自动恢复(${task.recovery.strategy === 'continue-from-state' ? '续跑' : '重试'})：`
@@ -515,6 +520,7 @@ export function formatProgressMessage(
   }
 
   const lines = [
+    formatSectionDivider('过程进度', '-'),
     '🛰️ **Codex 实时进度**',
     `项目：**${binding.projectName}**`,
     `请求人：${activeRun.task.requestedBy}`,
@@ -600,6 +606,7 @@ export function formatSuccessReply(
     || '本轮已完成，但 Codex 没有返回文本消息。';
 
   return [
+    formatSectionDivider('最终总结', '='),
     `🤖 **${binding.projectName}** · ${requestedBy}`,
     finalMessage,
   ].join('\n\n');
