@@ -167,7 +167,7 @@ export interface CollabToolCall {
 }
 
 export type RunStatus = 'idle' | 'queued' | 'starting' | 'running' | 'completed' | 'failed' | 'cancelled';
-export type CancellationReason = 'user_cancel' | 'guidance' | 'binding_reset' | 'reset' | 'unbind';
+export type CancellationReason = 'user_cancel' | 'guidance' | 'binding_reset' | 'reset' | 'unbind' | 'autopilot_disabled';
 
 export interface ActiveRunState {
   task: PromptTask;
