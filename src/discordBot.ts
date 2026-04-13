@@ -2008,6 +2008,9 @@ export class DiscordCodexBridge {
     }
 
     await this.setAutopilotEnabledAcrossBindings(command.action === 'on');
+    if (command.action === 'off') {
+      await this.stopAutopilotWorkAcrossBindings('已按服务级暂停命令停止当前 Autopilot 运行');
+    }
     return formatAutopilotServiceAck(command.action);
   }
 
@@ -2025,7 +2028,8 @@ export class DiscordCodexBridge {
         return formatAutopilotProjectAck('on', binding, nextProject);
       }
       case 'off': {
-        const nextProject = await this.setAutopilotProjectEnabled(binding, project, false);
+        const nextProject = await this.setAutopilotProjectEnabled(binding, project, false, false);
+        await this.stopAutopilotWorkForBinding(binding, '已按项目级暂停命令停止当前 Autopilot 运行');
         return formatAutopilotProjectAck('off', binding, nextProject);
       }
       case 'clear': {
@@ -2354,18 +2358,66 @@ export class DiscordCodexBridge {
     binding: ChannelBinding,
     project: AutopilotProjectState,
     enabled: boolean,
+    preserveRunning = true,
   ): Promise<AutopilotProjectState> {
     const now = new Date().toISOString();
     const nextProject = await this.store.upsertAutopilotProject({
       ...project,
       enabled,
-      status: this.getAutopilotProjectStatus({ ...project, enabled }),
+      status: this.getAutopilotProjectStatus({ ...project, enabled }, undefined, preserveRunning),
       lastActivityAt: now,
       lastActivityText: enabled ? '项目级 Autopilot 已开启' : '项目级 Autopilot 已暂停',
     });
 
     await this.refreshAutopilotEntryCard(binding, nextProject);
     return nextProject;
+  }
+
+  private async stopAutopilotWorkAcrossBindings(reasonText: string): Promise<void> {
+    for (const binding of this.store.listBindings()) {
+      await this.stopAutopilotWorkForBinding(binding, reasonText);
+    }
+  }
+
+  private async stopAutopilotWorkForBinding(binding: ChannelBinding, reasonText: string): Promise<void> {
+    const sessions = this.store.listSessions(binding.channelId);
+
+    for (const session of sessions) {
+      const runtime = this.runtimes.get(session.conversationId);
+      if (!runtime) {
+        continue;
+      }
+
+      let changed = false;
+      const nextQueue = runtime.queue.filter((task) => !(task.origin === 'autopilot' && task.bindingChannelId === binding.channelId));
+      if (nextQueue.length !== runtime.queue.length) {
+        runtime.queue = nextQueue;
+        changed = true;
+      }
+
+      if (runtime.activeRun?.task.origin === 'autopilot' && runtime.activeRun.task.bindingChannelId === binding.channelId) {
+        runtime.activeRun.cancellationReason = 'autopilot_disabled';
+        runtime.activeRun.status = 'cancelled';
+        runtime.activeRun.latestActivity = reasonText;
+        this.pushRunTimeline(runtime, `⏹️ ${reasonText}`);
+        this.activeJobs.get(session.conversationId)?.cancel();
+        this.activeAutopilotProjects.delete(binding.channelId);
+        changed = true;
+      }
+
+      if (!changed) {
+        continue;
+      }
+
+      this.scheduleRuntimeStateSave(session.conversationId, true);
+      const channel = await this.fetchChannel(session.conversationId);
+      if (!channel) {
+        continue;
+      }
+
+      const nextSession = this.store.getSession(session.conversationId) ?? session;
+      await this.refreshRuntimeViews(channel, binding, nextSession, runtime, session.conversationId !== binding.channelId);
+    }
   }
 
   private async setAutopilotProjectInterval(
@@ -2660,6 +2712,41 @@ export class DiscordCodexBridge {
     const savedProject = await this.store.upsertAutopilotProject(nextProject);
     await this.refreshAutopilotEntryCard(binding, savedProject);
     await channel.send(formatAutopilotRunSummary(binding, savedProject, boardChanges, boardSyncError));
+  }
+
+  private async finishStoppedAutopilotTask(
+    binding: ChannelBinding,
+    task: PromptTask,
+    channel: SendableChannel,
+  ): Promise<void> {
+    const project = this.store.getAutopilotProject(task.bindingChannelId);
+    if (!project) {
+      return;
+    }
+
+    this.autopilotBoardSnapshots.delete(task.bindingChannelId);
+    let syncedProject = project;
+
+    try {
+      syncedProject = await this.syncAutopilotBoardState(binding, project);
+    } catch (error) {
+      this.logBridgeError(`syncAutopilotBoardOnStop channel=${binding.channelId}`, error);
+    }
+
+    const now = new Date().toISOString();
+    const nextProject = await this.store.upsertAutopilotProject({
+      ...syncedProject,
+      status: this.getAutopilotProjectStatus(syncedProject, undefined, false),
+      lastResultStatus: 'skipped',
+      lastSummary: '已按暂停命令停止当前 Autopilot 运行',
+      currentGoal: undefined,
+      currentRunStartedAt: undefined,
+      lastActivityAt: now,
+      lastActivityText: 'Autopilot 已按暂停命令停止',
+    });
+
+    await this.refreshAutopilotEntryCard(binding, nextProject);
+    await channel.send(formatAutopilotSkipNotice(binding, '已按暂停命令停止当前运行。'));
   }
 
   private buildFallbackAutopilotBoard(project: AutopilotProjectState, success: boolean): AutopilotProjectState['board'] {
@@ -3400,6 +3487,7 @@ export class DiscordCodexBridge {
       }
 
       if (runtime.activeRun) {
+        const stoppedByAutopilotPause = cancellationReason === 'autopilot_disabled';
         this.touchActiveRun(runtime.activeRun);
         runtime.activeRun.exitCode = result.exitCode;
         runtime.activeRun.signal = result.signal;
@@ -3413,15 +3501,19 @@ export class DiscordCodexBridge {
           ? '本轮执行完成'
           : cancellationReason === 'guidance'
             ? '已按新的引导继续原任务'
-            : failureDiagnosis.diagnosticLines.at(-1) ?? '本轮执行失败';
-        this.pushRunTimeline(
-          runtime,
-          result.success
-            ? '🎉 本轮执行完成'
-            : cancellationReason === 'guidance'
-              ? '🧭 当前步骤已被中途引导打断，准备继续原任务'
-              : '🛑 本轮执行失败',
-        );
+            : stoppedByAutopilotPause
+              ? '已按暂停命令停止当前 Autopilot 运行'
+              : failureDiagnosis.diagnosticLines.at(-1) ?? '本轮执行失败';
+        if (!stoppedByAutopilotPause) {
+          this.pushRunTimeline(
+            runtime,
+            result.success
+              ? '🎉 本轮执行完成'
+              : cancellationReason === 'guidance'
+                ? '🧭 当前步骤已被中途引导打断，准备继续原任务'
+                : '🛑 本轮执行失败',
+          );
+        }
       }
 
       await this.safeRefreshProgressMessage(channel, binding, runtime);
@@ -3461,7 +3553,11 @@ export class DiscordCodexBridge {
 
       if (currentTask.origin === 'autopilot') {
         this.activeAutopilotProjects.delete(currentTask.bindingChannelId);
-        await this.finishAutopilotTask(binding, currentTask, result, channel);
+        if (cancellationReason === 'autopilot_disabled') {
+          await this.finishStoppedAutopilotTask(binding, currentTask, channel);
+        } else {
+          await this.finishAutopilotTask(binding, currentTask, result, channel);
+        }
       }
     } finally {
       this.activeJobs.delete(conversationId);

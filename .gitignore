@@ -1,6 +1,8 @@
 node_modules
 dist
 .env
+.env.local
+.env.*.local
 .codex
 .codex-plans
 .worktrees
@@ -8,3 +10,4 @@ data
 logs
 .run
 docs/AUTOPILOT_BOARD.md
+.DS_Store
