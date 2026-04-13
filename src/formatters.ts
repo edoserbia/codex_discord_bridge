@@ -773,7 +773,7 @@ export function formatAutopilotServiceAck(
     case 'on':
       return `${stampAutopilotLine('已开启当前 bridge 进程里所有已绑定项目的服务级 Autopilot。')}\n\n项目仍需单独执行 \`!autopilot project on\` 才会按周期运行。`;
     case 'off':
-      return `${stampAutopilotLine('已暂停当前 bridge 进程里所有已绑定项目的服务级 Autopilot。')}\n\n不会启动新的自动迭代任务。`;
+      return `${stampAutopilotLine('已暂停当前 bridge 进程里所有已绑定项目的服务级 Autopilot。')}\n\n不会再启动新的自动迭代任务；当前正在运行或排队中的 Autopilot 任务也会停止。`;
     case 'clear':
       return `${stampAutopilotLine('已清空当前 bridge 进程里所有已绑定项目的 Autopilot 任务看板和历史状态。')}\n\nPrompt、项目开关和调度周期会保留。`;
     case 'concurrency':
@@ -794,6 +794,7 @@ export function formatAutopilotProjectAck(
       break;
     case 'off':
       lines.push('项目级开关：已暂停');
+      lines.push('当前项目里正在运行或排队中的 Autopilot 任务会一并停止');
       break;
     case 'clear':
       lines.push('已清空该项目的 Autopilot 看板和历史状态');
