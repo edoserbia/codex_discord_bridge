@@ -163,6 +163,45 @@ test('loadConfig defaults web bind to lan-friendly 0.0.0.0', { concurrency: fals
   }
 });
 
+test('loadConfig exposes a configurable Codex config path', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-config-codex-path-');
+  const secretFile = path.join(rootDir, 'secrets.env');
+  const codexConfigPath = path.join(rootDir, '.codex', 'config.toml');
+  await fs.writeFile(secretFile, 'CODEX_TUNNING_DISCORD_BOT_TOKEN="secret-token-from-file"\n', 'utf8');
+
+  const previous = {
+    CODEX_TUNNING_SECRETS_FILE: process.env.CODEX_TUNNING_SECRETS_FILE,
+    CODEX_TUNNING_DISCORD_BOT_TOKEN: process.env.CODEX_TUNNING_DISCORD_BOT_TOKEN,
+    DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
+    DISCORD_TOKEN: process.env.DISCORD_TOKEN,
+    DATA_DIR: process.env.DATA_DIR,
+    WEB_ENABLED: process.env.WEB_ENABLED,
+    CODEX_CONFIG_PATH: process.env.CODEX_CONFIG_PATH,
+  };
+
+  delete process.env.CODEX_TUNNING_DISCORD_BOT_TOKEN;
+  delete process.env.DISCORD_BOT_TOKEN;
+  delete process.env.DISCORD_TOKEN;
+  process.env.CODEX_TUNNING_SECRETS_FILE = secretFile;
+  process.env.DATA_DIR = rootDir;
+  process.env.WEB_ENABLED = 'false';
+  process.env.CODEX_CONFIG_PATH = codexConfigPath;
+
+  try {
+    const config = loadConfig();
+    assert.equal((config as any).codexConfigPath, codexConfigPath);
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+    await cleanupDir(rootDir);
+  }
+});
+
 test('loadConfig respects explicit CODEX_DRIVER_MODE override', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-config-driver-override-');
   const secretFile = path.join(rootDir, 'secrets.env');

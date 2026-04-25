@@ -21,6 +21,7 @@ export interface ChannelBinding {
   projectName: string;
   workspacePath: string;
   codex: BindingCodexOptions;
+  modelScope?: 'global' | 'project' | undefined;
   createdAt: string;
   updatedAt: string;
 }

@@ -66,6 +66,7 @@ import type {
 import { buildPromptWithAttachments, downloadAttachments, extractMessageAttachments, removeAttachmentDir } from './attachments.js';
 import { appendBridgeFileSendInstructions, extractBridgeFileSendDirective } from './bridgeFileSendProtocol.js';
 import { diagnoseCodexFailure, filterDiagnosticStderr, isIgnorableCodexStderrLine } from './codexDiagnostics.js';
+import { loadCodexGlobalModel, resolveCodexConfigPath, writeCodexGlobalModel } from './codexConfig.js';
 import { isCommandMessage, parseCommand } from './commandParser.js';
 import {
   detectNaturalLanguageFileRequest,
@@ -487,9 +488,13 @@ export class DiscordCodexBridge {
 
     const existingBinding = this.store.getBinding(request.channelId);
     const codexOptions = cloneCodexOptions(this.config.defaultCodex);
+    let modelScope: ChannelBinding['modelScope'];
 
     if (options.model) {
       codexOptions.model = options.model;
+      modelScope = 'project';
+    } else if (codexOptions.model) {
+      modelScope = 'global';
     }
 
     if (options.profile) {
@@ -527,6 +532,7 @@ export class DiscordCodexBridge {
       projectName: request.projectName,
       workspacePath: resolvedWorkspace,
       codex: codexOptions,
+      modelScope,
       createdAt: existingBinding?.createdAt ?? now,
       updatedAt: now,
     };
@@ -1611,6 +1617,13 @@ export class DiscordCodexBridge {
         }
         await this.handleSendFileRequest(message, resolved, command.request);
         return;
+      case 'model':
+        if (command.action !== 'status' && !this.isAdmin(message)) {
+          await message.reply('只有管理员才能切换 Codex 模型。');
+          return;
+        }
+        await this.handleModelCommand(message, resolved, command);
+        return;
       case 'autopilot':
         if (command.scope === 'help') {
           await this.replyWithChunks(message, formatAutopilotHelp(this.config.commandPrefix));
@@ -1699,6 +1712,7 @@ export class DiscordCodexBridge {
       options,
     });
     const autopilotProject = this.store.getAutopilotProject(savedBinding.channelId);
+    const globalModel = await this.getGlobalCodexModel();
 
     const executionChanged = hasBindingExecutionChanged(existingBinding, savedBinding);
 
@@ -1707,6 +1721,7 @@ export class DiscordCodexBridge {
         `已绑定当前频道到项目 **${savedBinding.projectName}**。`,
         `目录：\`${savedBinding.workspacePath}\``,
         `执行模式：sandbox=\`${savedBinding.codex.sandboxMode}\` · approval=\`${savedBinding.codex.approvalPolicy}\` · search=${savedBinding.codex.search ? 'on' : 'off'}`,
+        `模型：${this.formatBindingModelSummary(savedBinding, globalModel)}`,
         autopilotProject?.threadChannelId
           ? `Autopilot 线程：<#${autopilotProject.threadChannelId}>`
           : 'Autopilot 线程：创建失败或当前频道不支持线程，请检查频道类型与权限。',
@@ -1714,6 +1729,120 @@ export class DiscordCodexBridge {
         executionChanged
           ? '检测到绑定配置已变更，已重置当前频道及其线程的 Codex 会话；下一条消息会按新权限新建会话。'
           : '现在主频道和其下线程都可以直接控制 Codex。',
+      ].join('\n'),
+    );
+  }
+
+  private async handleModelCommand(
+    message: Message,
+    resolved: ResolvedConversation | undefined,
+    command: Extract<ParsedCommand, { kind: 'model' }>,
+  ): Promise<void> {
+    if (command.scope === 'global') {
+      if (command.action === 'status') {
+        const globalModel = await this.getGlobalCodexModel();
+        await message.reply(
+          [
+            '🧠 **Codex 全局模型**',
+            `全局模型：${globalModel ? `\`${globalModel}\`` : '未在配置文件中显式设置'}`,
+            `配置文件：\`${this.getCodexConfigPath()}\``,
+            '说明：全局切换不会 reset 当前会话；运行中的本轮继续使用旧模型，下一轮开始使用新模型。',
+          ].join('\n'),
+        );
+        return;
+      }
+
+      const nextModel = command.model.trim();
+      await writeCodexGlobalModel(this.getCodexConfigPath(), nextModel);
+      this.config.defaultCodex.model = nextModel;
+
+      const now = new Date().toISOString();
+      const bindings = this.store.listBindings();
+
+      for (const binding of bindings) {
+        await this.store.upsertBinding({
+          ...binding,
+          codex: {
+            ...binding.codex,
+            model: nextModel,
+          },
+          modelScope: 'global',
+          updatedAt: now,
+        });
+      }
+
+      await this.refreshStatusPanelsForBindings(bindings.map((binding) => binding.channelId));
+      await message.reply(
+        [
+          `已切换全局 Codex 模型为 \`${nextModel}\`。`,
+          `配置文件：\`${this.getCodexConfigPath()}\``,
+          `已同步绑定项目：${bindings.length}`,
+          '运行中的任务不会被打断；下一轮请求开始使用新模型。',
+        ].join('\n'),
+      );
+      return;
+    }
+
+    if (!resolved) {
+      await message.reply('当前频道未绑定项目。先执行 `!bind`。');
+      return;
+    }
+
+    const binding = this.store.getBinding(resolved.bindingChannelId);
+    if (!binding) {
+      await message.reply('当前频道未绑定项目。先执行 `!bind`。');
+      return;
+    }
+
+    const globalModel = await this.getGlobalCodexModel();
+
+    if (command.action === 'status') {
+      await message.reply(this.formatProjectModelStatusMessage(binding, globalModel));
+      return;
+    }
+
+    if (command.action === 'set') {
+      const nextBinding: ChannelBinding = {
+        ...binding,
+        codex: {
+          ...binding.codex,
+          model: command.model.trim(),
+        },
+        modelScope: 'project',
+        updatedAt: new Date().toISOString(),
+      };
+      await this.store.upsertBinding(nextBinding);
+      await this.refreshStatusPanelsForBindings([nextBinding.channelId]);
+      await message.reply(
+        [
+          `已将当前项目切换到 Codex 模型 \`${nextBinding.codex.model}\`。`,
+          `项目：**${nextBinding.projectName}**`,
+          '来源：项目覆盖',
+          '运行中的任务不会被打断；下一轮请求开始使用新模型。',
+        ].join('\n'),
+      );
+      return;
+    }
+
+    const nextCodex = {
+      ...binding.codex,
+    };
+    delete nextCodex.model;
+
+    const clearedBinding: ChannelBinding = {
+      ...binding,
+      codex: nextCodex,
+      modelScope: undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.store.upsertBinding(clearedBinding);
+    await this.refreshStatusPanelsForBindings([clearedBinding.channelId]);
+    await message.reply(
+      [
+        '已清除当前项目的模型覆盖，恢复跟随全局。',
+        `项目：**${clearedBinding.projectName}**`,
+        `全局模型：${globalModel ? `\`${globalModel}\`` : '未在配置文件中显式设置'}`,
+        '运行中的任务不会被打断；下一轮请求开始使用全局模型。',
       ].join('\n'),
     );
   }
@@ -1729,6 +1858,80 @@ export class DiscordCodexBridge {
     await message.reply(`已解绑当前频道，原项目为 **${existing.projectName}**。`);
   }
 
+  private getCodexConfigPath(): string {
+    return resolveCodexConfigPath(this.config.codexConfigPath);
+  }
+
+  private async getGlobalCodexModel(): Promise<string | undefined> {
+    const configured = await loadCodexGlobalModel(this.getCodexConfigPath());
+    return configured?.trim() || this.config.defaultCodex.model?.trim() || undefined;
+  }
+
+  private formatBindingModelSummary(binding: ChannelBinding, globalModel: string | undefined): string {
+    const projectModel = binding.codex.model?.trim();
+
+    if (binding.modelScope === 'project' && projectModel) {
+      return `\`${projectModel}\`（项目覆盖）`;
+    }
+
+    if (binding.modelScope === 'global' && projectModel) {
+      return `\`${projectModel}\`（全局已同步）`;
+    }
+
+    if (projectModel) {
+      return `\`${projectModel}\``;
+    }
+
+    if (globalModel) {
+      return `\`${globalModel}\`（跟随全局）`;
+    }
+
+    return '未显式指定（跟随 Codex 默认配置）';
+  }
+
+  private formatProjectModelStatusMessage(binding: ChannelBinding, globalModel: string | undefined): string {
+    const effectiveModel = binding.codex.model?.trim() || globalModel;
+    const projectModelLine = binding.codex.model?.trim()
+      ? `项目模型：${this.formatBindingModelSummary(binding, globalModel)}`
+      : globalModel
+        ? '项目模型：跟随全局'
+        : '项目模型：未显式指定';
+
+    return [
+      '🧠 **Codex 项目模型**',
+      `项目：**${binding.projectName}**`,
+      projectModelLine,
+      `全局模型：${globalModel ? `\`${globalModel}\`` : '未在配置文件中显式设置'}`,
+      `当前生效：${effectiveModel ? `\`${effectiveModel}\`` : 'Codex 默认配置'}`,
+      '说明：切换模型不会 reset 当前会话；运行中的本轮继续使用旧模型，下一轮开始使用新模型。',
+    ].join('\n');
+  }
+
+  private async refreshStatusPanelsForBindings(bindingChannelIds: string[]): Promise<void> {
+    for (const bindingChannelId of bindingChannelIds) {
+      const binding = this.store.getBinding(bindingChannelId);
+      if (!binding) {
+        continue;
+      }
+
+      for (const session of this.store.listSessions(bindingChannelId)) {
+        const channel = await this.fetchChannel(session.conversationId);
+        if (!channel) {
+          continue;
+        }
+
+        const runtime = this.getRuntime(session.conversationId);
+        await this.safeRefreshStatusPanel(
+          channel,
+          binding,
+          session,
+          runtime,
+          session.conversationId !== bindingChannelId,
+        );
+      }
+    }
+  }
+
   private async handleStatusCommand(message: Message, resolved: ResolvedConversation | undefined): Promise<void> {
     if (!resolved) {
       await message.reply('当前频道未绑定项目。先执行 `!bind`。');
@@ -1737,6 +1940,7 @@ export class DiscordCodexBridge {
 
     const runtime = this.getRuntime(resolved.conversationId);
     const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
+    const globalModel = await this.getGlobalCodexModel();
     await this.refreshStatusPanel(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
     await message.reply(
       formatStatus(
@@ -1746,6 +1950,7 @@ export class DiscordCodexBridge {
         this.config.commandPrefix,
         resolved.isThreadConversation,
         this.config.codexDriverMode ?? 'app-server',
+        globalModel,
       ),
     );
   }
@@ -4281,6 +4486,7 @@ export class DiscordCodexBridge {
     runtime: ChannelRuntime,
     isThreadConversation: boolean,
   ): Promise<void> {
+    const globalModel = await this.getGlobalCodexModel();
     const content = formatStatus(
       binding,
       session,
@@ -4288,6 +4494,7 @@ export class DiscordCodexBridge {
       this.config.commandPrefix,
       isThreadConversation,
       this.config.codexDriverMode ?? 'app-server',
+      globalModel,
     );
     const statusMessageId = session.statusMessageId;
 

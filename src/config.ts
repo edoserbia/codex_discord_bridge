@@ -7,6 +7,7 @@ import path from 'node:path';
 import { config as dotenvConfig } from 'dotenv';
 
 import type { AppServerTransport, ApprovalPolicy, BindingCodexOptions, CodexDriverMode, SandboxMode } from './types.js';
+import { resolveCodexConfigPath } from './codexConfig.js';
 
 const DEFAULT_SECRETS_FILE = path.join(os.homedir(), '.codex-tunning', 'secrets.env');
 
@@ -21,6 +22,7 @@ export interface AppConfig {
   discordToken: string;
   commandPrefix: string;
   dataDir: string;
+  codexConfigPath?: string | undefined;
   codexCommand: string;
   codexMaxAttempts: number;
   codexRateLimitMaxAttempts: number;
@@ -136,6 +138,7 @@ export function loadConfig(): AppConfig {
     discordToken,
     commandPrefix: process.env.COMMAND_PREFIX?.trim() || '!',
     dataDir: path.resolve(process.env.DATA_DIR ?? './data'),
+    codexConfigPath: resolveCodexConfigPath(),
     codexCommand: process.env.CODEX_COMMAND?.trim() || 'codex',
     codexMaxAttempts: parseMinimumInteger(process.env.CODEX_MAX_ATTEMPTS, 10, 1),
     codexRateLimitMaxAttempts: parseMinimumInteger(process.env.CODEX_RATE_LIMIT_MAX_ATTEMPTS, 0, 0),

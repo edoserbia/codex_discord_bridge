@@ -19,6 +19,10 @@ export type ParsedCommand =
   | { kind: 'guide'; prompt: string }
   | { kind: 'sendfile'; request: string }
   | { kind: 'sendfile'; index: number }
+  | { kind: 'model'; scope: 'global'; action: 'status' }
+  | { kind: 'model'; scope: 'global'; action: 'set'; model: string }
+  | { kind: 'model'; scope: 'project'; action: 'status' | 'clear' }
+  | { kind: 'model'; scope: 'project'; action: 'set'; model: string }
   | { kind: 'autopilot'; scope: 'help' }
   | { kind: 'autopilot'; scope: 'server'; action: 'on' | 'off' | 'clear' | 'status' }
   | { kind: 'autopilot'; scope: 'server'; action: 'concurrency'; parallelism: number }
@@ -97,6 +101,63 @@ function parseSendFileIndex(value: string): number {
   }
 
   return parsed;
+}
+
+function parseModelCommand(body: string): Extract<ParsedCommand, { kind: 'model' }> {
+  const tokens = tokenizeCommand(body);
+  tokens.shift();
+
+  const scopeOrAction = tokens.shift()?.toLowerCase();
+
+  if (!scopeOrAction || scopeOrAction === 'status') {
+    return {
+      kind: 'model',
+      scope: 'global',
+      action: 'status',
+    };
+  }
+
+  if (scopeOrAction === 'set') {
+    return {
+      kind: 'model',
+      scope: 'global',
+      action: 'set',
+      model: readValue(tokens, '!model set'),
+    };
+  }
+
+  if (scopeOrAction !== 'project') {
+    throw new Error('用法：!model status | !model set <模型名> | !model project <status|set <模型名>|clear>');
+  }
+
+  const action = tokens.shift()?.toLowerCase();
+
+  if (!action || action === 'status') {
+    return {
+      kind: 'model',
+      scope: 'project',
+      action: 'status',
+    };
+  }
+
+  if (action === 'set') {
+    return {
+      kind: 'model',
+      scope: 'project',
+      action: 'set',
+      model: readValue(tokens, '!model project set'),
+    };
+  }
+
+  if (action === 'clear') {
+    return {
+      kind: 'model',
+      scope: 'project',
+      action: 'clear',
+    };
+  }
+
+  throw new Error('用法：!model status | !model set <模型名> | !model project <status|set <模型名>|clear>');
 }
 
 function parseAutopilotCommand(body: string): Extract<ParsedCommand, { kind: 'autopilot' }> {
@@ -301,6 +362,8 @@ export function parseCommand(content: string, prefix: string): ParsedCommand {
     }
     case 'autopilot':
       return parseAutopilotCommand(body);
+    case 'model':
+      return parseModelCommand(body);
     case 'bind': {
       const projectName = tokens.shift();
       const workspacePath = tokens.shift();

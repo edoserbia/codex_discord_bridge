@@ -12,6 +12,10 @@ test('help text documents workspace inbox mirroring and file-send workflows', ()
   assert.match(text, /!sendfile <文件名\/相对路径>/);
   assert.match(text, /!sendfile 2/);
   assert.match(text, /绝对路径/);
+  assert.match(text, /!model status/);
+  assert.match(text, /!model set gpt-5\.5/);
+  assert.match(text, /!model project set gpt-5\.5/);
+  assert.match(text, /!model project clear/);
 });
 
 test('formatSuccessReply falls back when Codex returns blank text', () => {

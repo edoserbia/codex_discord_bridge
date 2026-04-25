@@ -148,3 +148,50 @@ test('parse autopilot project run command', () => {
     action: 'run',
   });
 });
+
+test('parse model status command', () => {
+  const parsed = parseCommand('!model status', '!');
+  assert.deepEqual(parsed, {
+    kind: 'model',
+    scope: 'global',
+    action: 'status',
+  });
+});
+
+test('parse model set command', () => {
+  const parsed = parseCommand('!model set gpt-5.5', '!');
+  assert.deepEqual(parsed, {
+    kind: 'model',
+    scope: 'global',
+    action: 'set',
+    model: 'gpt-5.5',
+  });
+});
+
+test('parse project model status command', () => {
+  const parsed = parseCommand('!model project status', '!');
+  assert.deepEqual(parsed, {
+    kind: 'model',
+    scope: 'project',
+    action: 'status',
+  });
+});
+
+test('parse project model set command', () => {
+  const parsed = parseCommand('!model project set gpt-5.5', '!');
+  assert.deepEqual(parsed, {
+    kind: 'model',
+    scope: 'project',
+    action: 'set',
+    model: 'gpt-5.5',
+  });
+});
+
+test('parse project model clear command', () => {
+  const parsed = parseCommand('!model project clear', '!');
+  assert.deepEqual(parsed, {
+    kind: 'model',
+    scope: 'project',
+    action: 'clear',
+  });
+});
