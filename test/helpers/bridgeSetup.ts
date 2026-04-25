@@ -19,6 +19,7 @@ class FakeChannelRegistry extends Map<string, FakeChannel> {
 export async function createBridgeTestRig(options: {
   rootDir: string;
   codexCommand?: string;
+  codexConfigPath?: string;
   driverMode?: 'legacy-exec' | 'app-server';
   appServerStartupTimeoutMs?: number;
   codexMaxAttempts?: number;
@@ -40,6 +41,7 @@ export async function createBridgeTestRig(options: {
     discordToken: 'test-token',
     commandPrefix: '!',
     dataDir: path.join(options.rootDir, 'data'),
+    codexConfigPath: options.codexConfigPath ?? path.join(options.rootDir, '.codex', 'config.toml'),
     codexCommand: options.codexCommand ?? 'codex',
     codexDriverMode: options.driverMode ?? 'legacy-exec',
     codexAppServerStartupTimeoutMs: options.appServerStartupTimeoutMs,
