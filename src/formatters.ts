@@ -101,6 +101,29 @@ function formatSectionDivider(label: string, fill: '-' | '='): string {
   return `${segment} ${label} ${segment}`;
 }
 
+function formatBindingModelSummary(binding: ChannelBinding, globalModel: string | undefined): string {
+  const projectModel = binding.codex.model?.trim();
+  const normalizedGlobalModel = globalModel?.trim();
+
+  if (binding.modelScope === 'project' && projectModel) {
+    return `\`${projectModel}\`（项目覆盖）`;
+  }
+
+  if (binding.modelScope === 'global' && projectModel) {
+    return `\`${projectModel}\`（全局已同步）`;
+  }
+
+  if (projectModel) {
+    return `\`${projectModel}\``;
+  }
+
+  if (normalizedGlobalModel) {
+    return `\`${normalizedGlobalModel}\`（跟随全局）`;
+  }
+
+  return '未显式指定（跟随 Codex 默认配置）';
+}
+
 function formatTaskSummary(task: PromptTask, maxLength = 90): string {
   const prefix = task.recovery
     ? `自动恢复(${task.recovery.strategy === 'continue-from-state' ? '续跑' : '重试'})：`
@@ -221,6 +244,11 @@ export function formatHelp(prefix: string): string {
     `- 发送文件：\`${prefix}sendfile <文件名/相对路径>\``,
     `- 发送候选序号：\`${prefix}sendfile 2\``,
     `- Autopilot 用法：\`${prefix}autopilot\``,
+    `- 全局模型状态：\`${prefix}model status\``,
+    `- 全局切换模型：\`${prefix}model set gpt-5.5\``,
+    `- 当前项目模型：\`${prefix}model project status\``,
+    `- 当前项目切换模型：\`${prefix}model project set gpt-5.5\``,
+    `- 当前项目恢复跟随全局：\`${prefix}model project clear\``,
     `- 查看状态：\`${prefix}status\``,
     `- 查看队列：\`${prefix}queue\``,
     `- 队列插入：\`${prefix}queue insert <序号>\``,
@@ -236,6 +264,7 @@ export function formatHelp(prefix: string): string {
     '绑定后还会自动创建一个 Autopilot 项目线程；可在主频道或线程里用 `!autopilot` 查看自动迭代用法。',
     '现在会在频道里持续更新实时进度、命令执行和计划状态。',
     'Subagent 支持已默认开启；如果你还希望 Codex 把 AGENTS.md 的层级说明显式透传给子代理，可在绑定时追加 `--config features.child_agents_md=true`。',
+    '模型切换不会自动 reset 当前会话；如果项目正在运行，本轮继续用旧模型，下一轮开始使用新模型。',
     '如果当前任务正在运行，可用 `!guide <内容>` 插入中途引导，bridge 会中断当前步骤，先处理引导，再按同一会话继续原任务。',
     '图片附件会自动透传到 `codex -i`；上传的附件会同步到绑定目录里的 `inbox/` 子目录，普通文件也会保留一份 bridge 本地缓存。',
     '上传和发回文件时会尽量保留原文件名；只有目标位置已存在同名文件时，才会在扩展名前追加一段随机后缀。',
@@ -422,6 +451,7 @@ export function formatStatus(
   prefix: string,
   isThreadConversation: boolean,
   preferredDriver: 'legacy-exec' | 'app-server' = 'legacy-exec',
+  globalModel?: string,
 ): string {
   const driverLabel = formatDriverLabel(runtime.activeRun?.driverMode ?? session.driver ?? preferredDriver, session.fallbackActive);
   const resumeId = session.codexThreadId?.trim();
@@ -446,6 +476,7 @@ export function formatStatus(
     `项目：**${binding.projectName}**`,
     `目录：\`${binding.workspacePath}\``,
     `执行模式：sandbox=\`${binding.codex.sandboxMode}\` · approval=\`${binding.codex.approvalPolicy}\` · search=${binding.codex.search ? 'on' : 'off'}`,
+    `模型：${formatBindingModelSummary(binding, globalModel)}`,
     `驱动：${driverLabel}`,
     `会话类型：${isThreadConversation ? 'Discord 线程会话' : '频道主会话'}`,
     `状态：${formatActiveStatus(runtime)}`,
@@ -503,7 +534,7 @@ export function formatStatus(
     lines.push('发送普通消息即可继续和当前项目会话。');
   }
 
-  lines.push(`控制：\`${prefix}status\` · \`${prefix}queue\` · \`${prefix}cancel\` · \`${prefix}reset\` · \`${prefix}unbind\``);
+  lines.push(`控制：\`${prefix}status\` · \`${prefix}model status\` · \`${prefix}queue\` · \`${prefix}cancel\` · \`${prefix}reset\` · \`${prefix}unbind\``);
   return truncate(lines.join('\n'), 1900);
 }
 
