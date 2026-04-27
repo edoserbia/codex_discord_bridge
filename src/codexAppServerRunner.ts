@@ -4,7 +4,7 @@ import type { CodexExecutionDriver, CodexRunHooks, RunningCodexJob } from './cod
 
 import { normalizeCodexDiagnosticLine } from './codexDiagnostics.js';
 import { CodexAppServerClient } from './codexAppServerClient.js';
-import { extractReasoningText, parseCollabToolCall } from './codexRunner.js';
+import { extractReasoningText, parseCollabToolCall, parsePlanItems } from './codexRunner.js';
 
 interface AppServerCommandBuffer {
   command: string;
@@ -129,57 +129,85 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
           buffer.output += event.delta;
           break;
         }
-        case 'item.started': {
-          if (event.item.type === 'commandExecution' && typeof event.item.command === 'string') {
-            let buffer = commandBuffers.get(String(event.item.id ?? ''));
-            if (!buffer) {
-              buffer = {
-                command: event.item.command,
-                output: '',
-                started: false,
-              };
-              commandBuffers.set(String(event.item.id ?? ''), buffer);
-            }
-
-            buffer.command = event.item.command;
-            if (!buffer.started) {
-              buffer.started = true;
-              await hooks.onCommandStarted?.(event.item.command);
-            }
-          }
-
-          if (event.item.type === 'collabAgentToolCall') {
-            const collabToolCall = parseCollabToolCall(event.item);
-            if (collabToolCall) {
-              await hooks.onCollabToolChanged?.(collabToolCall);
-            }
-          }
-          break;
-        }
+        case 'item.started':
+        case 'item.updated':
         case 'item.completed': {
-          if (event.item.type === 'reasoning') {
+          const itemType = normalizeAppServerItemType(event.item.type);
+
+          if (itemType === 'todo_list') {
+            const hasRawTodoItems = Array.isArray(event.item.items);
+            const nextPlanItems = parsePlanItems(event.item.items, planItems);
+            if (hasRawTodoItems) {
+              planItems = nextPlanItems;
+              await hooks.onTodoListChanged?.(nextPlanItems);
+            }
+          }
+
+          if (itemType === 'reasoning') {
             const reasoningText = extractReasoningText(event.item);
             if (reasoningText) {
-              reasoning.push(reasoningText);
+              reasoningBuffers.set(readAppServerItemId(event.item), reasoningText);
+              if (reasoning.at(-1) !== reasoningText) {
+                reasoning.push(reasoningText);
+              }
               await hooks.onReasoning?.(reasoningText);
             }
           }
 
-          if (event.item.type === 'commandExecution' && typeof event.item.command === 'string') {
-            const output = typeof event.item.aggregatedOutput === 'string' ? event.item.aggregatedOutput : '';
-            const exitCode = typeof event.item.exitCode === 'number' ? event.item.exitCode : null;
-            commands.push({
-              command: event.item.command,
-              output,
-              exitCode,
-            });
-            const itemId = String(event.item.id ?? '');
-            commandBuffers.delete(itemId);
-            completedCommandItemIds.add(itemId);
-            await hooks.onCommandCompleted?.(event.item.command, output, exitCode);
+          if (itemType === 'agent_message') {
+            const itemId = readAppServerItemId(event.item);
+            const messageText = extractAgentMessageText(event.item);
+            if (messageText) {
+              if (!agentMessageBuffers.has(itemId)) {
+                agentMessageItemOrder.push(itemId);
+              }
+              agentMessageBuffers.set(itemId, messageText);
+              const visibleMessage = buildVisibleAgentMessage();
+              if (visibleMessage && agentMessages.at(-1) !== visibleMessage) {
+                agentMessages.push(visibleMessage);
+                await hooks.onAgentMessage?.(visibleMessage);
+              }
+            }
           }
 
-          if (event.item.type === 'collabAgentToolCall') {
+          if (itemType === 'command_execution') {
+            const command = readCommandText(event.item);
+            if (!command) {
+              break;
+            }
+
+            let buffer = commandBuffers.get(readAppServerItemId(event.item));
+            if (!buffer) {
+              buffer = {
+                command,
+                output: '',
+                started: false,
+              };
+              commandBuffers.set(readAppServerItemId(event.item), buffer);
+            }
+
+            buffer.command = command;
+            if (!buffer.started) {
+              buffer.started = true;
+              await hooks.onCommandStarted?.(command);
+            }
+
+            if (event.type === 'item.completed') {
+              const output = readCommandOutput(event.item);
+              const exitCode = readCommandExitCode(event.item);
+              commands.push({
+                command,
+                output,
+                exitCode,
+              });
+              const itemId = readAppServerItemId(event.item);
+              commandBuffers.delete(itemId);
+              completedCommandItemIds.add(itemId);
+              await hooks.onCommandCompleted?.(command, output, exitCode);
+            }
+          }
+
+          if (itemType === 'collab_tool_call') {
             const collabToolCall = parseCollabToolCall(event.item);
             if (collabToolCall) {
               await hooks.onCollabToolChanged?.(collabToolCall);
@@ -321,4 +349,93 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
     this.clients.set(workspacePath, client);
     return client;
   }
+}
+
+function normalizeAppServerItemType(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  switch (value) {
+    case 'todo_list':
+    case 'agent_message':
+    case 'reasoning':
+    case 'command_execution':
+    case 'collab_tool_call':
+      return value;
+    case 'commandExecution':
+      return 'command_execution';
+    case 'collabAgentToolCall':
+      return 'collab_tool_call';
+    case 'agentMessage':
+      return 'agent_message';
+    case 'todoList':
+      return 'todo_list';
+    default:
+      return value;
+  }
+}
+
+function readAppServerItemId(item: Record<string, unknown>): string {
+  return typeof item.id === 'string' && item.id.trim() ? item.id.trim() : 'unknown-item';
+}
+
+function extractAgentMessageText(item: Record<string, unknown>): string | undefined {
+  if (typeof item.text === 'string' && item.text.trim()) {
+    return item.text.trim();
+  }
+
+  const content = Array.isArray(item.content)
+    ? item.content.map(extractTextFragment).filter((value): value is string => Boolean(value)).join('\n').trim()
+    : '';
+
+  return content || undefined;
+}
+
+function extractTextFragment(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    return value.trim() || undefined;
+  }
+
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  for (const key of ['text', 'content', 'value']) {
+    const text = candidate[key];
+    if (typeof text === 'string' && text.trim()) {
+      return text.trim();
+    }
+  }
+
+  return undefined;
+}
+
+function readCommandText(item: Record<string, unknown>): string | undefined {
+  return typeof item.command === 'string' && item.command.trim() ? item.command : undefined;
+}
+
+function readCommandOutput(item: Record<string, unknown>): string {
+  if (typeof item.aggregatedOutput === 'string') {
+    return item.aggregatedOutput;
+  }
+
+  if (typeof item.aggregated_output === 'string') {
+    return item.aggregated_output;
+  }
+
+  return '';
+}
+
+function readCommandExitCode(item: Record<string, unknown>): number | null {
+  if (typeof item.exitCode === 'number') {
+    return item.exitCode;
+  }
+
+  if (typeof item.exit_code === 'number') {
+    return item.exit_code;
+  }
+
+  return null;
 }

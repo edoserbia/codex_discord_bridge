@@ -150,3 +150,70 @@ test('formatProgressMessage adds a clear process divider', () => {
   assert.match(text, /-{8,} 过程进度 -{8,}/);
   assert.match(text, /🛰️ \*\*Codex 实时进度\*\*/);
 });
+
+test('formatProgressMessage keeps the newest live draft visible when content is long', () => {
+  const text = formatProgressMessage(
+    {
+      channelId: 'channel-1',
+      guildId: 'guild-1',
+      projectName: 'api'.repeat(80),
+      workspacePath: '/tmp/api',
+      codex: {
+        sandboxMode: 'danger-full-access',
+        approvalPolicy: 'never',
+        search: true,
+        skipGitRepoCheck: true,
+        addDirs: [],
+        extraConfig: [],
+      },
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+    {
+      conversationId: 'channel-1',
+      queue: [],
+      pendingReplies: [],
+      activeRun: {
+        task: {
+          id: 'task-1',
+          prompt: '这是一个很长的用户请求。'.repeat(80),
+          effectivePrompt: '这是一个很长的用户请求。'.repeat(80),
+          rootPrompt: '这是一个很长的用户请求。'.repeat(80),
+          rootEffectivePrompt: '这是一个很长的用户请求。'.repeat(80),
+          requestedBy: 'alice'.repeat(40),
+          requestedById: 'user-1',
+          messageId: 'message-1',
+          enqueuedAt: '2026-01-01T00:00:00.000Z',
+          bindingChannelId: 'channel-1',
+          conversationId: 'channel-1',
+          attachments: [],
+          extraAddDirs: [],
+          origin: 'user',
+        },
+        driverMode: 'app-server',
+        status: 'running',
+        startedAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        latestActivity: '正在持续生成回复草稿'.repeat(40),
+        agentMessages: ['旧回复草稿', 'LATEST-LIVE-DRAFT 当前最新回复草稿必须保留'],
+        reasoningSummaries: [
+          '分析摘要一。'.repeat(80),
+          '分析摘要二。'.repeat(80),
+          '分析摘要三。'.repeat(80),
+        ],
+        planItems: Array.from({ length: 8 }, (_, index) => ({
+          id: `plan-${index}`,
+          text: `计划项 ${index} `.repeat(40),
+          completed: index < 2,
+        })),
+        collabToolCalls: [],
+        timeline: Array.from({ length: 8 }, (_, index) => `[08:0${index}] ${'过程记录 '.repeat(40)}`),
+        stderr: [],
+        usedResume: false,
+      },
+    },
+    '!',
+  );
+
+  assert.match(text, /LATEST-LIVE-DRAFT/);
+});
