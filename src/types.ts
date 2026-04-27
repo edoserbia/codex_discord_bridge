@@ -261,6 +261,7 @@ export type AppServerTurnEvent =
   | { type: 'turn.steered'; threadId: string; turnId: string; prompt: string }
   | { type: 'plan.updated'; threadId: string; turnId: string; plan: AppServerPlanStep[] }
   | { type: 'item.started'; threadId: string; turnId: string; item: Record<string, unknown> }
+  | { type: 'item.updated'; threadId: string; turnId: string; item: Record<string, unknown> }
   | { type: 'item.completed'; threadId: string; turnId: string; item: Record<string, unknown> }
   | { type: 'command.output.delta'; threadId: string; turnId: string; itemId: string; delta: string }
   | { type: 'agent.message.delta'; threadId: string; turnId: string; itemId: string; delta: string }

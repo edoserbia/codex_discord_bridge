@@ -374,7 +374,7 @@ export function resolveCodexConfigEntries(extraConfig: string[]): string[] {
   return entries;
 }
 
-function parsePlanItems(rawItems: unknown, existingItems: PlanItem[] = []): PlanItem[] {
+export function parsePlanItems(rawItems: unknown, existingItems: PlanItem[] = []): PlanItem[] {
   if (!Array.isArray(rawItems)) {
     return [];
   }
@@ -613,20 +613,54 @@ function normalizeCollabToolStatus(value: unknown): CollabToolStatus | undefined
 
 export function extractReasoningText(item: Record<string, unknown>): string | undefined {
   const summary = Array.isArray(item.summary)
-    ? item.summary.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    ? item.summary.map(extractTextValue).filter((value): value is string => Boolean(value))
     : [];
   if (summary.length > 0) {
     return summary.join('\n').trim();
   }
 
   const content = Array.isArray(item.content)
-    ? item.content.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    ? item.content.map(extractTextValue).filter((value): value is string => Boolean(value))
     : [];
   if (content.length > 0) {
     return content.join('\n').trim();
   }
 
+  const rawContent = Array.isArray(item.raw_content)
+    ? item.raw_content.map(extractTextValue).filter((value): value is string => Boolean(value))
+    : [];
+  if (rawContent.length > 0) {
+    return rawContent.join('\n').trim();
+  }
+
+  if (typeof item.text === 'string' && item.text.trim()) {
+    return item.text.trim();
+  }
+
+  if (typeof item.reasoning_text === 'string' && item.reasoning_text.trim()) {
+    return item.reasoning_text.trim();
+  }
+
   return undefined;
+}
+
+function extractTextValue(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    return value.trim() || undefined;
+  }
+
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return coerceOptionalString(
+    candidate.text
+      ?? candidate.content
+      ?? candidate.value
+      ?? candidate.reasoning_text
+      ?? candidate.summary_text,
+  );
 }
 
 function normalizeCollabAgentStatus(value: unknown): CollabAgentStatus | undefined {

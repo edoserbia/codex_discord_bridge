@@ -141,7 +141,11 @@ export class CodexAppServerClient {
     };
 
     const result = existingThreadId
-      ? await this.request('thread/resume', { ...sharedParams, threadId: existingThreadId })
+      ? await this.request('thread/resume', {
+        ...sharedParams,
+        threadId: existingThreadId,
+        experimentalRawEvents: false,
+      })
       : await this.request('thread/start', {
         ...sharedParams,
         experimentalRawEvents: false,
@@ -570,7 +574,23 @@ export class CodexAppServerClient {
         }
         break;
       }
+      case 'item/plan/delta': {
+        const target = this.resolveTurnReference(params);
+        const rawPlan = Array.isArray(params.plan) ? params.plan : Array.isArray(params.items) ? params.items : [];
+        if (target && rawPlan.length > 0) {
+          await this.emitTurnEvent(target.turnId, {
+            event: {
+              type: 'plan.updated',
+              threadId: target.threadId,
+              turnId: target.turnId,
+              plan: rawPlan.map(normalizePlanStep).filter((item): item is AppServerPlanStep => item !== undefined),
+            },
+          });
+        }
+        break;
+      }
       case 'item/started':
+      case 'item.updated':
       case 'item/completed': {
         const threadId = typeof params.threadId === 'string' ? params.threadId : '';
         const turnId = typeof params.turnId === 'string' ? params.turnId : '';
@@ -578,7 +598,11 @@ export class CodexAppServerClient {
         if (threadId && turnId && item && !Array.isArray(item)) {
           await this.emitTurnEvent(turnId, {
             event: {
-              type: method === 'item/started' ? 'item.started' : 'item.completed',
+              type: method === 'item/started'
+                ? 'item.started'
+                : method === 'item.updated'
+                  ? 'item.updated'
+                  : 'item.completed',
               threadId,
               turnId,
               item,
@@ -634,6 +658,24 @@ export class CodexAppServerClient {
               type: 'reasoning.summary.delta',
               threadId,
               turnId,
+              itemId,
+              delta,
+            },
+          });
+        }
+        break;
+      }
+      case 'item/reasoning/summaryPartAdded':
+      case 'item/reasoning/textDelta': {
+        const target = this.resolveTurnReference(params);
+        const itemId = typeof params.itemId === 'string' ? params.itemId : '';
+        const delta = extractReasoningDelta(params);
+        if (target && itemId && delta) {
+          await this.emitTurnEvent(target.turnId, {
+            event: {
+              type: 'reasoning.summary.delta',
+              threadId: target.threadId,
+              turnId: target.turnId,
               itemId,
               delta,
             },
@@ -906,7 +948,7 @@ function normalizePlanStep(raw: unknown): AppServerPlanStep | undefined {
   }
 
   const candidate = raw as Record<string, unknown>;
-  const step = typeof candidate.step === 'string' ? candidate.step.trim() : '';
+  const step = extractPlanStepText(candidate);
   const rawStatus = typeof candidate.status === 'string' ? candidate.status.trim() : '';
   if (!step || !rawStatus) {
     return undefined;
@@ -921,6 +963,39 @@ function normalizePlanStep(raw: unknown): AppServerPlanStep | undefined {
   }
 
   return { step, status: 'pending' };
+}
+
+function extractPlanStepText(candidate: Record<string, unknown>): string {
+  for (const key of ['step', 'text', 'title', 'content', 'task', 'description']) {
+    const value = candidate[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return '';
+}
+
+function extractReasoningDelta(params: Record<string, unknown>): string {
+  for (const key of ['delta', 'text', 'summaryText', 'reasoningText']) {
+    const value = params[key];
+    if (typeof value === 'string' && value.length > 0) {
+      return value;
+    }
+  }
+
+  const part = params.part;
+  if (part && typeof part === 'object' && !Array.isArray(part)) {
+    const candidate = part as Record<string, unknown>;
+    for (const key of ['text', 'content', 'summaryText']) {
+      const value = candidate[key];
+      if (typeof value === 'string' && value.length > 0) {
+        return value;
+      }
+    }
+  }
+
+  return '';
 }
 
 function buildThreadConfig(binding: ChannelBinding): Record<string, unknown> | null {

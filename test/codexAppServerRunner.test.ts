@@ -80,3 +80,43 @@ test('app-server runner surfaces app-server failure details instead of a generic
     await cleanupDir(rootDir);
   }
 });
+
+test('app-server runner surfaces real Codex live item updates before final completion', async () => {
+  const rootDir = await makeTempDir('codex-app-server-runner-real-live-');
+  const workspace = await createWorkspace(rootDir);
+  const runner = new CodexAppServerRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+  const planSnapshots: string[][] = [];
+  const reasoningSnapshots: string[] = [];
+  const agentMessageSnapshots: string[] = [];
+
+  try {
+    const result = await runner.start(
+      binding,
+      { prompt: '[app-real-live] stream real app-server events', imagePaths: [], extraAddDirs: [] },
+      undefined,
+      {
+        onTodoListChanged: async (items) => {
+          planSnapshots.push(items.map((item) => `${item.completed ? 'done' : 'open'}:${item.text}`));
+        },
+        onReasoning: async (message) => {
+          reasoningSnapshots.push(message);
+        },
+        onAgentMessage: async (message) => {
+          agentMessageSnapshots.push(message);
+        },
+      },
+    ).done;
+
+    assert.equal(result.success, true);
+    assert.deepEqual(planSnapshots.at(-1), [
+      'done:Inspect real app-server events',
+      'open:Patch realtime bridge updates',
+    ]);
+    assert.match(reasoningSnapshots.join('\n'), /Reading real-time event stream/);
+    assert.match(agentMessageSnapshots.at(-1) ?? '', /Live draft from item\.updated/);
+  } finally {
+    await runner.stop();
+    await cleanupDir(rootDir);
+  }
+});

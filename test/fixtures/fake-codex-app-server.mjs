@@ -257,6 +257,37 @@ async function handleAsync(message) {
         });
       }
 
+      if (prompt.includes('[app-real-live]')) {
+        notify('item.updated', {
+          threadId,
+          turnId,
+          item: {
+            id: `todo-${turnId}`,
+            type: 'todo_list',
+            items: [
+              { id: 'inspect', text: 'Inspect real app-server events', status: 'completed' },
+              { id: 'patch', text: 'Patch realtime bridge updates', status: 'in_progress' },
+            ],
+          },
+        });
+        notify('item/reasoning/textDelta', {
+          threadId,
+          turnId,
+          itemId: `reason-${turnId}`,
+          contentIndex: 0,
+          delta: 'Reading real-time event stream',
+        });
+        notify('item.updated', {
+          threadId,
+          turnId,
+          item: {
+            id: `msg-${turnId}`,
+            type: 'agent_message',
+            text: 'Live draft from item.updated',
+          },
+        });
+      }
+
       if (prompt.includes('[app-rich]') || prompt.includes('[app-rich-stream]')) {
         notify('item/reasoning/summaryTextDelta', {
           threadId,
@@ -368,6 +399,9 @@ async function handleAsync(message) {
           itemId: `msg-b-${turnId}`,
           delta: 'second part of answer',
         });
+      } else if (prompt.includes('[app-real-live]')) {
+        // The live draft above is intentionally sent through the newer item.updated
+        // method so tests catch clients that only support agentMessage deltas.
       } else {
         notify('item/agentMessage/delta', {
           threadId,

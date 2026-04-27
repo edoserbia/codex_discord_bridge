@@ -70,7 +70,7 @@ function appendPlanLines(lines: string[], planItems: PlanItem[], maxItems = 6): 
 
   lines.push('计划：');
   for (const item of planItems.slice(0, maxItems)) {
-    lines.push(`- ${item.completed ? '✓' : '□'} ${truncate(item.text, 120)}`);
+    lines.push(`- ${item.completed ? '✓' : '□'} ${truncate(item.text, 90)}`);
   }
 }
 
@@ -99,6 +99,14 @@ function appendTimelineLines(lines: string[], entries: string[], maxItems = 5): 
 function formatSectionDivider(label: string, fill: '-' | '='): string {
   const segment = fill.repeat(16);
   return `${segment} ${label} ${segment}`;
+}
+
+function tailText(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `…${value.slice(Math.max(0, value.length - maxLength + 1))}`;
 }
 
 function formatBindingModelSummary(binding: ChannelBinding, globalModel: string | undefined): string {
@@ -553,38 +561,36 @@ export function formatProgressMessage(
   const lines = [
     formatSectionDivider('过程进度', '-'),
     '🛰️ **Codex 实时进度**',
-    `项目：**${binding.projectName}**`,
-    `请求人：${activeRun.task.requestedBy}`,
+    `项目：**${truncate(binding.projectName, 80)}**`,
+    `请求人：${truncate(activeRun.task.requestedBy, 80)}`,
     `状态：${formatActiveStatus(runtime)}`,
     `驱动：${formatDriverLabel(activeRun.driverMode, preferredDriver === 'app-server' && activeRun.driverMode === 'legacy-exec')}`,
     `最近更新：${formatClockTimestamp(activeRun.updatedAt)}`,
-    `最新活动：${formatClockTimestamp(activeRun.updatedAt)} ${truncate(activeRun.latestActivity, 180)}`,
+    `最新活动：${formatClockTimestamp(activeRun.updatedAt)} ${tailText(activeRun.latestActivity, 140)}`,
   ];
 
+  if (activeRun.agentMessages.length > 0) {
+    lines.push('回复草稿（最新）：');
+    lines.push(`- ${tailText(activeRun.agentMessages.at(-1) ?? '', 520)}`);
+  }
+
+  appendPlanLines(lines, activeRun.planItems, 6);
+  appendCollabLines(lines, activeRun.collabToolCalls, 4);
+
+  if (activeRun.reasoningSummaries.length > 0) {
+    lines.push('分析摘要（最新）：');
+    for (const summary of activeRun.reasoningSummaries.slice(-2)) {
+      lines.push(`- ${tailText(summary, 140)}`);
+    }
+  }
+
   if (shouldRenderTaskContext(activeRun)) {
-    appendTaskContextLines(lines, activeRun.task, '请求', 120);
+    appendTaskContextLines(lines, activeRun.task, '请求', 90);
   } else {
     lines.push('请求：已接收，正在建立 Codex 会话');
   }
 
-  appendPlanLines(lines, activeRun.planItems, 8);
-  appendCollabLines(lines, activeRun.collabToolCalls, 4);
-
-  if (activeRun.reasoningSummaries.length > 0) {
-    lines.push('分析摘要：');
-    for (const summary of activeRun.reasoningSummaries.slice(-3)) {
-      lines.push(`- ${truncate(summary, 160)}`);
-    }
-  }
-
-  if (activeRun.agentMessages.length > 0) {
-    lines.push('回复草稿：');
-    for (const message of activeRun.agentMessages.slice(-2)) {
-      lines.push(`- ${truncate(message, 180)}`);
-    }
-  }
-
-  appendTimelineLines(lines, activeRun.timeline, 8);
+  appendTimelineLines(lines, activeRun.timeline, 5);
 
   if (activeRun.currentCommand) {
     lines.push(`当前命令：\`${truncate(sanitizeInlineCode(activeRun.currentCommand), 180)}\``);
