@@ -26,14 +26,14 @@
 | 线程独立会话 | 主频道下的每个线程自动继承目录，但拥有自己的 Codex 会话 |
 | `!status` 恢复入口 | 返回完整 Resume ID 和可直接复制的 `bridgectl session resume <id>` |
 | 本机续聊 | 通过 `bridgectl session status/send/resume` 在 Terminal 接回同一会话 |
-| Transcript 同步 | 本机续聊和 Discord 发起的消息都能同步回 Discord，保留完整记录 |
+| Transcript 同步 | 本机续聊和 Discord 发起的消息都能同步回 Discord，保留完整记录；最终总结回复遇到瞬时写入失败也会补发 |
 | 实时进度面板 | 持续更新分析摘要、计划、时间线、当前命令、输出预览和 stderr |
 | 运行中引导 | 用 `!guide <内容>` 在任务执行途中插入额外要求，再继续原任务 |
 | 文件双向传输 | Discord 上传文件自动落地到工作区 `inbox/`，也能把工作区文件直接回传到 Discord |
 | Autopilot | 对绑定项目做周期性自动迭代，支持服务级和项目级开关、周期、并行度和自然语言方向 |
 | Web 管理面板 | 查看绑定、会话、运行状态，并从浏览器管理 bridge |
 | macOS 服务化 | 支持 `launchd` 的 `LaunchAgent` 和 `LaunchDaemon` |
-| 恢复与重试 | Bridge 重启后优先恢复未完成任务；兼容 `app-server` 优先和可见 fallback |
+| 恢复与重试 | Bridge 重启后优先恢复未完成任务；最终总结回复遇到 Discord 瞬时写入失败会延迟重试并补发 |
 | 代理自动探测 | 启动脚本会优先直连，失败时自动尝试 `http://127.0.0.1:7890` |
 
 ## 工作模型
@@ -218,6 +218,8 @@ http://127.0.0.1:3769/?token=<YOUR_WEB_AUTH_TOKEN>
 
 - 一条持续更新的“Codex 实时进度”消息
 - 一条本轮最终结果回复
+
+如果最终结果回复在发送到 Discord 时碰到短暂网络抖动或连接中断，bridge 会先把这条回复加入待补发队列，恢复后自动重试，避免频道里只剩过程消息而丢掉总结性回复。
 
 实时进度消息会展示：
 

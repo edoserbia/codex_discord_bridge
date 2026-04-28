@@ -1411,7 +1411,7 @@ export class DiscordCodexBridge {
   }
 
   private isRetryableDiscordWriteError(error: unknown): boolean {
-    return /(ECONNRESET|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|UND_ERR|timeout|other side closed|socket hang up|Client network socket disconnected|secure TLS connection was established|fetch failed)/i
+    return /(ECONNRESET|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|EPIPE|ABORT_ERR|AbortError|This operation was aborted|UND_ERR|timeout|other side closed|socket hang up|Client network socket disconnected|secure TLS connection was established|fetch failed)/i
       .test(this.describeDiscordError(error));
   }
 
