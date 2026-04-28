@@ -191,6 +191,8 @@ bridgectl session resume <Resume ID>
 - 如果 `app-server` 暂时不可用，或当前绑定目录不满足启动条件，bridge 会明确提示当前请求已回退到 `legacy-exec`
 - 进度卡会显示本轮实际驱动模式，避免“看起来像正常运行，实际上已经 fallback”这种误判
 - bridge 重启后，会优先恢复上一次中断的任务，再处理普通排队消息；Discord 中会看到恢复提示和恢复模式
+- 当前版本已兼容较新的 Codex live event 形态；真实运行中的回复草稿、计划状态和分析摘要应持续刷新，而不是只在结束时出现
+- 当 Discord 进度卡接近长度上限时，bridge 会优先保留最新回复草稿和最新计划状态，避免它们被旧内容截断
 
 ## 非 Git 目录绑定
 
