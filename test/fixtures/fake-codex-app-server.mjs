@@ -6,6 +6,7 @@ import path from 'node:path';
 
 let buffer = Buffer.alloc(0);
 const threads = new Map();
+const goals = new Map();
 const activeTurns = new Map();
 const logDir = process.env.FAKE_CODEX_APP_SERVER_LOG_DIR;
 const initializeDelayMs = Number.parseInt(process.env.FAKE_CODEX_APP_SERVER_INITIALIZE_DELAY_MS ?? '0', 10) || 0;
@@ -143,6 +144,43 @@ async function handleAsync(message) {
         sandbox: 'workspace-write',
         thread: { id: threadId },
       });
+      return;
+    }
+    case 'thread/goal/set': {
+      const threadId = message.params?.threadId;
+      if (!threadId) {
+        error(message.id, -32602, 'missing threadId');
+        return;
+      }
+      const goal = {
+        threadId,
+        objective: message.params?.objective ?? '',
+        status: message.params?.status ?? 'active',
+        tokenBudget: message.params?.tokenBudget ?? null,
+        tokensUsed: 0,
+        timeUsedSeconds: 0,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      goals.set(threadId, goal);
+      respond(message.id, { goal });
+      notify('thread/goal/updated', {
+        threadId,
+        turnId: null,
+        goal,
+      });
+      return;
+    }
+    case 'thread/goal/get': {
+      const threadId = message.params?.threadId;
+      respond(message.id, { goal: goals.get(threadId) ?? null });
+      return;
+    }
+    case 'thread/goal/clear': {
+      const threadId = message.params?.threadId;
+      const cleared = goals.delete(threadId);
+      respond(message.id, { cleared });
+      notify('thread/goal/cleared', { threadId });
       return;
     }
     case 'turn/start': {

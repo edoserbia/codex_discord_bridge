@@ -376,7 +376,23 @@ bridgectl session resume <Resume ID>
 sandbox_mode = "danger-full-access"
 approval_policy = "never"
 approval_mode = "never"
+
+[features]
+multi_agent = true
+goals = true
 ```
+
+Bridge 服务启动时会自动确保 `~/.codex/config.toml` 里存在 `[features] multi_agent = true` 和 `goals = true`。Bridge 启动 Codex 任务时也会显式注入 `features.multi_agent=true` 与 `features.goals=true`，除非单个项目额外配置明确覆盖。
+
+Goal Loop 通过 Discord 命令控制：
+
+```text
+!goal <目标>
+!goal status
+!goal stop
+```
+
+`!goal <目标>` 会复用当前频道或线程的 Codex 会话，不会自动 `reset`；`!goal stop` 只停止 Goal Loop，不删除 Resume ID 或上下文。Discord 侧只使用 `!goal`，不要使用 `/goal` slash command。
 
 不要继续保留旧权限 profile：
 

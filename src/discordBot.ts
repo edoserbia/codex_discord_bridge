@@ -57,6 +57,7 @@ import type {
   DashboardConversation,
   DeferredDiscordReply,
   DeferredSendPayload,
+  GoalSessionState,
   LocalSessionSendResult,
   PromptTask,
   SessionLookupResult,
@@ -454,6 +455,7 @@ export class DiscordCodexBridge {
     }
     this.pendingDeferredReplyFlushes.clear();
 
+    await this.store.drain();
     await this.runner.stop?.();
     await this.client.destroy();
   }
@@ -771,8 +773,14 @@ export class DiscordCodexBridge {
     let runtime = this.runtimes.get(conversationId);
 
     if (!runtime) {
-      runtime = this.store.getRuntimeState(conversationId) ?? { conversationId, queue: [], pendingReplies: [] };
+      runtime = this.store.getRuntimeState(conversationId) ?? {
+        conversationId,
+        queue: [],
+        pendingReplies: [],
+        goal: this.store.getGoal(conversationId),
+      };
       runtime.pendingReplies ??= [];
+      runtime.goal ??= this.store.getGoal(conversationId);
       this.runtimes.set(conversationId, runtime);
     }
 
@@ -836,7 +844,7 @@ export class DiscordCodexBridge {
   private async persistRuntimeState(conversationId: string): Promise<void> {
     const runtime = this.runtimes.get(conversationId);
 
-    if (!runtime || (!runtime.activeRun && runtime.queue.length === 0 && (runtime.pendingReplies?.length ?? 0) === 0)) {
+    if (!runtime || (!runtime.activeRun && runtime.queue.length === 0 && (runtime.pendingReplies?.length ?? 0) === 0 && !runtime.goal)) {
       await this.store.removeRuntimeState(conversationId);
       return;
     }
@@ -1201,7 +1209,7 @@ export class DiscordCodexBridge {
       return 'local-resume';
     }
 
-    if (task.origin === 'autopilot') {
+    if (task.origin === 'autopilot' || task.origin === 'goal') {
       return 'bridge';
     }
 
@@ -1624,6 +1632,13 @@ export class DiscordCodexBridge {
         }
         await this.handleModelCommand(message, resolved, command);
         return;
+      case 'goal':
+        if (command.action !== 'status' && !this.isAdmin(message)) {
+          await message.reply('只有管理员才能管理 Goal Loop。');
+          return;
+        }
+        await this.handleGoalCommand(message, resolved, command);
+        return;
       case 'autopilot':
         if (command.scope === 'help') {
           await this.replyWithChunks(message, formatAutopilotHelp(this.config.commandPrefix));
@@ -1845,6 +1860,161 @@ export class DiscordCodexBridge {
         '运行中的任务不会被打断；下一轮请求开始使用全局模型。',
       ].join('\n'),
     );
+  }
+
+  private async handleGoalCommand(
+    message: Message,
+    resolved: ResolvedConversation | undefined,
+    command: Extract<ParsedCommand, { kind: 'goal' }>,
+  ): Promise<void> {
+    if (!resolved) {
+      await message.reply('当前频道未绑定项目。先执行 `!bind`。');
+      return;
+    }
+
+    const runtime = this.getRuntime(resolved.conversationId);
+    const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
+
+    if (command.action === 'status') {
+      await message.reply(this.formatGoalStatusMessage(resolved.binding, runtime.goal ?? this.store.getGoal(resolved.conversationId)));
+      return;
+    }
+
+    if (command.action === 'stop') {
+      await this.stopGoalLoop(message, resolved, runtime, session);
+      return;
+    }
+
+    if (command.action === 'start') {
+      await this.startGoalLoop(message, resolved, runtime, session, command.goal);
+    }
+  }
+
+  private formatGoalStatusMessage(binding: ChannelBinding, goal: GoalSessionState | undefined): string {
+    if (!goal || goal.status === 'stopped') {
+      return [
+        '🎯 **Goal Loop 状态**',
+        `项目：**${binding.projectName}**`,
+        '状态：未运行',
+        '用法：`!goal <目标>` 启动；`!goal stop` 停止。',
+      ].join('\n');
+    }
+
+    return [
+      '🎯 **Goal Loop 状态**',
+      `项目：**${binding.projectName}**`,
+      `状态：${goal.status}`,
+      `目标：${goal.objective}`,
+      `Codex 会话：${goal.codexThreadId ? `\`${goal.codexThreadId}\`` : '尚未建立'}`,
+      `更新时间：${goal.updatedAt}`,
+      goal.lastActivity ? `最近活动：${goal.lastActivity}` : undefined,
+    ].filter((line): line is string => Boolean(line)).join('\n');
+  }
+
+  private buildGoalPrompt(objective: string): string {
+    return [
+      `Bridge Goal Loop 目标：${objective}`,
+      '',
+      'Bridge 指令：请开始推进当前已设置的 Goal Loop 目标。只有在目标已经完成、被阻塞且需要用户输入，或收到 `!goal stop` 时才停止。',
+      '不要 reset 当前会话；沿用已有上下文继续工作。',
+    ].join('\n');
+  }
+
+  private async startGoalLoop(
+    message: Message,
+    resolved: ResolvedConversation,
+    runtime: ChannelRuntime,
+    session: ConversationSessionState,
+    objective: string,
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    let codexThreadId = session.codexThreadId;
+    let nativeGoalEnabled = false;
+
+    if (this.runner.setGoal) {
+      try {
+        codexThreadId = await this.runner.setGoal(resolved.binding, session.codexThreadId, objective);
+        nativeGoalEnabled = true;
+        if (codexThreadId !== session.codexThreadId) {
+          await this.store.updateSession(resolved.conversationId, {
+            codexThreadId,
+            driver: this.config.codexDriverMode ?? 'app-server',
+            fallbackActive: false,
+          }, resolved.bindingChannelId);
+        }
+      } catch (error) {
+        this.logBridgeError(`goalSet conversation=${resolved.conversationId}`, error);
+      }
+    }
+
+    const goal: GoalSessionState = {
+      conversationId: resolved.conversationId,
+      bindingChannelId: resolved.bindingChannelId,
+      objective,
+      status: 'active',
+      codexThreadId,
+      createdAt: runtime.goal?.createdAt ?? now,
+      updatedAt: now,
+      lastActivity: nativeGoalEnabled ? '已通过 app-server 原生 Goal API 启动' : '已通过 prompt 级 Goal 指令启动',
+    };
+
+    runtime.goal = goal;
+    await this.store.upsertGoal(goal);
+
+    await this.enqueuePrompt(message, resolved, this.buildGoalPrompt(objective), 'normal', 'goal');
+    await message.reply(
+      [
+        '🎯 Goal Loop 已启动。',
+        `项目：**${resolved.binding.projectName}**`,
+        `目标：${objective}`,
+        nativeGoalEnabled ? '模式：app-server 原生 goal + bridge 状态跟踪' : '模式：prompt 级 goal + bridge 状态跟踪',
+        '当前会话上下文已保留，没有 reset。',
+      ].join('\n'),
+    );
+  }
+
+  private async stopGoalLoop(
+    message: Message,
+    resolved: ResolvedConversation,
+    runtime: ChannelRuntime,
+    session: ConversationSessionState,
+  ): Promise<void> {
+    const existingGoal = runtime.goal ?? this.store.getGoal(resolved.conversationId);
+    if (!existingGoal || existingGoal.status === 'stopped') {
+      await message.reply('当前没有正在运行的 Goal Loop。');
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const stoppedGoal: GoalSessionState = {
+      ...existingGoal,
+      status: 'stopped',
+      updatedAt: now,
+      lastActivity: `已由 ${message.author.username} 停止`,
+    };
+
+    if (this.runner.clearGoal && session.codexThreadId) {
+      try {
+        await this.runner.clearGoal(resolved.binding, session.codexThreadId);
+      } catch (error) {
+        this.logBridgeError(`goalClear conversation=${resolved.conversationId}`, error);
+      }
+    }
+
+    if (runtime.activeRun) {
+      runtime.activeRun.latestActivity = 'Goal Loop 已请求停止';
+      runtime.activeRun.cancellationReason = 'user_cancel';
+      runtime.activeRun.status = 'cancelled';
+      this.pushRunTimeline(runtime, 'Goal Loop 已请求停止');
+      if (runtime.activeRun.task.origin === 'goal') {
+        this.activeJobs.get(resolved.conversationId)?.cancel();
+      }
+    }
+
+    runtime.goal = stoppedGoal;
+    await this.store.upsertGoal(stoppedGoal);
+    await this.refreshRuntimeViews(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
+    await message.reply('Goal Loop 已停止；当前 Codex 会话和上下文已保留。');
   }
 
   private async handleUnbindCommand(message: Message): Promise<void> {
@@ -3220,6 +3390,7 @@ export class DiscordCodexBridge {
     resolved: ResolvedConversation,
     prompt: string,
     mode: 'normal' | 'guidance' = 'normal',
+    origin: PromptTask['origin'] = 'user',
   ): Promise<void> {
     const runtime = this.getRuntime(resolved.conversationId);
     const taskId = randomUUID();
@@ -3259,7 +3430,7 @@ export class DiscordCodexBridge {
       attachments: downloaded.attachments,
       attachmentDir: downloaded.attachmentDir,
       extraAddDirs: [],
-      origin: 'user',
+      origin,
       priority: 'normal',
     };
 
@@ -3731,7 +3902,9 @@ export class DiscordCodexBridge {
       );
       await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
       this.scheduleRuntimeStateSave(conversationId, true);
-      if (!suppressReply && currentTask.origin === 'user') {
+      const shouldReplyToOriginal = currentTask.origin === 'user'
+        || (currentTask.origin === 'goal' && cancellationReason !== 'user_cancel');
+      if (!suppressReply && shouldReplyToOriginal) {
         const replyPayload = result.success
           ? await this.buildSuccessReplyPayload(channel, binding, currentTask, result)
           : formatFailureReply(binding, currentTask.requestedBy, result);
@@ -3742,6 +3915,23 @@ export class DiscordCodexBridge {
           currentTask.messageId,
           replyPayload,
         );
+      }
+
+      if (runtime.goal && currentTask.origin === 'goal') {
+        const now = new Date().toISOString();
+        const nextGoal: GoalSessionState = {
+          ...runtime.goal,
+          status: cancellationReason === 'user_cancel' ? 'stopped' : result.success ? 'active' : 'failed',
+          codexThreadId: result.codexThreadId ?? nextSession.codexThreadId ?? runtime.goal.codexThreadId,
+          updatedAt: now,
+          lastActivity: cancellationReason === 'user_cancel'
+            ? 'Goal Loop 已停止'
+            : result.success
+              ? 'Goal Loop 本轮完成，等待 Codex 继续或用户停止'
+              : 'Goal Loop 本轮失败',
+        };
+        runtime.goal = nextGoal;
+        await this.store.upsertGoal(nextGoal);
       }
 
       if (currentTask.origin === 'local-resume') {

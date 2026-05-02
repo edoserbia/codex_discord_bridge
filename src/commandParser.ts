@@ -23,6 +23,8 @@ export type ParsedCommand =
   | { kind: 'model'; scope: 'global'; action: 'set'; model: string }
   | { kind: 'model'; scope: 'project'; action: 'status' | 'clear' }
   | { kind: 'model'; scope: 'project'; action: 'set'; model: string }
+  | { kind: 'goal'; action: 'start'; goal: string }
+  | { kind: 'goal'; action: 'status' | 'stop' }
   | { kind: 'autopilot'; scope: 'help' }
   | { kind: 'autopilot'; scope: 'server'; action: 'on' | 'off' | 'clear' | 'status' }
   | { kind: 'autopilot'; scope: 'server'; action: 'concurrency'; parallelism: number }
@@ -158,6 +160,29 @@ function parseModelCommand(body: string): Extract<ParsedCommand, { kind: 'model'
   }
 
   throw new Error('用法：!model status | !model set <模型名> | !model project <status|set <模型名>|clear>');
+}
+
+function parseGoalCommand(body: string): Extract<ParsedCommand, { kind: 'goal' }> {
+  const rawTarget = body.slice('goal'.length).trim();
+  const normalized = rawTarget.toLowerCase();
+
+  if (normalized === 'status') {
+    return { kind: 'goal', action: 'status' };
+  }
+
+  if (normalized === 'stop' || normalized === 'off' || normalized === 'clear' || normalized === 'cancel') {
+    return { kind: 'goal', action: 'stop' };
+  }
+
+  if (!rawTarget) {
+    throw new Error('用法：!goal <目标> | !goal status | !goal stop');
+  }
+
+  return {
+    kind: 'goal',
+    action: 'start',
+    goal: rawTarget,
+  };
 }
 
 function parseAutopilotCommand(body: string): Extract<ParsedCommand, { kind: 'autopilot' }> {
@@ -364,6 +389,8 @@ export function parseCommand(content: string, prefix: string): ParsedCommand {
       return parseAutopilotCommand(body);
     case 'model':
       return parseModelCommand(body);
+    case 'goal':
+      return parseGoalCommand(body);
     case 'bind': {
       const projectName = tokens.shift();
       const workspacePath = tokens.shift();

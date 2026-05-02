@@ -16,6 +16,13 @@ test('help text documents workspace inbox mirroring and file-send workflows', ()
   assert.match(text, /!model set gpt-5\.5/);
   assert.match(text, /!model project set gpt-5\.5/);
   assert.match(text, /!model project clear/);
+  assert.match(text, /!goal <目标>/);
+  assert.match(text, /!goal status/);
+  assert.match(text, /!goal stop/);
+  assert.match(text, /Goal Loop 用法：/);
+  assert.match(text, /!goal 把当前项目测试全部修到通过/);
+  assert.match(text, /不会 reset 当前会话/);
+  assert.match(text, /不要在 Discord 里使用 \/goal/);
 });
 
 test('formatSuccessReply falls back when Codex returns blank text', () => {

@@ -334,6 +334,22 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
     };
   }
 
+  async setGoal(binding: ChannelBinding, existingThreadId: string | undefined, objective: string): Promise<string> {
+    const client = this.getClient(binding.workspacePath);
+    const threadId = await client.ensureThread(binding, existingThreadId);
+    await client.setThreadGoal(binding, threadId, objective);
+    return threadId;
+  }
+
+  async clearGoal(binding: ChannelBinding, existingThreadId: string | undefined): Promise<void> {
+    if (!existingThreadId) {
+      return;
+    }
+
+    const client = this.getClient(binding.workspacePath);
+    await client.clearThreadGoal(binding, existingThreadId);
+  }
+
   async stop(): Promise<void> {
     await Promise.all([...this.clients.values()].map(async (client) => client.stop()));
     this.clients.clear();

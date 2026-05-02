@@ -810,7 +810,38 @@ destructive_enabled = true
 - Bridge 会同时兼容传统 `app-server` 增量事件和较新的 Codex live event 形态，所以真实任务运行时，计划、分析和回复草稿会持续刷新。
 - 如果进度消息很长，bridge 会优先保留最新回复草稿和最新计划，而不是让它们被前面的旧内容截断。
 
-### 6. 图片和普通附件怎么处理
+### 6. Goal Loop 怎么用
+
+如果你希望当前 Codex 会话持续推进一个目标，可以在已绑定频道或线程里发送：
+
+```text
+!goal 把当前项目测试全部修到通过，并补齐必要文档
+```
+
+常用命令：
+
+```text
+!goal <目标>
+!goal status
+!goal stop
+```
+
+说明：
+
+- `!goal <目标>` 会复用当前 Codex 会话，不会自动 `reset`，所以已有上下文会保留。
+- `!goal status` 只查看当前目标状态，不会触发新任务。
+- `!goal stop` 会停止 Goal Loop，保留当前会话和 Resume ID。
+- Discord 侧只使用 `!goal`，不要使用 `/goal` slash command。
+
+Bridge 服务启动时会自动确保 `~/.codex/config.toml` 含有：
+
+```toml
+[features]
+multi_agent = true
+goals = true
+```
+
+### 7. 图片和普通附件怎么处理
 
 - 图片附件：直接透传给 `codex -i`
 - 普通文件：先下载到本地附件目录，再同步到绑定目录的 `inbox/`

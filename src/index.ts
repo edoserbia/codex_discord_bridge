@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 import { createCodexExecutionDriver } from './createCodexExecutionDriver.js';
-import { loadConfig } from './config.js';
+import { ensureRequiredCodexFeatures, loadConfig } from './config.js';
 import { DiscordCodexBridge } from './discordBot.js';
 import { JsonStateStore } from './store.js';
 import { AdminWebServer } from './webServer.js';
@@ -16,6 +16,7 @@ process.on('uncaughtExceptionMonitor', (error) => {
 
 async function main(): Promise<void> {
   const config = loadConfig();
+  await ensureRequiredCodexFeatures(config);
   const store = new JsonStateStore(path.join(config.dataDir, 'state.json'));
   await store.load();
 

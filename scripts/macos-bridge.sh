@@ -1017,6 +1017,19 @@ append_node_option_flag() {
   export NODE_OPTIONS="${NODE_OPTIONS:+${NODE_OPTIONS} }${flag}"
 }
 
+maybe_configure_node_memory() {
+  local max_old_space_mb="${CODEX_TUNNING_NODE_MAX_OLD_SPACE_MB:-8192}"
+  if [[ ! "${max_old_space_mb}" =~ ^[0-9]+$ ]]; then
+    max_old_space_mb='8192'
+  fi
+  if (( max_old_space_mb < 2048 )); then
+    max_old_space_mb='2048'
+  fi
+
+  append_node_option_flag "--max-old-space-size=${max_old_space_mb}"
+  print_info "已为 Node 设置内存上限（--max-old-space-size=${max_old_space_mb}）"
+}
+
 maybe_configure_node_tls() {
   local raw_ca_cert ca_cert
   raw_ca_cert="$(read_bridge_ca_cert_value || true)"
@@ -1592,6 +1605,7 @@ run_service_run() {
   auto_configure_bridge_proxy
   validate_required_env
   maybe_export_proxy
+  maybe_configure_node_memory
   maybe_configure_node_tls
   sanitize_codex_desktop_env
 
@@ -1622,6 +1636,7 @@ run_start_manual() {
   auto_configure_bridge_proxy
   validate_required_env
   maybe_export_proxy
+  maybe_configure_node_memory
   maybe_configure_node_tls
 
   if is_running; then

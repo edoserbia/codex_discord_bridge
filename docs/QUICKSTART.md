@@ -139,6 +139,9 @@ sudo ./scripts/install-service.sh --mode daemon
 !autopilot project run
 !autopilot project interval 30m
 !autopilot project status
+!goal <目标>
+!goal status
+!goal stop
 !status
 !queue
 !queue insert 2
@@ -160,6 +163,22 @@ sudo ./scripts/install-service.sh --mode daemon
 这样你可以把 Discord 里的会话直接接回到本机终端继续。
 
 `!guide` 的语义是“插入中途引导，再继续原任务”，不是直接丢弃当前复杂任务。
+
+`!goal` 用于让当前 Codex 会话进入持续推进目标的 Goal Loop：
+
+- `!goal <目标>`：启动目标，例如 `!goal 把测试全部修到通过并提交变更`
+- `!goal status`：查看当前目标、状态和 Codex 会话 ID
+- `!goal stop`：停止 Goal Loop，但保留当前会话上下文
+
+Bridge 会复用当前频道或线程的 Codex 会话，不会因为切换 Goal Loop 自动 `reset`。服务启动时会自动确保 `~/.codex/config.toml` 含有：
+
+```toml
+[features]
+multi_agent = true
+goals = true
+```
+
+Discord 侧只使用 `!goal`，不要使用 `/goal` slash command。
 
 管理员判定规则：
 

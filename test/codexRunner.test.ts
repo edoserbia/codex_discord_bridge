@@ -201,7 +201,7 @@ test('runner preserves plan text across todo updates that only change status fie
   await cleanupDir(rootDir);
 });
 
-test('runner enables multi_agent by default for bridge-launched Codex runs', async () => {
+test('runner enables multi_agent and goals by default for bridge-launched Codex runs', async () => {
   const rootDir = await makeTempDir('codex-runner-multi-agent-default-');
   const workspace = await createWorkspace(rootDir);
   const logDir = path.join(rootDir, 'fake-codex-logs');
@@ -220,6 +220,7 @@ test('runner enables multi_agent by default for bridge-launched Codex runs', asy
     };
 
     assert.ok(payload.args.configs.includes('features.multi_agent=true'));
+    assert.ok(payload.args.configs.includes('features.goals=true'));
   } finally {
     delete process.env.FAKE_CODEX_LOG_DIR;
     await cleanupDir(rootDir);
@@ -247,6 +248,35 @@ test('runner respects explicit multi_agent overrides instead of forcing them on'
 
     assert.ok(payload.args.configs.includes('features.multi_agent=false'));
     assert.ok(!payload.args.configs.includes('features.multi_agent=true'));
+    assert.ok(payload.args.configs.includes('features.goals=true'));
+  } finally {
+    delete process.env.FAKE_CODEX_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
+test('runner respects explicit goals overrides instead of forcing them on', async () => {
+  const rootDir = await makeTempDir('codex-runner-goals-override-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-codex-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+
+  const runner = new CodexRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+  binding.codex.extraConfig = ['features.goals=false'];
+
+  try {
+    const result = await runner.start(binding, { prompt: 'hello no goals', imagePaths: [], extraAddDirs: [] }, undefined).done;
+    assert.equal(result.success, true);
+
+    const logFiles = await readdir(logDir);
+    const payload = JSON.parse(await readFile(path.join(logDir, logFiles.sort().at(-1)!), 'utf8')) as {
+      args: { configs: string[] };
+    };
+
+    assert.ok(payload.args.configs.includes('features.goals=false'));
+    assert.ok(!payload.args.configs.includes('features.goals=true'));
+    assert.ok(payload.args.configs.includes('features.multi_agent=true'));
   } finally {
     delete process.env.FAKE_CODEX_LOG_DIR;
     await cleanupDir(rootDir);

@@ -248,6 +248,22 @@ export class CodexAppServerClient {
     });
   }
 
+  async setThreadGoal(binding: ChannelBinding, threadId: string, objective: string): Promise<void> {
+    await this.start(binding.workspacePath);
+    await this.request('thread/goal/set', {
+      threadId,
+      objective,
+      status: 'active',
+    });
+  }
+
+  async clearThreadGoal(binding: ChannelBinding, threadId: string): Promise<void> {
+    await this.start(binding.workspacePath);
+    await this.request('thread/goal/clear', {
+      threadId,
+    });
+  }
+
   private async startTransport(startupWorkspacePath: string): Promise<void> {
     const { command, argsPrefix } = resolveCommandInvocation(this.config.codexCommand);
     const startupTimeoutMs = this.getStartupTimeoutMs();

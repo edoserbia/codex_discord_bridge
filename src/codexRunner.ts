@@ -42,6 +42,8 @@ export interface CodexExecutionDriver {
     existingThreadId: string | undefined,
     hooks?: CodexRunHooks,
   ) => RunningCodexJob;
+  setGoal?: ((binding: ChannelBinding, existingThreadId: string | undefined, objective: string) => Promise<string>) | undefined;
+  clearGoal?: ((binding: ChannelBinding, existingThreadId: string | undefined) => Promise<void>) | undefined;
   stop?: (() => Promise<void>) | undefined;
 }
 
@@ -366,9 +368,17 @@ export function resolveCodexConfigEntries(extraConfig: string[]): string[] {
     const normalized = entry.replace(/\s+/g, '').toLowerCase();
     return /^(?:features\.)?(?:multi_agent|collab)=/.test(normalized);
   });
+  const hasGoalsOverride = entries.some((entry) => {
+    const normalized = entry.replace(/\s+/g, '').toLowerCase();
+    return /^(?:features\.)?goals=/.test(normalized);
+  });
 
   if (!hasMultiAgentOverride) {
     entries.push('features.multi_agent=true');
+  }
+
+  if (!hasGoalsOverride) {
+    entries.push('features.goals=true');
   }
 
   return entries;

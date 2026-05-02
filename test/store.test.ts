@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { writeFile } from 'node:fs/promises';
+import { access, writeFile } from 'node:fs/promises';
 
 import { JsonStateStore } from '../src/store.js';
 
@@ -109,5 +109,30 @@ test('store migrates legacy persisted sessions without driver metadata', async (
   assert.equal(store.getSession('channel-legacy')?.driver, 'legacy-exec');
   assert.equal(store.getSession('channel-empty')?.driver, undefined);
 
+  await cleanupDir(rootDir);
+});
+
+test('store drain waits for queued persistence before callers remove the data directory', async () => {
+  const rootDir = await makeTempDir('codex-bridge-store-drain-');
+  const statePath = path.join(rootDir, 'state.json');
+  const store = new JsonStateStore(statePath);
+  await store.load();
+
+  await store.upsertRuntimeState({
+    conversationId: 'channel-1',
+    queue: [],
+    pendingReplies: [],
+    goal: {
+      conversationId: 'channel-1',
+      bindingChannelId: 'channel-1',
+      objective: 'finish goal',
+      status: 'active',
+      createdAt: '2026-05-02T00:00:00.000Z',
+      updatedAt: '2026-05-02T00:00:00.000Z',
+    },
+  });
+
+  await store.drain();
+  await access(statePath);
   await cleanupDir(rootDir);
 });

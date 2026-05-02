@@ -7,7 +7,7 @@ import path from 'node:path';
 import { config as dotenvConfig } from 'dotenv';
 
 import type { AppServerTransport, ApprovalPolicy, BindingCodexOptions, CodexDriverMode, SandboxMode } from './types.js';
-import { resolveCodexConfigPath } from './codexConfig.js';
+import { ensureCodexFeatureFlags, resolveCodexConfigPath } from './codexConfig.js';
 
 const DEFAULT_SECRETS_FILE = path.join(os.homedir(), '.codex-tunning', 'secrets.env');
 
@@ -37,6 +37,8 @@ export interface AppConfig {
   defaultCodex: BindingCodexOptions;
   web: WebConfig;
 }
+
+export const REQUIRED_CODEX_FEATURE_FLAGS = ['multi_agent', 'goals'] as const;
 
 function loadExternalSecretEnv(): void {
   const secretFile = process.env.CODEX_TUNNING_SECRETS_FILE?.trim() || DEFAULT_SECRETS_FILE;
@@ -167,4 +169,8 @@ export function loadConfig(): AppConfig {
       authToken: process.env.WEB_AUTH_TOKEN?.trim() || undefined,
     },
   };
+}
+
+export async function ensureRequiredCodexFeatures(config: AppConfig): Promise<void> {
+  await ensureCodexFeatureFlags(resolveCodexConfigPath(config.codexConfigPath), [...REQUIRED_CODEX_FEATURE_FLAGS]);
 }

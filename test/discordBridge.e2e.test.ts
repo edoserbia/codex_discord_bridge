@@ -126,6 +126,71 @@ test('bridge can drive manual sessions through app-server and reuse the same off
   }
 });
 
+test('bridge starts a project goal loop through app-server without resetting the session', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-goal-loop-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-app-server-logs');
+  process.env.FAKE_CODEX_APP_SERVER_LOG_DIR = logDir;
+  const { bridge, store, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeAppServerCommand,
+    driverMode: 'app-server',
+  });
+  const rootChannel = new FakeChannel('channel-goal-loop', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, 'first prompt'));
+    await waitFor(() => rootChannel.sent.some((message) => /app-server ok: first prompt/.test(message.content)), 15_000);
+
+    const firstSession = store.getSession(rootChannel.id);
+    assert.ok(firstSession?.codexThreadId);
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!goal 完成所有测试并提交', { userId: 'admin-user' }));
+    await waitFor(() => rootChannel.sent.some((message) => /Goal Loop 已启动/.test(message.content)), 15_000);
+    await waitFor(() => rootChannel.sent.some((message) => /🤖 \*\*api\*\*/.test(message.content)
+      && /Bridge Goal Loop 目标：完成所有测试并提交/.test(message.content)), 15_000);
+
+    const secondSession = store.getSession(rootChannel.id);
+    assert.equal(secondSession?.codexThreadId, firstSession.codexThreadId);
+    assert.equal(store.getGoal(rootChannel.id)?.objective, '完成所有测试并提交');
+
+    const files = await readdir(logDir);
+    const payloads = await Promise.all(files.map(async (fileName) => JSON.parse(await readFile(path.join(logDir, fileName), 'utf8')) as {
+      method: string;
+      params: Record<string, any>;
+    }));
+    const goalSet = payloads.find((payload) => payload.method === 'thread/goal/set');
+    assert.ok(goalSet);
+    assert.equal(goalSet!.params.threadId, firstSession.codexThreadId);
+    assert.equal(goalSet!.params.objective, '完成所有测试并提交');
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!goal status'));
+    await waitFor(() => rootChannel.sent.some((message) => /Goal Loop 状态/.test(message.content)
+      && /完成所有测试并提交/.test(message.content)), 15_000);
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!goal stop', { userId: 'admin-user' }));
+    await waitFor(() => rootChannel.sent.some((message) => /Goal Loop 已停止/.test(message.content)), 15_000);
+
+    const afterStopSession = store.getSession(rootChannel.id);
+    assert.equal(afterStopSession?.codexThreadId, firstSession.codexThreadId);
+
+    const filesAfterStop = await readdir(logDir);
+    const payloadsAfterStop = await Promise.all(filesAfterStop.map(async (fileName) => JSON.parse(await readFile(path.join(logDir, fileName), 'utf8')) as {
+      method: string;
+      params: Record<string, any>;
+    }));
+    const goalClear = payloadsAfterStop.find((payload) => payload.method === 'thread/goal/clear');
+    assert.ok(goalClear);
+    assert.equal(goalClear!.params.threadId, firstSession.codexThreadId);
+  } finally {
+    await (bridge as any).stop?.();
+    delete process.env.FAKE_CODEX_APP_SERVER_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge status defaults to app-server for a fresh app-server session before the first run', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-app-server-status-');
   const workspace = await createWorkspace(rootDir);
@@ -653,7 +718,7 @@ test('bridge keeps streaming app-server deltas out of the process timeline while
 
     assert.doesNotMatch(progressMessage!.content, /- \[\d{2}:\d{2}\] 🧠 /);
     assert.doesNotMatch(progressMessage!.content, /- \[\d{2}:\d{2}\] 💬 /);
-    assert.match(progressMessage!.content, /- \[\d{2}:\d{2}\] ▶️ \/bin\/zsh -lc "pwd"/);
+    assert.match(progressMessage!.content, /- \[\d{2}:\d{2}\] ✅ \/bin\/zsh -lc "pwd" \(0\)/);
     assert.match(progressMessage!.content, /- \[\d{2}:\d{2}\] 🤝 /);
     assert.match(progressMessage!.content, /- \[\d{2}:\d{2}\] 🔄 本轮已完成/);
   } finally {
@@ -1360,17 +1425,21 @@ test('bridge posts live progress with reasoning summary and plan updates', { con
   const rootChannel = new FakeChannel('channel-progress', 'guild-1');
   channels.set(rootChannel.id, rootChannel);
 
-  await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
-  await dispatch(bridge, createUserMessage(rootChannel, '[plan] show me live progress'));
-  await waitFor(() => findSent(rootChannel, /Codex 实时进度/));
-  await waitFor(() => findSent(rootChannel, /计划：/));
-  await waitFor(() => findSent(rootChannel, /分析摘要：/));
-  await waitFor(() => findSent(rootChannel, /最近更新：\[\d{2}:\d{2}\]/));
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[plan] show me live progress'));
+    await waitFor(() => findSent(rootChannel, /Codex 实时进度/));
+    await waitFor(() => findSent(rootChannel, /计划：/));
+    await waitFor(() => findSent(rootChannel, /分析摘要（最新）：/));
+    await waitFor(() => findSent(rootChannel, /最近更新：\[\d{2}:\d{2}\]/));
 
-  assert.ok(rootChannel.sent.some((message) => /Codex 实时进度/.test(message.content)));
-  assert.ok(rootChannel.sent.some((message) => /Create a short plan/.test(message.content)));
-  assert.ok(rootChannel.sent.some((message) => /\[\d{2}:\d{2}\] 🔄 Codex 正在分析请求/.test(message.content)));
-  await cleanupDir(rootDir);
+    assert.ok(rootChannel.sent.some((message) => /Codex 实时进度/.test(message.content)));
+    assert.ok(rootChannel.sent.some((message) => /Create a short plan/.test(message.content)));
+    assert.ok(rootChannel.sent.some((message) => /最新活动：\[\d{2}:\d{2}\].*(Codex 正在分析请求|本轮执行完成)/.test(message.content)));
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
 });
 
 test('bridge updates plan checkmarks live when todo items complete', { concurrency: false }, async () => {

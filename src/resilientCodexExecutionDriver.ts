@@ -132,6 +132,14 @@ export class ResilientCodexExecutionDriver implements CodexExecutionDriver {
     };
   }
 
+  async setGoal(binding: ChannelBinding, existingThreadId: string | undefined, objective: string): Promise<string> {
+    return this.appServerRunner.setGoal(binding, existingThreadId, objective);
+  }
+
+  async clearGoal(binding: ChannelBinding, existingThreadId: string | undefined): Promise<void> {
+    await this.appServerRunner.clearGoal(binding, existingThreadId);
+  }
+
   async stop(): Promise<void> {
     await this.appServerRunner.stop?.();
   }

@@ -13,6 +13,7 @@ Linux / WSL 当前可以稳定使用这些能力：
 
 - Discord 主频道绑定项目、线程拆分独立会话
 - `!status` 返回 Resume ID，并在本机用 `bridgectl session resume <id>` 接回同一会话
+- `!goal <目标>` 启动当前会话的 Goal Loop，`!goal status` 查看状态，`!goal stop` 停止且不 reset 上下文
 - Web 管理面板
 - `bridgectl` CLI
 - 文件上传、文件回传、Autopilot、Transcript 同步
@@ -250,6 +251,22 @@ bridgectl autopilot status
 说明 Linux / WSL 这条链路已经打通。
 
 这条实时进度消息会优先显示最新回复草稿、最新计划状态和最新分析摘要；即使消息很长，也会尽量保留这些最新内容，而不是只保留前面的旧内容。
+
+如果你希望 Codex 持续推进一个目标，可以发送：
+
+```text
+!goal 把当前项目测试全部修到通过，并补齐必要文档
+```
+
+后续用 `!goal status` 查看状态，用 `!goal stop` 停止。Bridge 会复用当前频道或线程的 Codex 会话，不会自动 `reset`，所以不会因为启动或停止 Goal Loop 丢失上下文。Discord 侧只使用 `!goal`，不要使用 `/goal` slash command。
+
+Bridge 启动时会自动确保 Codex 配置文件 `~/.codex/config.toml` 含有：
+
+```toml
+[features]
+multi_agent = true
+goals = true
+```
 
 ## 十一、从 Discord 里拿到什么信息，以及它们填到哪里
 

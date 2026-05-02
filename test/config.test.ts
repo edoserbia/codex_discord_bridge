@@ -4,6 +4,7 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 
 import { loadConfig } from '../src/config.js';
+import { ensureCodexFeatureFlags, readCodexFeatureFlag } from '../src/codexConfig.js';
 
 import { cleanupDir, makeTempDir } from './helpers/testUtils.js';
 
@@ -198,6 +199,46 @@ test('loadConfig exposes a configurable Codex config path', { concurrency: false
         process.env[key] = value;
       }
     }
+    await cleanupDir(rootDir);
+  }
+});
+
+test('ensureCodexFeatureFlags inserts goals and multi_agent into config.toml', async () => {
+  const rootDir = await makeTempDir('codex-bridge-config-features-');
+  const codexConfigPath = path.join(rootDir, '.codex', 'config.toml');
+
+  try {
+    await fs.mkdir(path.dirname(codexConfigPath), { recursive: true });
+    await fs.writeFile(codexConfigPath, 'model = "gpt-5.5"\n\n[tools]\nweb_search = true\n', 'utf8');
+
+    await ensureCodexFeatureFlags(codexConfigPath, ['multi_agent', 'goals']);
+
+    const content = await fs.readFile(codexConfigPath, 'utf8');
+    assert.match(content, /\[features\]/);
+    assert.equal(readCodexFeatureFlag(content, 'multi_agent'), true);
+    assert.equal(readCodexFeatureFlag(content, 'goals'), true);
+    assert.match(content, /\[tools\]\nweb_search = true/);
+  } finally {
+    await cleanupDir(rootDir);
+  }
+});
+
+test('ensureCodexFeatureFlags flips existing false feature flags to true', async () => {
+  const rootDir = await makeTempDir('codex-bridge-config-features-existing-');
+  const codexConfigPath = path.join(rootDir, '.codex', 'config.toml');
+
+  try {
+    await fs.mkdir(path.dirname(codexConfigPath), { recursive: true });
+    await fs.writeFile(codexConfigPath, '[features]\nmulti_agent = false\ngoals = false\n', 'utf8');
+
+    await ensureCodexFeatureFlags(codexConfigPath, ['multi_agent', 'goals']);
+
+    const content = await fs.readFile(codexConfigPath, 'utf8');
+    assert.equal(readCodexFeatureFlag(content, 'multi_agent'), true);
+    assert.equal(readCodexFeatureFlag(content, 'goals'), true);
+    assert.doesNotMatch(content, /multi_agent = false/);
+    assert.doesNotMatch(content, /goals = false/);
+  } finally {
     await cleanupDir(rootDir);
   }
 });

@@ -303,6 +303,7 @@ test('app-server client forwards per-thread config and writable roots to the off
     assert.equal(threadStart!.params.config.profile, 'reviewer');
     assert.equal(threadStart!.params.config.web_search, 'live');
     assert.equal(threadStart!.params.config.features.multi_agent, false);
+    assert.equal(threadStart!.params.config.features.goals, true);
     assert.equal(threadStart!.params.config.tools.view_image, true);
     assert.equal(turnStart!.params.cwd, workspace);
     assert.equal(turnStart!.params.approvalPolicy, 'never');

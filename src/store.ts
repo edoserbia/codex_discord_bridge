@@ -8,6 +8,7 @@ import type {
   ChannelRuntime,
   ChannelBinding,
   ConversationSessionState,
+  GoalSessionState,
   PersistedState,
 } from './types.js';
 
@@ -18,6 +19,7 @@ export class JsonStateStore {
     runtimes: {},
     autopilotServices: {},
     autopilotProjects: {},
+    goals: {},
   };
   private saveChain: Promise<void> = Promise.resolve();
 
@@ -49,6 +51,7 @@ export class JsonStateStore {
               queue: Array.isArray(runtime.queue) ? runtime.queue : [],
               activeRun: runtime.activeRun ?? undefined,
               pendingReplies: Array.isArray(runtime.pendingReplies) ? runtime.pendingReplies : [],
+              goal: runtime.goal ?? parsed.goals?.[conversationId] ?? undefined,
             } satisfies ChannelRuntime,
           ]),
         ),
@@ -73,6 +76,7 @@ export class JsonStateStore {
             } satisfies AutopilotProjectState,
           ]),
         ),
+        goals: parsed.goals ?? {},
       };
     } catch (error) {
       const nodeError = error as NodeJS.ErrnoException;
@@ -117,6 +121,7 @@ export class JsonStateStore {
       if (session.bindingChannelId === channelId) {
         delete this.state.sessions[conversationId];
         delete this.state.runtimes[conversationId];
+        delete this.state.goals?.[conversationId];
       }
     }
 
@@ -193,6 +198,7 @@ export class JsonStateStore {
   async removeSession(conversationId: string): Promise<void> {
     delete this.state.sessions[conversationId];
     delete this.state.runtimes[conversationId];
+    delete this.state.goals?.[conversationId];
     await this.save();
   }
 
@@ -216,13 +222,54 @@ export class JsonStateStore {
 
   async upsertRuntimeState(runtime: ChannelRuntime): Promise<ChannelRuntime> {
     this.state.runtimes[runtime.conversationId] = structuredClone(runtime);
+    if (!this.state.goals) {
+      this.state.goals = {};
+    }
+    if (runtime.goal) {
+      this.state.goals[runtime.conversationId] = structuredClone(runtime.goal);
+    } else {
+      delete this.state.goals[runtime.conversationId];
+    }
     await this.save();
     return structuredClone(runtime);
   }
 
   async removeRuntimeState(conversationId: string): Promise<void> {
     delete this.state.runtimes[conversationId];
+    delete this.state.goals?.[conversationId];
     await this.save();
+  }
+
+  getGoal(conversationId: string): GoalSessionState | undefined {
+    const goal = this.state.goals?.[conversationId]
+      ?? this.state.runtimes[conversationId]?.goal;
+    return goal ? structuredClone(goal) : undefined;
+  }
+
+  async upsertGoal(goal: GoalSessionState): Promise<GoalSessionState> {
+    if (!this.state.goals) {
+      this.state.goals = {};
+    }
+    this.state.goals[goal.conversationId] = structuredClone(goal);
+    const runtime = this.state.runtimes[goal.conversationId];
+    if (runtime) {
+      runtime.goal = structuredClone(goal);
+    }
+    await this.save();
+    return structuredClone(goal);
+  }
+
+  async removeGoal(conversationId: string): Promise<void> {
+    delete this.state.goals?.[conversationId];
+    const runtime = this.state.runtimes[conversationId];
+    if (runtime) {
+      delete runtime.goal;
+    }
+    await this.save();
+  }
+
+  async drain(): Promise<void> {
+    await this.saveChain;
   }
 
   getAutopilotService(guildId: string): AutopilotServiceState | undefined {

@@ -82,12 +82,24 @@ export interface ConversationSessionState {
   updatedAt: string;
 }
 
+export interface GoalSessionState {
+  conversationId: string;
+  bindingChannelId: string;
+  objective: string;
+  status: 'active' | 'stopping' | 'stopped' | 'failed';
+  codexThreadId?: string | undefined;
+  createdAt: string;
+  updatedAt: string;
+  lastActivity?: string | undefined;
+}
+
 export interface PersistedState {
   bindings: Record<string, ChannelBinding>;
   sessions: Record<string, ConversationSessionState>;
   runtimes: Record<string, ChannelRuntime>;
   autopilotServices: Record<string, AutopilotServiceState>;
   autopilotProjects: Record<string, AutopilotProjectState>;
+  goals?: Record<string, GoalSessionState> | undefined;
 }
 
 export interface AttachmentRef {
@@ -116,7 +128,7 @@ export interface PromptTask {
   attachments: AttachmentRef[];
   attachmentDir?: string | undefined;
   extraAddDirs: string[];
-  origin: 'user' | 'autopilot' | 'local-resume';
+  origin: 'user' | 'goal' | 'autopilot' | 'local-resume';
   priority?: 'normal' | 'recovery' | undefined;
   recovery?: {
     source: 'retry' | 'restart';
@@ -222,6 +234,7 @@ export interface ChannelRuntime {
   queue: PromptTask[];
   activeRun?: ActiveRunState | undefined;
   pendingReplies?: DeferredDiscordReply[] | undefined;
+  goal?: GoalSessionState | undefined;
 }
 
 export interface CodexRunInput {

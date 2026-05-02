@@ -195,3 +195,32 @@ test('parse project model clear command', () => {
     action: 'clear',
   });
 });
+
+test('parse goal start command with free text', () => {
+  const parsed = parseCommand('!goal 修复所有测试并完成提交', '!');
+  assert.deepEqual(parsed, {
+    kind: 'goal',
+    action: 'start',
+    goal: '修复所有测试并完成提交',
+  });
+});
+
+test('parse goal status command', () => {
+  const parsed = parseCommand('!goal status', '!');
+  assert.deepEqual(parsed, {
+    kind: 'goal',
+    action: 'status',
+  });
+});
+
+test('parse goal stop command', () => {
+  const parsed = parseCommand('!goal stop', '!');
+  assert.deepEqual(parsed, {
+    kind: 'goal',
+    action: 'stop',
+  });
+});
+
+test('reject empty goal start command', () => {
+  assert.throws(() => parseCommand('!goal', '!'), /用法：!goal <目标>/);
+});

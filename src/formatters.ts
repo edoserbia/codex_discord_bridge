@@ -256,6 +256,9 @@ export function formatHelp(prefix: string): string {
     `- 当前项目模型：\`${prefix}model project status\``,
     `- 当前项目切换模型：\`${prefix}model project set gpt-5.5\``,
     `- 当前项目恢复跟随全局：\`${prefix}model project clear\``,
+    `- 启动 Goal Loop：\`${prefix}goal <目标>\``,
+    `- 查看 Goal 状态：\`${prefix}goal status\``,
+    `- 停止 Goal Loop：\`${prefix}goal stop\``,
     `- 查看状态：\`${prefix}status\``,
     `- 查看队列：\`${prefix}queue\``,
     `- 队列插入：\`${prefix}queue insert <序号>\``,
@@ -271,6 +274,12 @@ export function formatHelp(prefix: string): string {
     '绑定后还会自动创建一个 Autopilot 项目线程；可在主频道或线程里用 `!autopilot` 查看自动迭代用法。',
     '现在会在频道里持续更新实时进度、命令执行和计划状态。',
     'Subagent 支持已默认开启；如果你还希望 Codex 把 AGENTS.md 的层级说明显式透传给子代理，可在绑定时追加 `--config features.child_agents_md=true`。',
+    'Goal Loop 用法：',
+    `- \`${prefix}goal 把当前项目测试全部修到通过，并补齐必要文档\`：启动目标循环`,
+    `- \`${prefix}goal status\`：查看当前目标、状态和 Codex 会话 ID`,
+    `- \`${prefix}goal stop\`：停止 Goal Loop，但保留当前会话上下文`,
+    'Goal Loop 支持已默认开启；`!goal <目标>` 会复用当前 Codex 会话，不会 reset 当前会话，也不会丢失已有上下文。',
+    'Discord 侧只使用 `!goal`，不要在 Discord 里使用 /goal slash command。',
     '模型切换不会自动 reset 当前会话；如果项目正在运行，本轮继续用旧模型，下一轮开始使用新模型。',
     '如果当前任务正在运行，可用 `!guide <内容>` 插入中途引导，bridge 会中断当前步骤，先处理引导，再按同一会话继续原任务。',
     '图片附件会自动透传到 `codex -i`；上传的附件会同步到绑定目录里的 `inbox/` 子目录，普通文件也会保留一份 bridge 本地缓存。',
@@ -496,6 +505,13 @@ export function formatStatus(
     lines.push(`最近请求：${session.lastRunAt}${lastPromptBy}`);
   }
 
+  if (runtime.goal) {
+    lines.push(`Goal：${runtime.goal.status === 'active' ? '运行中' : runtime.goal.status} · ${truncate(runtime.goal.objective, 120)}`);
+    if (runtime.goal.lastActivity) {
+      lines.push(`Goal 活动：${truncate(runtime.goal.lastActivity, 160)}`);
+    }
+  }
+
   if (runtime.activeRun) {
     lines.push(`最近更新：${formatClockTimestamp(runtime.activeRun.updatedAt)}`);
     lines.push(`请求人：${runtime.activeRun.task.requestedBy}`);
@@ -541,7 +557,7 @@ export function formatStatus(
     lines.push('发送普通消息即可继续和当前项目会话。');
   }
 
-  lines.push(`控制：\`${prefix}status\` · \`${prefix}model status\` · \`${prefix}queue\` · \`${prefix}cancel\` · \`${prefix}reset\` · \`${prefix}unbind\``);
+  lines.push(`控制：\`${prefix}status\` · \`${prefix}goal status\` · \`${prefix}model status\` · \`${prefix}queue\` · \`${prefix}cancel\` · \`${prefix}reset\` · \`${prefix}unbind\``);
   return truncate(lines.join('\n'), 1900);
 }
 

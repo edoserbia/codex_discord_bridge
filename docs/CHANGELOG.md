@@ -10,6 +10,7 @@
 - 新增文档化说明 `!web`、`--skip-git-check`、启动自动恢复、`app-server` / `legacy-exec` 驱动切换和管理员权限边界。
 - 新增 `!status` 的完整 Resume ID 恢复入口，以及 `bridgectl session status/send/resume` 的本机续聊文档说明。
 - 新增 transcript 落盘与 Discord 同步说明：本机续聊产生的用户/助手消息会同步回 Discord transcript，并持久化到 `data/transcripts/*.jsonl`。
+- 新增 `!goal <目标>` / `!goal status` / `!goal stop`：可在 Discord 里启动和管理 Codex Goal Loop，复用当前会话，不自动 reset；服务启动时会确保 `features.multi_agent` 与 `features.goals` 已开启。
 
 ### Changed
 
@@ -18,6 +19,7 @@
 - `bridgectl` 的文档安装方式已统一更新为当前行为：`setup` / `deploy` / `install-service` 自动安装到 PATH，不再要求手动 `npm link`。
 - 本机 `session resume` 的终端交互文档已补齐，包括多行粘贴整段发送、`/status` 和 `/exit` 的使用方式。
 - 文档中的“实时进度”说明已更新为当前行为：优先展示最新回复草稿、最新计划状态，并明确长消息时采用“最新状态优先”的截断策略。
+- README、Quickstart、macOS、Linux / WSL 和部署文档已补齐 Goal Loop 使用方式，以及 `~/.codex/config.toml` 所需 `[features]` 配置。
 
 ### Fixed
 

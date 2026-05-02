@@ -29,6 +29,7 @@
 | Transcript 同步 | 本机续聊和 Discord 发起的消息都能同步回 Discord，保留完整记录；最终总结回复遇到瞬时写入失败也会补发 |
 | 实时进度面板 | 持续更新回复草稿、分析摘要、计划、时间线、当前命令、输出预览和 stderr；长消息时优先保留最新状态 |
 | 运行中引导 | 用 `!guide <内容>` 在任务执行途中插入额外要求，再继续原任务 |
+| Goal Loop | 用 `!goal <目标>` 让当前 Codex 会话持续推进目标；`!goal status` 查看状态，`!goal stop` 停止，过程中不会 reset 或丢失上下文 |
 | 文件双向传输 | Discord 上传文件自动落地到工作区 `inbox/`，也能把工作区文件直接回传到 Discord |
 | Autopilot | 对绑定项目做周期性自动迭代，支持服务级和项目级开关、周期、并行度和自然语言方向 |
 | Web 管理面板 | 查看绑定、会话、运行状态，并从浏览器管理 bridge |
@@ -85,9 +86,15 @@
 sandbox_mode = "danger-full-access"
 approval_policy = "never"
 approval_mode = "never"
+
+[features]
+multi_agent = true
+goals = true
 ```
 
 这会保留全局高权限，不会把访问范围限制在当前项目目录。
+
+Bridge 启动时会自动确保 `~/.codex/config.toml` 里存在上面的 `[features]` 开关；Bridge 启动 Codex 时也会显式传入 `features.multi_agent=true` 和 `features.goals=true`，除非单个项目的额外配置明确覆盖它们。
 
 不要继续保留旧的权限 profile：
 
@@ -292,7 +299,31 @@ bridgectl session send <Resume ID> "hello"
 
 Bridge 会中断当前步骤，在同一条 Codex 会话里先处理新增引导，然后继续原任务。只有当新引导明确要求停止或替换原任务时，bridge 才会转向新的目标。
 
-### 6. 文件上传和回传
+### 6. 启动 Goal Loop
+
+如果你希望 Codex 持续推进一个明确目标，而不是只完成一轮普通问答，可以在当前绑定频道或线程发送：
+
+```text
+!goal 把当前项目测试全部修到通过，并补齐必要文档
+```
+
+常用命令：
+
+```text
+!goal <目标>
+!goal status
+!goal stop
+```
+
+行为规则：
+
+- `!goal <目标>` 会复用当前频道或线程的 Codex 会话，不会自动 `reset`，因此已有上下文会保留。
+- 在 `app-server` 驱动下，bridge 会优先调用 Codex 原生 `thread/goal/set` API 设置目标，然后发送一条自然语言推进提示。
+- `!goal status` 只查看当前 Goal Loop 状态，不会触发新任务。
+- `!goal stop` 会清除 Codex 目标状态，并在当前运行任务是 goal 任务时请求取消；它不会删除会话，也不会清空上下文。
+- Discord 侧只支持 `!goal` 命令；不要在 Discord 里使用 `/goal` slash command。
+
+### 7. 文件上传和回传
 
 文件收发支持两条方向：
 
@@ -322,7 +353,7 @@ Bridge 会中断当前步骤，在同一条 Codex 会话里先处理新增引导
 !sendfile /absolute/path/to/report.pdf
 ```
 
-### 7. 开启 Autopilot
+### 8. 开启 Autopilot
 
 如果你希望 bridge 周期性处理“补测试、低风险修复、小范围清理”这类工作，最短流程如下：
 
@@ -355,6 +386,9 @@ Bridge 会中断当前步骤，在同一条 Codex 会话里先处理新增引导
 | `!queue insert <序号>` | 把队列里的任务插到指定位置 |
 | `!queue remove <序号>` | 移除排队中的任务 |
 | `!guide <内容>` | 在执行途中插入引导，再继续原任务 |
+| `!goal <目标>` | 启动当前会话的 Goal Loop，不 reset 上下文 |
+| `!goal status` | 查看当前 Goal Loop 状态 |
+| `!goal stop` | 停止 Goal Loop，保留当前 Codex 会话 |
 | `!sendfile <文件名/相对路径/绝对路径/序号>` | 把工作区文件发回 Discord |
 | `!web` | 返回 Web 管理面板地址 |
 | `!cancel` | 取消当前运行 |
