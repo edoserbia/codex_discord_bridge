@@ -2,6 +2,14 @@
 
 这份文档面向通用 Git 托管场景，适用于 GitHub、GitLab、Gitea 或其他兼容 SSH / HTTPS 的远端。
 
+当前自建 GitLab 的标准入口域名是：
+
+```text
+https://mytokens.live
+```
+
+当任务涉及自建 GitLab、远端仓库、创建仓库、迁移远端或推送策略时，默认优先使用这个域名。
+
 这份文档说明：
 
 - 如何把一个新的本地仓库接到远端平台
@@ -30,6 +38,12 @@
 git remote add origin git@<git-host>:<owner-or-namespace>/<repo>.git
 ```
 
+自建 GitLab 示例：
+
+```bash
+git remote add origin git@mytokens.live:<owner-or-namespace>/<repo>.git
+```
+
 如果本地已经存在 `origin`，改成：
 
 ```bash
@@ -54,6 +68,14 @@ git remote -v
 
 ```bash
 git remote set-url origin git@<git-host>:<owner-or-namespace>/<repo>.git
+git fetch origin --prune
+git branch -u origin/main main
+```
+
+自建 GitLab 示例：
+
+```bash
+git remote set-url origin git@mytokens.live:<owner-or-namespace>/<repo>.git
 git fetch origin --prune
 git branch -u origin/main main
 ```

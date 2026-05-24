@@ -263,6 +263,35 @@ test('app-server client preserves failure details from app-server error notifica
   }
 });
 
+test('app-server client surfaces native compact notifications and context compaction items', async () => {
+  const rootDir = await makeTempDir('codex-app-server-client-compact-');
+  const workspace = await createWorkspace(rootDir);
+  const binding = makeBinding(workspace);
+  const client = new CodexAppServerClient(makeConfig(rootDir));
+  const events: string[] = [];
+
+  try {
+    await client.start();
+    const threadId = await client.ensureThread(binding, undefined);
+    const turn = await client.startTurn(binding, threadId, {
+      prompt: '[app-compact] emit native compact events',
+      imagePaths: [],
+      extraAddDirs: [],
+      onEvent: async (event) => {
+        events.push(event.type);
+      },
+    });
+
+    const result = await turn.done;
+    assert.equal(result.success, true);
+    assert.ok(events.includes('thread.compacted'));
+    assert.ok(events.includes('context.compaction'));
+  } finally {
+    await client.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('app-server client forwards per-thread config and writable roots to the official protocol', async () => {
   const rootDir = await makeTempDir('codex-app-server-client-config-');
   const workspace = await createWorkspace(rootDir);

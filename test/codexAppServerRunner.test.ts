@@ -120,3 +120,30 @@ test('app-server runner surfaces real Codex live item updates before final compl
     await cleanupDir(rootDir);
   }
 });
+
+test('app-server runner reports native context compact activity', async () => {
+  const rootDir = await makeTempDir('codex-app-server-runner-compact-');
+  const workspace = await createWorkspace(rootDir);
+  const runner = new CodexAppServerRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+  const activities: string[] = [];
+
+  try {
+    const result = await runner.start(
+      binding,
+      { prompt: '[app-compact] compact current thread', imagePaths: [], extraAddDirs: [] },
+      undefined,
+      {
+        onActivity: async (activity) => {
+          activities.push(activity);
+        },
+      },
+    ).done;
+
+    assert.equal(result.success, true);
+    assert.ok(activities.includes('Codex 已压缩上下文'));
+  } finally {
+    await runner.stop();
+    await cleanupDir(rootDir);
+  }
+});

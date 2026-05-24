@@ -14,6 +14,10 @@ const stdoutProtocol = process.env.FAKE_CODEX_APP_SERVER_STDOUT_PROTOCOL ?? 'con
 
 const startupLogged = logStartup();
 
+function extractUserPrompt(prompt) {
+  return prompt.split('\n\nBridge 项目上下文：')[0].trimEnd();
+}
+
 process.stdin.on('data', (chunk) => {
   buffer = Buffer.concat([buffer, chunk]);
   processBuffer();
@@ -288,6 +292,21 @@ async function handleAsync(message) {
         });
       }
 
+      if (prompt.includes('[app-compact]')) {
+        notify('thread/compacted', {
+          threadId,
+          turnId,
+        });
+        notify('item/completed', {
+          threadId,
+          turnId,
+          item: {
+            id: `compact-${turnId}`,
+            type: 'contextCompaction',
+          },
+        });
+      }
+
       if (prompt.includes('[app-rich]') || prompt.includes('[app-rich-stream]')) {
         notify('item/reasoning/summaryTextDelta', {
           threadId,
@@ -378,7 +397,7 @@ async function handleAsync(message) {
         delta: '/bin/zsh -lc "pwd"\n',
       });
       if (prompt.includes('[app-rich-stream]')) {
-        for (const delta of ['app-server ', 'stream ok: ', prompt]) {
+        for (const delta of ['app-server ', 'stream ok: ', extractUserPrompt(prompt)]) {
           notify('item/agentMessage/delta', {
             threadId,
             turnId,

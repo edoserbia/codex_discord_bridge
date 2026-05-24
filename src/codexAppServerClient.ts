@@ -558,6 +558,19 @@ export class CodexAppServerClient {
         }
         break;
       }
+      case 'thread/compacted': {
+        const target = this.resolveTurnReference(params);
+        if (target) {
+          await this.emitTurnEvent(target.turnId, {
+            event: {
+              type: 'thread.compacted',
+              threadId: target.threadId,
+              turnId: target.turnId,
+            },
+          });
+        }
+        break;
+      }
       case 'turn/plan/updated': {
         const threadId = typeof params.threadId === 'string' ? params.threadId : '';
         const turnId = typeof params.turnId === 'string' ? params.turnId : '';
@@ -596,6 +609,17 @@ export class CodexAppServerClient {
         const turnId = typeof params.turnId === 'string' ? params.turnId : '';
         const item = (params.item ?? null) as Record<string, unknown> | null;
         if (threadId && turnId && item && !Array.isArray(item)) {
+          if (normalizeAppServerItemType(item.type) === 'context_compaction') {
+            await this.emitTurnEvent(turnId, {
+              event: {
+                type: 'context.compaction',
+                threadId,
+                turnId,
+                itemId: readAppServerItemId(item),
+              },
+            });
+          }
+
           await this.emitTurnEvent(turnId, {
             event: {
               type: method === 'item/started'
@@ -996,6 +1020,23 @@ function extractReasoningDelta(params: Record<string, unknown>): string {
   }
 
   return '';
+}
+
+function normalizeAppServerItemType(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  switch (value) {
+    case 'contextCompaction':
+      return 'context_compaction';
+    default:
+      return value;
+  }
+}
+
+function readAppServerItemId(item: Record<string, unknown>): string {
+  return typeof item.id === 'string' && item.id.trim() ? item.id.trim() : 'unknown-item';
 }
 
 function buildThreadConfig(binding: ChannelBinding): Record<string, unknown> | null {

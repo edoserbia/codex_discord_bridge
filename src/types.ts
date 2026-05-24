@@ -259,6 +259,8 @@ export type AppServerTurnEvent =
   | { type: 'turn.failed'; threadId: string; turnId: string; message?: string | undefined }
   | { type: 'turn.interrupted'; threadId: string; turnId: string }
   | { type: 'turn.steered'; threadId: string; turnId: string; prompt: string }
+  | { type: 'thread.compacted'; threadId: string; turnId: string }
+  | { type: 'context.compaction'; threadId: string; turnId: string; itemId: string }
   | { type: 'plan.updated'; threadId: string; turnId: string; plan: AppServerPlanStep[] }
   | { type: 'item.started'; threadId: string; turnId: string; item: Record<string, unknown> }
   | { type: 'item.updated'; threadId: string; turnId: string; item: Record<string, unknown> }

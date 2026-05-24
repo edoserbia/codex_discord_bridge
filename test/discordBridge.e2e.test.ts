@@ -497,6 +497,33 @@ test('bridge resets existing Codex sessions when bind execution settings change'
   await cleanupDir(rootDir);
 });
 
+test('bridge injects the self-hosted GitLab host into project prompts', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-project-context-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-codex-project-context-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-project-context', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, 'check repository remote guidance'));
+    await waitFor(() => findSent(rootChannel, /ok: /), 15_000);
+
+    const logFiles = await readdir(logDir);
+    const payloads = await Promise.all(logFiles.map(async (fileName) => JSON.parse(await readFile(path.join(logDir, fileName), 'utf8')) as {
+      prompt: string;
+    }));
+
+    assert.ok(payloads.some((payload) => /https:\/\/mytokens\.live/.test(payload.prompt)));
+    assert.ok(payloads.some((payload) => /自建 GitLab/.test(payload.prompt)));
+  } finally {
+    delete process.env.FAKE_CODEX_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge can inject guide prompts into an active run and continue on the same session', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-guide-');
   const workspace = await createWorkspace(rootDir);
@@ -621,6 +648,33 @@ test('bridge keeps live reasoning, command, and subagent progress in app-server 
     assert.match(progressMessage!.content, /Investigate the login flow/);
     await waitFor(() => rootChannel.sent.some((message) => /🤖 \*\*api\*\*/.test(message.content)
       && /app-server ok: \[app-rich\] show me live progress/.test(message.content)), 15_000);
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge shows native Codex compact status in app-server progress', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-app-server-compact-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeAppServerCommand,
+    driverMode: 'app-server',
+  });
+  const rootChannel = new FakeChannel('channel-app-server-compact', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[app-compact] show compact status'));
+
+    await waitFor(() => rootChannel.sent.some((message) => /Codex 实时进度/.test(message.content)), 15_000);
+    const progressMessage = rootChannel.sent.find((message) => /Codex 实时进度/.test(message.content));
+    assert.ok(progressMessage);
+
+    await waitFor(() => /Codex 已压缩上下文/.test(progressMessage!.content), 15_000);
+    assert.match(progressMessage!.content, /🧹 Codex 已压缩上下文/);
   } finally {
     await (bridge as any).stop?.();
     await cleanupDir(rootDir);
@@ -1242,6 +1296,38 @@ test('project-level autopilot run command triggers an immediate run and refreshe
   await dispatch(bridge, createUserMessage(rootChannel, '!autopilot project status', { userId: 'admin-user' }));
   assert.ok(rootChannel.sent.some((message) => /下次运行：20\d\d-\d\d-\d\dT/.test(message.content)));
   await cleanupDir(rootDir);
+});
+
+test('autopilot prompts include the self-hosted GitLab host for managed projects', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-autopilot-gitlab-context-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-autopilot-gitlab-context-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-autopilot-gitlab-context', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '!autopilot server on', { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '!autopilot project on', { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '!autopilot project run', { userId: 'admin-user' }));
+    await waitFor(async () => {
+      const files = await readdir(logDir).catch(() => []);
+      return files.length > 0;
+    }, 15_000);
+
+    const logFiles = await readdir(logDir);
+    const payloads = await Promise.all(logFiles.map(async (fileName) => JSON.parse(await readFile(path.join(logDir, fileName), 'utf8')) as {
+      prompt: string;
+    }));
+
+    assert.ok(payloads.some((payload) => /https:\/\/mytokens\.live/.test(payload.prompt)));
+    assert.ok(payloads.some((payload) => /自建 GitLab/.test(payload.prompt)));
+  } finally {
+    delete process.env.FAKE_CODEX_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
 });
 
 test('autopilot thread natural-language messages update project direction instead of running codex', { concurrency: false }, async () => {

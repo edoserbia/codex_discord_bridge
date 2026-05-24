@@ -9,6 +9,7 @@ import type {
 } from './types.js';
 
 import { formatClockTimestamp, summarizeReasoningText, truncate } from './utils.js';
+import { buildBridgeProjectContext } from './projectContext.js';
 
 const AUTOPILOT_MARKER = 'AUTOPILOT_REPORT';
 const BRIDGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -102,6 +103,8 @@ export function buildAutopilotPrompt(binding: ChannelBinding, project: Autopilot
     '',
     `项目：${binding.projectName}`,
     `目录：${binding.workspacePath}`,
+    '',
+    buildBridgeProjectContext(binding),
     `当前时间：${new Date().toISOString()}`,
     '',
     '先阅读并遵守这个治理规则文件：',

@@ -68,6 +68,7 @@ import { appendBridgeFileSendInstructions, extractBridgeFileSendDirective } from
 import { diagnoseCodexFailure, filterDiagnosticStderr, isIgnorableCodexStderrLine } from './codexDiagnostics.js';
 import { loadCodexGlobalModel, resolveCodexConfigPath, writeCodexGlobalModel } from './codexConfig.js';
 import { isCommandMessage, parseCommand } from './commandParser.js';
+import { appendBridgeProjectContext } from './projectContext.js';
 import {
   detectNaturalLanguageFileRequest,
   formatFileCandidates,
@@ -357,9 +358,10 @@ function shouldAutoRetryFailedRun(
   return Boolean(activeRun && shouldContinueRecoveryFromState(activeRun));
 }
 
-function buildRunInputFromTask(task: PromptTask): CodexRunInput {
+function buildRunInputFromTask(task: PromptTask, binding: ChannelBinding): CodexRunInput {
+  const prompt = appendBridgeProjectContext(task.effectivePrompt, binding);
   return {
-    prompt: appendBridgeFileSendInstructions(task.effectivePrompt),
+    prompt: appendBridgeFileSendInstructions(prompt),
     imagePaths: task.attachments.filter((item) => item.isImage).map((item) => item.localPath),
     extraAddDirs: [
       ...task.extraAddDirs,
@@ -3397,7 +3399,7 @@ export class DiscordCodexBridge {
     }, task.bindingChannelId);
 
     let currentTask = task;
-    let runInput = buildRunInputFromTask(currentTask);
+    let runInput = buildRunInputFromTask(currentTask, binding);
     let pendingRecoveryNotice = false;
     const flushPendingRecoveryNotice = async (): Promise<void> => {
       if (!pendingRecoveryNotice) {
@@ -3436,7 +3438,8 @@ export class DiscordCodexBridge {
         this.touchActiveRun(runtime.activeRun);
         runtime.activeRun.status = runtime.activeRun.status === 'cancelled' ? 'cancelled' : 'running';
         runtime.activeRun.latestActivity = activity;
-        this.pushRunTimeline(runtime, `🔄 ${activity}`);
+        const activityIcon = activity === 'Codex 已压缩上下文' ? '🧹' : '🔄';
+        this.pushRunTimeline(runtime, `${activityIcon} ${activity}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
         this.scheduleRuntimeStateSave(conversationId);
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
@@ -3584,7 +3587,7 @@ export class DiscordCodexBridge {
             retryDescription.latestActivity,
             attemptsUsed - 1,
           );
-          runInput = buildRunInputFromTask(currentTask);
+          runInput = buildRunInputFromTask(currentTask, binding);
           this.touchActiveRun(runtime.activeRun);
           runtime.activeRun.task = currentTask;
           runtime.activeRun.status = 'starting';

@@ -577,7 +577,7 @@ export function formatProgressMessage(
   appendCollabLines(lines, activeRun.collabToolCalls, 4);
 
   if (activeRun.reasoningSummaries.length > 0) {
-    lines.push('分析摘要（最新）：');
+    lines.push('分析摘要：最新');
     for (const summary of activeRun.reasoningSummaries.slice(-2)) {
       lines.push(`- ${tailText(summary, 140)}`);
     }
@@ -589,7 +589,7 @@ export function formatProgressMessage(
     lines.push('请求：已接收，正在建立 Codex 会话');
   }
 
-  appendTimelineLines(lines, activeRun.timeline, 5);
+  appendTimelineLines(lines, activeRun.timeline, 8);
 
   if (activeRun.currentCommand) {
     lines.push(`当前命令：\`${truncate(sanitizeInlineCode(activeRun.currentCommand), 180)}\``);

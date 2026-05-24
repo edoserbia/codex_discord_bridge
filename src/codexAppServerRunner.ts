@@ -105,6 +105,10 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
           await flushCommandBuffers(null);
           await hooks.onActivity?.('当前轮次已中断');
           break;
+        case 'thread.compacted':
+        case 'context.compaction':
+          await hooks.onActivity?.('Codex 已压缩上下文');
+          break;
         case 'plan.updated':
           planItems = event.plan.map((item, index) => ({
             id: `${event.turnId}:${index}`,
@@ -362,6 +366,7 @@ function normalizeAppServerItemType(value: unknown): string | undefined {
     case 'reasoning':
     case 'command_execution':
     case 'collab_tool_call':
+    case 'context_compaction':
       return value;
     case 'commandExecution':
       return 'command_execution';
@@ -371,6 +376,8 @@ function normalizeAppServerItemType(value: unknown): string | undefined {
       return 'agent_message';
     case 'todoList':
       return 'todo_list';
+    case 'contextCompaction':
+      return 'context_compaction';
     default:
       return value;
   }

@@ -336,6 +336,13 @@ git clone git@<git-host>:<owner-or-namespace>/<repo>.git
 cd <你的仓库目录名>
 ```
 
+当前自建 GitLab 的标准入口域名是 `https://mytokens.live`。如果目标仓库在这个自建 GitLab 上，SSH 示例为：
+
+```bash
+git clone git@mytokens.live:<owner-or-namespace>/<repo>.git
+cd <你的仓库目录名>
+```
+
 如果你还没有配 SSH Key，也可以先用 HTTPS：
 
 ```bash
@@ -352,6 +359,14 @@ cd <你的仓库目录名>
 
 ```bash
 git remote set-url origin git@<git-host>:<owner-or-namespace>/<repo>.git
+git fetch origin --prune
+git branch -u origin/main main
+```
+
+自建 GitLab 示例：
+
+```bash
+git remote set-url origin git@mytokens.live:<owner-or-namespace>/<repo>.git
 git fetch origin --prune
 git branch -u origin/main main
 ```

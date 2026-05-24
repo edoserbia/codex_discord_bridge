@@ -118,6 +118,8 @@ sudo ./scripts/install-service.sh --mode daemon
 
 如果你通过 Git / GitLab 管理这个仓库，推荐更新流程：
 
+当前自建 GitLab 的标准入口域名是 `https://mytokens.live`。涉及自建 GitLab 的拉取、推送、建仓或远端迁移时，默认优先使用这个域名。
+
 ```bash
 git pull
 npm install
