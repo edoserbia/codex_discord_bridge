@@ -38,6 +38,7 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
     let codexThreadId = existingThreadId;
     let cancelRequested = false;
     let finished = false;
+    let hasTurnStreamEvent = false;
     let turnContext: { threadId: string; turnId: string } | undefined;
     let resolveTurnReady!: (context: { threadId: string; turnId: string } | undefined) => void;
     const turnReady = new Promise<{ threadId: string; turnId: string } | undefined>((resolve) => {
@@ -85,6 +86,7 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
     };
 
     const handleEvent = async (event: AppServerTurnEvent): Promise<void> => {
+      hasTurnStreamEvent = true;
       switch (event.type) {
         case 'turn.started':
           turnContext = { threadId: event.threadId, turnId: event.turnId };
@@ -258,6 +260,9 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
         });
         turnContext = { threadId, turnId: turn.turnId };
         resolveTurnReady(turnContext);
+        if (!hasTurnStreamEvent) {
+          await hooks.onActivity?.('Codex 轮次已提交，等待模型响应');
+        }
 
         if (cancelRequested) {
           await client.interruptTurn(threadId, turn.turnId);

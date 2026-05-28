@@ -7,7 +7,7 @@ import type { ChannelBinding } from '../src/types.js';
 
 import { CodexAppServerRunner } from '../src/codexAppServerRunner.js';
 
-import { cleanupDir, createWorkspace, makeTempDir } from './helpers/testUtils.js';
+import { cleanupDir, createWorkspace, makeTempDir, waitFor } from './helpers/testUtils.js';
 
 const fakeAppServerCommand = path.resolve('test/fixtures/fake-codex-app-server.mjs');
 
@@ -142,6 +142,35 @@ test('app-server runner reports native context compact activity', async () => {
 
     assert.equal(result.success, true);
     assert.ok(activities.includes('Codex 已压缩上下文'));
+  } finally {
+    await runner.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('app-server runner reports that a turn was submitted before the first stream event arrives', async () => {
+  const rootDir = await makeTempDir('codex-app-server-runner-started-no-events-');
+  const workspace = await createWorkspace(rootDir);
+  const runner = new CodexAppServerRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+  const activities: string[] = [];
+
+  try {
+    const job = runner.start(
+      binding,
+      { prompt: '[app-started-no-events] wait before events', imagePaths: [], extraAddDirs: [] },
+      undefined,
+      {
+        onActivity: async (activity) => {
+          activities.push(activity);
+        },
+      },
+    );
+
+    await waitFor(() => activities.includes('Codex 轮次已提交，等待模型响应'), 1_500);
+    job.cancel();
+    const result = await job.done;
+    assert.equal(result.success, false);
   } finally {
     await runner.stop();
     await cleanupDir(rootDir);

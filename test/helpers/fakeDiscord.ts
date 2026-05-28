@@ -2,6 +2,13 @@ import { randomUUID } from 'node:crypto';
 
 export type FakeSentFile = string | { attachment: string; name?: string };
 
+let fakeSnowflakeCounter = 1500000000000000000n;
+
+function nextFakeSnowflake(): string {
+  fakeSnowflakeCounter += 1n;
+  return fakeSnowflakeCounter.toString();
+}
+
 type FakeOutgoingPayload =
   | string
   | {
@@ -26,6 +33,10 @@ export class FakeChannel {
 
   public readonly messages = {
     fetch: async (messageId: string): Promise<any> => {
+      if (!/^\d{17,20}$/.test(messageId)) {
+        throw new Error(`message_id[NUMBER_TYPE_COERCE]: Value "${messageId}" is not snowflake.`);
+      }
+
       const message = this.store.get(messageId);
 
       if (!message) {
@@ -64,7 +75,6 @@ export class FakeChannel {
   async send(payload: FakeOutgoingPayload): Promise<any> {
     const normalized = normalizeOutgoingPayload(payload);
     const message = new FakeMessage({
-      id: randomUUID(),
       content: normalized.content,
       channel: this,
       guildId: this.guildId,
@@ -129,7 +139,7 @@ export class FakeMessage {
   public deleted = false;
 
   constructor(init: FakeMessageInit) {
-    this.id = init.id ?? randomUUID();
+    this.id = init.id ?? nextFakeSnowflake();
     this.content = init.content;
     this.channel = init.channel;
     this.guildId = init.guildId;

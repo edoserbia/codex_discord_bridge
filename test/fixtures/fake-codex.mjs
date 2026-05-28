@@ -54,7 +54,11 @@ function parseArgs(argv) {
             continue;
           }
 
-          if (resumeArg === '--skip-git-repo-check' || resumeArg === '--json') {
+          if (
+            resumeArg === '--dangerously-bypass-approvals-and-sandbox'
+            || resumeArg === '--skip-git-repo-check'
+            || resumeArg === '--json'
+          ) {
             continue;
           }
 

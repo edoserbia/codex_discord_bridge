@@ -105,6 +105,38 @@ test('app-server client can start a thread and stream turn updates', async () =>
   }
 });
 
+test('app-server client surfaces raw exec function calls as command execution items', async () => {
+  const rootDir = await makeTempDir('codex-app-server-client-raw-exec-command-');
+  const workspace = await createWorkspace(rootDir);
+  const binding = makeBinding(workspace);
+  const client = new CodexAppServerClient(makeConfig(rootDir));
+  const commandItems: Array<Record<string, unknown>> = [];
+
+  try {
+    await client.start();
+    const threadId = await client.ensureThread(binding, undefined);
+    const turn = await client.startTurn(binding, threadId, {
+      prompt: '[app-raw-exec-command] simulate current Codex raw exec event',
+      imagePaths: [],
+      extraAddDirs: [],
+      onEvent: async (event) => {
+        if (event.type === 'item.started') {
+          commandItems.push(event.item);
+        }
+      },
+    });
+
+    const result = await turn.done;
+    assert.equal(result.success, true);
+    assert.ok(commandItems.some((item) => item.type === 'commandExecution'
+      && typeof item.command === 'string'
+      && item.command.includes('sleep 1800')));
+  } finally {
+    await client.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('app-server client can steer and interrupt an active turn on the same thread', async () => {
   const rootDir = await makeTempDir('codex-app-server-client-steer-');
   const workspace = await createWorkspace(rootDir);

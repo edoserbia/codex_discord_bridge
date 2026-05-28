@@ -85,7 +85,7 @@ export class ResilientCodexExecutionDriver implements CodexExecutionDriver {
           reason,
         }),
       ).catch(() => undefined);
-      currentJob = this.legacyRunner.start(binding, input, undefined, gateHooksAfterFallbackNotice(hooks, fallbackGate));
+      currentJob = this.legacyRunner.start(binding, input, existingThreadId, gateHooksAfterFallbackNotice(hooks, fallbackGate));
       return currentJob.done;
     };
 

@@ -258,6 +258,38 @@ test('bridge persists transcript events and mirrors local-resume replies into Di
   }
 });
 
+test('bridge sends local-resume progress and final replies without fetching a synthetic message id', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-local-resume-synthetic-id-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeCodexCommand,
+  });
+  const rootChannel = new FakeChannel('channel-local-resume-synthetic-id', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, 'first prompt'));
+    await waitFor(() => findSent(rootChannel, /ok: first prompt/), 15_000);
+
+    const codexThreadId = store.getSession(rootChannel.id)?.codexThreadId;
+    assert.ok(codexThreadId);
+
+    const sendResult = await (bridge as any).sendLocalSessionMessage(codexThreadId, 'hello from synthetic local resume');
+    assert.equal(sendResult?.ok, true);
+    assert.match(sendResult?.assistantMessage ?? '', /ok: hello from synthetic local resume/);
+
+    assert.ok(rootChannel.sent.some((message) => /过程进度/.test(message.content)));
+    assert.ok(rootChannel.sent.some((message) => /ok: hello from synthetic local resume/.test(message.content)));
+    assert.equal(store.getRuntimeState(rootChannel.id), undefined);
+    assert.equal(store.getSession(rootChannel.id)?.codexThreadId, codexThreadId);
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge does not mirror Discord-origin turns back into the channel transcript', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-transcript-no-discord-echo-');
   const workspace = await createWorkspace(rootDir);
@@ -716,6 +748,39 @@ test('bridge keeps streaming app-server deltas out of the process timeline while
   }
 });
 
+test('bridge shows raw app-server exec command progress for TMP instead of staying at received', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-tmp-raw-exec-progress-');
+  const workspace = path.join(rootDir, 'tmp');
+  await mkdir(workspace, { recursive: true });
+  const { bridge, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeAppServerCommand,
+    driverMode: 'app-server',
+  });
+  const rootChannel = new FakeChannel('channel-tmp-raw-exec-progress', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind tmp "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[app-raw-exec-command] [app-hang-after-raw-exec] reproduce TMP long command progress'));
+
+    await waitFor(() => rootChannel.sent.some((message) => /Codex 实时进度/.test(message.content)), 15_000);
+    const progressMessage = rootChannel.sent.find((message) => /Codex 实时进度/.test(message.content));
+    assert.ok(progressMessage);
+
+    await waitFor(() => /当前命令：`sleep 1800; ssh westd-pro6000 status`/.test(progressMessage!.content), 15_000);
+    assert.match(progressMessage!.content, /项目：\*\*tmp\*\*/);
+    assert.match(progressMessage!.content, /最新活动：.*正在执行命令/);
+    assert.doesNotMatch(progressMessage!.content, /最新活动：.*准备启动 Codex/);
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!reset', { userId: 'admin-user' }));
+    await waitFor(() => rootChannel.sent.some((message) => /Codex 上下文已重置/.test(message.content)), 15_000);
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge preserves the full final answer when app-server emits multiple agent message items in one turn', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-app-server-multi-agent-items-');
   const workspace = await createWorkspace(rootDir);
@@ -809,6 +874,42 @@ test('bridge reset interrupts the active app-server turn and clears persisted se
     const session = store.getSession(rootChannel.id);
     assert.equal(session?.codexThreadId, undefined);
     assert.equal((session as any)?.driver, undefined);
+  } finally {
+    await (bridge as any).stop?.();
+    delete process.env.FAKE_CODEX_APP_SERVER_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge reset releases a hung app-server run so queued prompts can start', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-app-server-reset-hung-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-app-server-reset-hung-logs');
+  process.env.FAKE_CODEX_APP_SERVER_LOG_DIR = logDir;
+  const { bridge, store, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeAppServerCommand,
+    driverMode: 'app-server',
+  });
+  const rootChannel = new FakeChannel('channel-app-server-reset-hung', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[app-slow] [app-ignore-interrupt] reset me'));
+    await waitFor(() => (bridge as any).getDashboardData().some((entry: any) => entry.conversations.some((conversation: any) => ['starting', 'running'].includes(conversation.status))), 15_000);
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!reset', { userId: 'admin-user' }));
+    await waitFor(() => rootChannel.sent.some((message) => /Codex 上下文已重置/.test(message.content)), 15_000);
+
+    await dispatch(bridge, createUserMessage(rootChannel, 'new prompt after hung reset'));
+    await waitFor(() => rootChannel.sent.some((message) => /app-server ok: new prompt after hung reset/.test(message.content)), 15_000);
+
+    assert.ok(store.getSession(rootChannel.id)?.codexThreadId);
+    await waitFor(() => {
+      const runtime = (bridge as any).getRuntime(rootChannel.id);
+      return !runtime.activeRun && runtime.queue.length === 0;
+    }, 15_000);
   } finally {
     await (bridge as any).stop?.();
     delete process.env.FAKE_CODEX_APP_SERVER_LOG_DIR;
@@ -954,6 +1055,47 @@ test('bridge falls back when app-server dies after creating a thread but before 
     assert.equal(session?.fallbackActive, true);
   } finally {
     await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge preserves an existing app-server thread when a later turn falls back to legacy resume', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-app-server-resume-fallback-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-codex-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+  const { bridge, store, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeTurnFallbackCommand,
+    driverMode: 'app-server',
+  });
+  const rootChannel = new FakeChannel('channel-app-server-resume-fallback', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    const originalThreadId = 'thread-existing-app-server';
+    await store.updateSession(rootChannel.id, {
+      codexThreadId: originalThreadId,
+      driver: 'app-server',
+      fallbackActive: false,
+    }, rootChannel.id);
+
+    await dispatch(bridge, createUserMessage(rootChannel, 'resume fallback prompt'));
+    await waitFor(() => rootChannel.sent.some((message) => /\[\d{2}:\d{2}\].*legacy-exec.*fallback/i.test(message.content)), 15_000);
+    await waitFor(() => rootChannel.sent.some((message) => message.content.includes('ok: resume fallback prompt')
+      && message.content.includes(`thread=${originalThreadId}`)), 15_000);
+
+    const session = store.getSession(rootChannel.id);
+    assert.equal(session?.driver, 'legacy-exec');
+    assert.equal(session?.fallbackActive, true);
+    assert.equal(session?.codexThreadId, originalThreadId);
+
+    const legacyLogs = await Promise.all((await readdir(logDir)).map(async (file) => JSON.parse(await readFile(path.join(logDir, file), 'utf8'))));
+    assert.ok(legacyLogs.some((entry) => entry.args?.mode === 'resume' && entry.args?.resumeThreadId === originalThreadId));
+  } finally {
+    await (bridge as any).stop?.();
+    delete process.env.FAKE_CODEX_LOG_DIR;
     await cleanupDir(rootDir);
   }
 });
@@ -2106,6 +2248,69 @@ test('bridge recovers a detached active run so queued prompts do not stay blocke
 
     await dispatch(bridge, createUserMessage(rootChannel, 'follow-up prompt after stale active run'));
     await waitFor(() => findSent(rootChannel, /ok: follow-up prompt after stale active run/), 15_000);
+    await waitFor(() => {
+      const nextRuntime = (bridge as any).getRuntime(rootChannel.id);
+      return !nextRuntime.activeRun && nextRuntime.queue.length === 0;
+    }, 15_000);
+  } finally {
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge clears a terminal detached active run so new queued prompts can start', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-terminal-detached-active-run-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-terminal-detached-active-run', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+
+    const detachedMessage = createUserMessage(rootChannel, '[cancel] already cancelled detached task');
+    await store.updateSession(rootChannel.id, {
+      codexThreadId: 'thread-terminal-detached-1',
+      driver: 'legacy-exec',
+    }, rootChannel.id);
+
+    const runtime = (bridge as any).getRuntime(rootChannel.id);
+    runtime.activeRun = {
+      task: {
+        id: 'terminal-detached-active-task',
+        prompt: '[cancel] already cancelled detached task',
+        effectivePrompt: '[cancel] already cancelled detached task',
+        rootPrompt: '[cancel] already cancelled detached task',
+        rootEffectivePrompt: '[cancel] already cancelled detached task',
+        requestedBy: detachedMessage.author.username,
+        requestedById: detachedMessage.author.id,
+        messageId: detachedMessage.id,
+        enqueuedAt: '2026-03-21T00:00:00.000Z',
+        bindingChannelId: rootChannel.id,
+        conversationId: rootChannel.id,
+        attachments: [],
+        extraAddDirs: [],
+        origin: 'user',
+      },
+      driverMode: 'legacy-exec',
+      status: 'cancelled',
+      startedAt: '2026-03-21T00:00:00.000Z',
+      updatedAt: '2026-03-21T00:00:01.000Z',
+      latestActivity: '已由 admin 重置当前会话',
+      agentMessages: [],
+      reasoningSummaries: [],
+      planItems: [],
+      collabToolCalls: [],
+      timeline: ['[00:00] 已重置'],
+      stderr: [],
+      usedResume: true,
+      codexThreadId: 'thread-terminal-detached-1',
+      cancellationReason: 'reset',
+    };
+    await store.upsertRuntimeState(runtime);
+    (bridge as any).activeJobs.delete(rootChannel.id);
+
+    await dispatch(bridge, createUserMessage(rootChannel, 'new prompt after cancelled detached run'));
+    await waitFor(() => findSent(rootChannel, /ok: new prompt after cancelled detached run/), 15_000);
     await waitFor(() => {
       const nextRuntime = (bridge as any).getRuntime(rootChannel.id);
       return !nextRuntime.activeRun && nextRuntime.queue.length === 0;

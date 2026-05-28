@@ -59,6 +59,7 @@ import type {
   DeferredSendPayload,
   LocalSessionSendResult,
   PromptTask,
+  RunStatus,
   SessionLookupResult,
   TranscriptEvent,
 } from './types.js';
@@ -139,6 +140,10 @@ type SendableChannel = {
     fetch: (messageId: string) => Promise<SendableMessage>;
   };
 };
+
+function isDiscordSnowflake(value: string | undefined): value is string {
+  return typeof value === 'string' && /^\d{17,20}$/.test(value);
+}
 
 class PendingRunningCodexJob implements RunningCodexJob {
   private currentJob: RunningCodexJob | undefined;
@@ -356,6 +361,10 @@ function shouldAutoRetryFailedRun(
   }
 
   return Boolean(activeRun && shouldContinueRecoveryFromState(activeRun));
+}
+
+function isTerminalRunStatus(status: RunStatus): boolean {
+  return status === 'completed' || status === 'failed' || status === 'cancelled';
 }
 
 function buildRunInputFromTask(task: PromptTask, binding: ChannelBinding): CodexRunInput {
@@ -3329,6 +3338,15 @@ export class DiscordCodexBridge {
   private async processQueue(conversationId: string): Promise<void> {
     const runtime = this.getRuntime(conversationId);
 
+    if (runtime.activeRun && isTerminalRunStatus(runtime.activeRun.status)) {
+      console.warn(
+        `[bridge-runtime] cleared terminal active run conversation=${conversationId} task=${runtime.activeRun.task.id.slice(0, 8)} status=${runtime.activeRun.status}`,
+      );
+      this.activeJobs.delete(conversationId);
+      runtime.activeRun = undefined;
+      this.scheduleRuntimeStateSave(conversationId, true);
+    }
+
     if (runtime.activeRun || runtime.queue.length === 0) {
       return;
     }
@@ -3387,6 +3405,10 @@ export class DiscordCodexBridge {
 
     const session = await this.store.ensureSession(task.bindingChannelId, conversationId);
     const isThreadConversation = conversationId !== task.bindingChannelId;
+    const getCurrentRun = (): ActiveRunState | undefined => {
+      const activeRun = runtime.activeRun;
+      return activeRun?.task.id === task.id ? activeRun : undefined;
+    };
     const resumableThreadId = !session.driver || session.driver === preferredDriverMode
       ? session.codexThreadId
       : undefined;
@@ -3411,33 +3433,35 @@ export class DiscordCodexBridge {
     };
     const hooks: CodexRunHooks = {
       onThreadStarted: async (codexThreadId: string) => {
-        if (!runtime.activeRun) {
+        const activeRun = getCurrentRun();
+        if (!activeRun) {
           return;
         }
 
         await flushPendingRecoveryNotice();
 
-        if (runtime.activeRun.cancellationReason === 'binding_reset'
-          || runtime.activeRun.cancellationReason === 'reset'
-          || runtime.activeRun.cancellationReason === 'unbind') {
+        if (activeRun.cancellationReason === 'binding_reset'
+          || activeRun.cancellationReason === 'reset'
+          || activeRun.cancellationReason === 'unbind') {
           return;
         }
 
-        this.touchActiveRun(runtime.activeRun);
-        runtime.activeRun.codexThreadId = codexThreadId;
+        this.touchActiveRun(activeRun);
+        activeRun.codexThreadId = codexThreadId;
         this.pushRunTimeline(runtime, `🧵 Codex 会话已建立：${codexThreadId.slice(0, 8)}`);
         const nextSession = await this.store.updateSession(conversationId, { codexThreadId }, task.bindingChannelId);
         this.scheduleRuntimeStateSave(conversationId);
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onActivity: async (activity: string) => {
-        if (!runtime.activeRun) {
+        const activeRun = getCurrentRun();
+        if (!activeRun) {
           return;
         }
 
-        this.touchActiveRun(runtime.activeRun);
-        runtime.activeRun.status = runtime.activeRun.status === 'cancelled' ? 'cancelled' : 'running';
-        runtime.activeRun.latestActivity = activity;
+        this.touchActiveRun(activeRun);
+        activeRun.status = activeRun.status === 'cancelled' ? 'cancelled' : 'running';
+        activeRun.latestActivity = activity;
         const activityIcon = activity === 'Codex 已压缩上下文' ? '🧹' : '🔄';
         this.pushRunTimeline(runtime, `${activityIcon} ${activity}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
@@ -3445,14 +3469,15 @@ export class DiscordCodexBridge {
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onReasoning: async (reasoning: string) => {
-        if (!runtime.activeRun) {
+        const activeRun = getCurrentRun();
+        if (!activeRun) {
           return;
         }
 
-        this.touchActiveRun(runtime.activeRun);
+        this.touchActiveRun(activeRun);
         const summary = summarizeReasoningText(reasoning, 180);
         if (summary) {
-          this.upsertStreamingText(runtime.activeRun.reasoningSummaries, summary, 6);
+          this.upsertStreamingText(activeRun.reasoningSummaries, summary, 6);
         }
 
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
@@ -3460,74 +3485,80 @@ export class DiscordCodexBridge {
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onTodoListChanged: async (items) => {
-        if (!runtime.activeRun) {
+        const activeRun = getCurrentRun();
+        if (!activeRun) {
           return;
         }
 
-        this.touchActiveRun(runtime.activeRun);
-        runtime.activeRun.planItems = items;
+        this.touchActiveRun(activeRun);
+        activeRun.planItems = items;
         const completed = items.filter((item) => item.completed).length;
-        runtime.activeRun.latestActivity = `计划进度 ${completed}/${items.length}`;
+        activeRun.latestActivity = `计划进度 ${completed}/${items.length}`;
         this.pushRunTimeline(runtime, `📋 计划进度 ${completed}/${items.length}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
         this.scheduleRuntimeStateSave(conversationId);
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onCollabToolChanged: async (item) => {
-        if (!runtime.activeRun) {
+        const activeRun = getCurrentRun();
+        if (!activeRun) {
           return;
         }
 
-        this.touchActiveRun(runtime.activeRun);
-        this.upsertCollabToolCall(runtime.activeRun, item);
-        runtime.activeRun.latestActivity = describeCollabToolCall(item);
+        this.touchActiveRun(activeRun);
+        this.upsertCollabToolCall(activeRun, item);
+        activeRun.latestActivity = describeCollabToolCall(item);
         this.pushRunTimeline(runtime, `🤝 ${truncate(describeCollabToolCall(item, true), 140)}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
         this.scheduleRuntimeStateSave(conversationId);
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onAgentMessage: async (agentMessage: string) => {
-        if (!runtime.activeRun) {
+        const activeRun = getCurrentRun();
+        if (!activeRun) {
           return;
         }
 
-        this.touchActiveRun(runtime.activeRun);
-        this.upsertStreamingText(runtime.activeRun.agentMessages, agentMessage);
-        runtime.activeRun.latestActivity = '正在生成回答';
+        this.touchActiveRun(activeRun);
+        this.upsertStreamingText(activeRun.agentMessages, agentMessage);
+        activeRun.latestActivity = '正在生成回答';
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
         this.scheduleRuntimeStateSave(conversationId);
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onCommandStarted: async (command: string) => {
-        if (!runtime.activeRun) {
+        const activeRun = getCurrentRun();
+        if (!activeRun) {
           return;
         }
 
-        this.touchActiveRun(runtime.activeRun);
-        runtime.activeRun.status = runtime.activeRun.status === 'cancelled' ? 'cancelled' : 'running';
-        runtime.activeRun.currentCommand = command;
-        runtime.activeRun.latestActivity = '正在执行命令';
+        this.touchActiveRun(activeRun);
+        activeRun.status = activeRun.status === 'cancelled' ? 'cancelled' : 'running';
+        activeRun.currentCommand = command;
+        activeRun.latestActivity = '正在执行命令';
         this.pushRunTimeline(runtime, `▶️ ${truncate(command, 120)}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
         this.scheduleRuntimeStateSave(conversationId);
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onCommandCompleted: async (command: string, output: string, exitCode: number | null) => {
-        if (!runtime.activeRun) {
+        const activeRun = getCurrentRun();
+        if (!activeRun) {
           return;
         }
 
-        this.touchActiveRun(runtime.activeRun);
-        runtime.activeRun.currentCommand = command;
-        runtime.activeRun.lastCommandOutput = output;
-        runtime.activeRun.latestActivity = exitCode === 0 ? '命令执行完成' : '命令执行失败';
+        this.touchActiveRun(activeRun);
+        activeRun.currentCommand = command;
+        activeRun.lastCommandOutput = output;
+        activeRun.latestActivity = exitCode === 0 ? '命令执行完成' : '命令执行失败';
         this.pushRunTimeline(runtime, `${exitCode === 0 ? '✅' : '❌'} ${truncate(command, 120)} (${exitCode ?? 'null'})`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
         this.scheduleRuntimeStateSave(conversationId);
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onStderr: async (line: string) => {
-        if (!runtime.activeRun) {
+        const activeRun = getCurrentRun();
+        if (!activeRun) {
           return;
         }
 
@@ -3535,29 +3566,29 @@ export class DiscordCodexBridge {
           return;
         }
 
-        this.touchActiveRun(runtime.activeRun);
-        runtime.activeRun.stderr.push(line);
-        runtime.activeRun.stderr = runtime.activeRun.stderr.slice(-20);
-        runtime.activeRun.latestActivity = line;
+        this.touchActiveRun(activeRun);
+        activeRun.stderr.push(line);
+        activeRun.stderr = activeRun.stderr.slice(-20);
+        activeRun.latestActivity = line;
         this.pushRunTimeline(runtime, `⚠️ ${truncate(line, 140)}`);
         const nextSession = this.store.getSession(conversationId) ?? currentSession;
         this.scheduleRuntimeStateSave(conversationId);
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onFallbackActivated: async (detail) => {
-        if (!runtime.activeRun) {
+        const activeRun = getCurrentRun();
+        if (!activeRun) {
           return;
         }
 
-        this.touchActiveRun(runtime.activeRun);
-        runtime.activeRun.driverMode = detail.to;
-        runtime.activeRun.latestActivity = 'app-server 不可用，已切换到 legacy-exec fallback';
+        this.touchActiveRun(activeRun);
+        activeRun.driverMode = detail.to;
+        activeRun.latestActivity = 'app-server 不可用，已切换到 legacy-exec fallback';
         this.pushRunTimeline(runtime, `↩️ 已切换到 legacy-exec fallback：${truncate(detail.reason, 120)}`);
         pendingRecoveryNotice = false;
         currentSession = await this.store.updateSession(conversationId, {
           driver: detail.to,
           fallbackActive: true,
-          codexThreadId: undefined,
         }, task.bindingChannelId);
         this.scheduleRuntimeStateSave(conversationId, true);
         await this.sendDriverStatusNotice(
@@ -3768,9 +3799,12 @@ export class DiscordCodexBridge {
         }
       }
     } finally {
-      this.activeJobs.delete(conversationId);
-      runtime.activeRun = undefined;
-      this.scheduleRuntimeStateSave(conversationId, true);
+      const finishingCurrentRun = Boolean(getCurrentRun());
+      if (finishingCurrentRun) {
+        this.activeJobs.delete(conversationId);
+        runtime.activeRun = undefined;
+        this.scheduleRuntimeStateSave(conversationId, true);
+      }
       const shouldKeepAttachmentDir = Boolean(
         currentTask.attachmentDir
         && (runtime.pendingReplies ?? []).some((item) => item.attachmentDir === currentTask.attachmentDir),
@@ -3779,7 +3813,9 @@ export class DiscordCodexBridge {
         await removeAttachmentDir(currentTask.attachmentDir).catch(() => undefined);
       }
       const nextSession = this.store.getSession(conversationId) ?? currentSession;
-      await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
+      if (finishingCurrentRun) {
+        await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
+      }
       if ((runtime.pendingReplies?.length ?? 0) > 0) {
         this.scheduleDeferredReplyFlush(conversationId, 0);
       }
@@ -4461,7 +4497,9 @@ export class DiscordCodexBridge {
     const progressMessageId = activeRun.progressMessageId;
 
     if (!progressMessageId) {
-      const originalMessage = await this.fetchChannelMessageWithRetry(channel, activeRun.task.messageId);
+      const originalMessage = isDiscordSnowflake(activeRun.task.messageId)
+        ? await this.fetchChannelMessageWithRetry(channel, activeRun.task.messageId)
+        : null;
       const created = originalMessage
         ? await this.replyWithRetry(originalMessage, content)
         : await this.sendWithRetry(channel, content);
@@ -4521,7 +4559,9 @@ export class DiscordCodexBridge {
   }
 
   private async replyToOriginalMessage(channel: SendableChannel, messageId: string, content: SendPayload): Promise<void> {
-    const originalMessage = await this.fetchChannelMessageWithRetry(channel, messageId);
+    const originalMessage = isDiscordSnowflake(messageId)
+      ? await this.fetchChannelMessageWithRetry(channel, messageId)
+      : null;
 
     if (typeof content !== 'string') {
       if (originalMessage) {

@@ -635,6 +635,21 @@ export class CodexAppServerClient {
         }
         break;
       }
+      case 'rawResponseItem/completed': {
+        const target = this.resolveTurnReference(params);
+        const item = normalizeRawResponseItem((params.item ?? null) as Record<string, unknown> | null);
+        if (target && item) {
+          await this.emitTurnEvent(target.turnId, {
+            event: {
+              type: 'item.started',
+              threadId: target.threadId,
+              turnId: target.turnId,
+              item,
+            },
+          });
+        }
+        break;
+      }
       case 'item/commandExecution/outputDelta': {
         const threadId = typeof params.threadId === 'string' ? params.threadId : '';
         const turnId = typeof params.turnId === 'string' ? params.turnId : '';
@@ -1033,6 +1048,103 @@ function normalizeAppServerItemType(value: unknown): string | undefined {
     default:
       return value;
   }
+}
+
+function normalizeRawResponseItem(item: Record<string, unknown> | null): Record<string, unknown> | undefined {
+  if (!item || Array.isArray(item)) {
+    return undefined;
+  }
+
+  const itemType = typeof item.type === 'string' ? item.type : '';
+  if (itemType === 'function_call' || itemType === 'custom_tool_call') {
+    const command = readRawToolCommand(item);
+    if (!command) {
+      return undefined;
+    }
+
+    const id = typeof item.call_id === 'string' && item.call_id.trim()
+      ? item.call_id.trim()
+      : typeof item.id === 'string' && item.id.trim()
+        ? item.id.trim()
+        : 'raw-exec-command';
+
+    return {
+      id,
+      type: 'commandExecution',
+      command,
+      commandActions: [],
+      status: 'in_progress',
+      aggregatedOutput: null,
+      exitCode: null,
+    };
+  }
+
+  if (itemType === 'local_shell_call') {
+    const action = item.action;
+    const command = action && typeof action === 'object' && !Array.isArray(action)
+      ? readShellCommand((action as Record<string, unknown>).command)
+      : undefined;
+    if (!command) {
+      return undefined;
+    }
+
+    const id = typeof item.call_id === 'string' && item.call_id.trim()
+      ? item.call_id.trim()
+      : 'raw-local-shell-command';
+
+    return {
+      id,
+      type: 'commandExecution',
+      command,
+      commandActions: [],
+      status: item.status === 'completed' ? 'completed' : 'in_progress',
+      aggregatedOutput: null,
+      exitCode: null,
+    };
+  }
+
+  return undefined;
+}
+
+function readRawToolCommand(item: Record<string, unknown>): string | undefined {
+  const name = typeof item.name === 'string' ? item.name.trim() : '';
+  if (name !== 'exec_command' && name !== 'exec') {
+    return undefined;
+  }
+
+  const rawArguments = typeof item.arguments === 'string'
+    ? item.arguments
+    : typeof item.input === 'string'
+      ? item.input
+      : '';
+  if (!rawArguments.trim()) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(rawArguments) as unknown;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const command = (parsed as Record<string, unknown>).cmd ?? (parsed as Record<string, unknown>).command;
+      return readShellCommand(command);
+    }
+  } catch {
+    return rawArguments.trim();
+  }
+
+  return undefined;
+}
+
+function readShellCommand(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim();
+  }
+
+  if (Array.isArray(value)) {
+    const parts = value.map((part) => typeof part === 'string' ? part : '').filter(Boolean);
+    return parts.length > 0 ? parts.join(' ') : undefined;
+  }
+
+  return undefined;
 }
 
 function readAppServerItemId(item: Record<string, unknown>): string {

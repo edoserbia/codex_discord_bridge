@@ -153,7 +153,12 @@ async function handleAsync(message) {
       const threadId = message.params?.threadId;
       const prompt = message.params?.input?.[0]?.text ?? '';
       const turnId = `turn-${randomUUID().slice(0, 8)}`;
-      activeTurns.set(turnId, { threadId, prompt, timeout: undefined });
+      activeTurns.set(turnId, {
+        threadId,
+        prompt,
+        timeout: undefined,
+        ignoreInterrupt: prompt.includes('[app-ignore-interrupt]'),
+      });
 
       if (prompt.includes('[app-buffered-interrupt]')) {
         notify('turn/completed', {
@@ -170,6 +175,10 @@ async function handleAsync(message) {
         turn: { id: turnId },
       });
 
+      if (prompt.includes('[app-started-no-events]')) {
+        return;
+      }
+
       notify('turn/started', {
         threadId,
         turn: { id: turnId },
@@ -180,6 +189,25 @@ async function handleAsync(message) {
           process.exit(1);
         }, 20);
         return;
+      }
+
+      if (prompt.includes('[app-raw-exec-command]')) {
+        notify('rawResponseItem/completed', {
+          threadId,
+          turnId,
+          item: {
+            type: 'function_call',
+            name: 'exec_command',
+            call_id: `call-${turnId}`,
+            arguments: JSON.stringify({
+              cmd: 'sleep 1800; ssh westd-pro6000 status',
+              yield_time_ms: 1000,
+            }),
+          },
+        });
+        if (prompt.includes('[app-hang-after-raw-exec]')) {
+          return;
+        }
       }
 
       if (prompt.includes('[app-slow]')) {
@@ -465,6 +493,10 @@ async function handleAsync(message) {
         const activeTurn = activeTurns.get(turnId);
         if (activeTurn?.timeout) {
           clearTimeout(activeTurn.timeout);
+        }
+        if (activeTurn?.ignoreInterrupt) {
+          respond(message.id, {});
+          return;
         }
         activeTurns.delete(turnId);
         respond(message.id, {});
