@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { parseCommand } from '../src/commandParser.js';
 
 test('parse bind command with quoted path and flags', () => {
-  const parsed = parseCommand('!bind api "/tmp/my repo" --sandbox workspace-write --approval never --search on --skip-git-check off --add-dir "/tmp/other" --config model="o3"', '!');
+  const parsed = parseCommand('!bind api "/tmp/my repo" --sandbox workspace-write --approval never --search on --skip-git-check off --add-dir "/tmp/other" --config model="o3" --engine claude', '!');
 
   assert.equal(parsed.kind, 'bind');
   if (parsed.kind !== 'bind') {
@@ -17,8 +17,46 @@ test('parse bind command with quoted path and flags', () => {
   assert.equal(parsed.options.approvalPolicy, 'never');
   assert.equal(parsed.options.search, true);
   assert.equal(parsed.options.skipGitRepoCheck, false);
+  assert.equal(parsed.options.engine, 'claude');
   assert.deepEqual(parsed.options.addDirs, ['/tmp/other']);
   assert.deepEqual(parsed.options.extraConfig, ['model=o3']);
+});
+
+test('parse bind command with codex engine', () => {
+  const parsed = parseCommand('!bind api /tmp --engine codex', '!');
+
+  assert.equal(parsed.kind, 'bind');
+  if (parsed.kind !== 'bind') {
+    return;
+  }
+
+  assert.equal(parsed.options.engine, 'codex');
+});
+
+test('reject invalid bind engine', () => {
+  assert.throws(() => parseCommand('!bind api /tmp --engine llama', '!'), /engine/);
+});
+
+test('parse claude prompt override command', () => {
+  const parsed = parseCommand('!claude inspect the failing test', '!');
+  assert.deepEqual(parsed, {
+    kind: 'prompt',
+    engine: 'claude',
+    prompt: 'inspect the failing test',
+  });
+});
+
+test('parse codex prompt override command', () => {
+  const parsed = parseCommand('!codex implement the patch', '!');
+  assert.deepEqual(parsed, {
+    kind: 'prompt',
+    engine: 'codex',
+    prompt: 'implement the patch',
+  });
+});
+
+test('reject empty engine prompt override command', () => {
+  assert.throws(() => parseCommand('!claude', '!'), /用法/);
 });
 
 test('parse help on empty command', () => {

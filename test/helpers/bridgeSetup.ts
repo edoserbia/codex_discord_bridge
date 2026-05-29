@@ -19,6 +19,7 @@ class FakeChannelRegistry extends Map<string, FakeChannel> {
 export async function createBridgeTestRig(options: {
   rootDir: string;
   codexCommand?: string;
+  claudeCommand?: string;
   codexConfigPath?: string;
   driverMode?: 'legacy-exec' | 'app-server';
   appServerStartupTimeoutMs?: number;
@@ -43,6 +44,7 @@ export async function createBridgeTestRig(options: {
     dataDir: path.join(options.rootDir, 'data'),
     codexConfigPath: options.codexConfigPath ?? path.join(options.rootDir, '.codex', 'config.toml'),
     codexCommand: options.codexCommand ?? 'codex',
+    claudeCommand: options.claudeCommand ?? 'claude',
     codexDriverMode: options.driverMode ?? 'legacy-exec',
     codexAppServerStartupTimeoutMs: options.appServerStartupTimeoutMs,
     codexMaxAttempts: options.codexMaxAttempts ?? 10,

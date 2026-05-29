@@ -3,7 +3,7 @@
 这份文档面向“先跑起来再说”的场景，默认你已经具备：
 
 - 一台 macOS、Linux 或 Windows（WSL）机器
-- 已安装并登录的 `codex` CLI
+- 已安装并登录的 `codex` CLI 或 `claude` CLI；要同时使用两个引擎，就两个都安装并登录
 - Node.js `>= 20.11`
 - 一个已经创建好的 Discord Bot
 
@@ -22,6 +22,7 @@
 | Discord 用户 ID | Discord 打开 `Developer Mode` 后，右键你的头像或消息 → `Copy User ID` | `.env` 的 `DISCORD_ADMIN_USER_IDS=...` | 让你拥有管理员命令 |
 | 允许绑定的根目录 | 你自己本机上的实际项目目录 | `.env` 的 `ALLOWED_WORKSPACE_ROOTS=...` | 限制 Discord 可访问范围 |
 | Web 面板 token | 你自己生成一串随机字符串 | `.env` 的 `WEB_AUTH_TOKEN=...` | 保护本机 Web 面板 |
+| Codex / Claude 命令（可选） | 本机 CLI 实际安装路径 | `.env` 的 `CODEX_COMMAND=...` / `CLAUDE_COMMAND=...` | 指定 Bridge 调用哪个引擎命令 |
 | Resume ID | Discord 当前频道或线程发送 `!status` | 不写入配置；直接用于 `bridgectl session resume <Resume ID>` | 把当前会话接回本机 |
 | 频道 ID / 线程 ID（可选） | Discord 打开 `Developer Mode` 后，右键频道或线程 → `Copy Channel ID` | 不写入配置；直接用于 `bridgectl ... --channel <频道ID>` | 从本机 CLI 精确指定绑定 |
 | 项目名（可选） | `!bind <project> ...` 的第一个参数，或 `!projects` 输出 | 不写入配置；直接用于 `bridgectl ... --project <项目名>` | 从本机 CLI 按项目定位 |
@@ -29,7 +30,7 @@
 ## 1. 进入项目目录
 
 ```bash
-cd /path/to/codex-discord-bridge
+cd /path/to/cc-bridge
 ```
 
 ## 2. 一键部署
@@ -94,16 +95,18 @@ sudo ./scripts/install-service.sh --mode daemon
 在一个普通文本频道发送：
 
 ```text
-!bind api "/path/to/workspaces/api" --sandbox danger-full-access --approval never --search off
+!bind api "/path/to/workspaces/api" --engine claude --sandbox danger-full-access --approval never --search off
 ```
 
 绑定成功后：
 
-- 该主频道的普通消息会直接驱动 Codex
+- 该主频道的普通消息会直接驱动默认引擎；不写 `--engine` 时默认使用 Codex，写 `--engine claude` 时默认使用 Claude
 - 该主频道下创建的线程会自动继承同一个项目目录
-- 每个线程会拥有独立 Codex 会话
+- 每个线程会拥有独立 Bridge 会话；Codex 和 Claude 分别保留自己的原生 session
 - 如果主绑定目录还不存在，bridge 会先自动创建这个目录
-- 如果目标目录本身不是 Git 仓库，建议改成 `!bind api "/path/to/workspaces/api" --sandbox danger-full-access --approval never --search off --skip-git-check on`
+- 如果目标目录本身不是 Git 仓库，建议改成 `!bind api "/path/to/workspaces/api" --engine claude --sandbox danger-full-access --approval never --search off --skip-git-check on`
+
+双引擎的完整说明见 [docs/ENGINES.md](./ENGINES.md)。
 
 ## 5. 直接开始对话
 
@@ -115,7 +118,7 @@ sudo ./scripts/install-service.sh --mode daemon
 
 你将看到：
 
-- 一条持续更新的“Codex 实时进度”消息
+- 一条持续更新的“CC Bridge 实时进度”消息
 - 一条最终结果消息
 - 如果服务刚刚重启而上一个任务未完成，bridge 会优先自动恢复它，并在进度消息里标明这是恢复执行
 
@@ -140,6 +143,8 @@ sudo ./scripts/install-service.sh --mode daemon
 !autopilot project interval 30m
 !autopilot project status
 !status
+!claude <请求内容>
+!codex <请求内容>
 !queue
 !queue insert 2
 !queue remove 2
@@ -158,6 +163,10 @@ sudo ./scripts/install-service.sh --mode daemon
 - 一条可直接复制的本机命令：`bridgectl session resume <Resume ID>`
 
 这样你可以把 Discord 里的会话直接接回到本机终端继续。
+
+`!claude` 和 `!codex` 是单次请求覆盖默认引擎，不会修改频道绑定。例如：默认绑定 Claude 后，临时发 `!codex 按刚才的结论改代码`，下一条普通消息仍然回到 Claude。
+
+切换引擎不会清掉另一边上下文。Bridge 会分别保存 Codex thread 和 Claude session，并在跨引擎时把最近 transcript 摘要带给新引擎。
 
 `!guide` 的语义是“插入中途引导，再继续原任务”，不是直接丢弃当前复杂任务。
 
@@ -219,7 +228,7 @@ bridgectl session send <Resume ID> "hello"
 
 - 服务级 Autopilot 默认并行度为 `5`
 - 可以随时用 `!autopilot server concurrency <N>` 调整
-- 主频道手动 Codex 与 Autopilot 定时任务彼此独立，不互相阻塞
+- 主频道手动引擎会话与 Autopilot 定时任务彼此独立，不互相阻塞
 
 然后去自动创建的 `Autopilot` 线程里直接发自然语言方向，例如：
 
@@ -259,7 +268,7 @@ npm run cli -- autopilot project status --project api
 
 ## 9. 文件收发
 
-- 图片附件会自动透传给 `codex -i`
+- Codex 引擎下图片附件会自动透传给 `codex -i`
 - 所有上传文件都会镜像到当前绑定目录里的 `inbox/`
 - 普通文件也会保留一份 bridge 本地缓存，路径仍位于 `data/attachments/...`
 - 上传和发回文件时都会尽量保留原文件名；只有目标位置已存在同名文件时，才会在扩展名前追加一段随机后缀

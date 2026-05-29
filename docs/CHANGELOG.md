@@ -6,6 +6,8 @@
 
 ### Added
 
+- 新增 Claude CLI 引擎：支持 `!bind ... --engine claude` 设置默认引擎，支持 `!claude` / `!codex` 单次覆盖，并为 Codex thread 与 Claude session 分别保留上下文。
+- 新增 `docs/ENGINES.md`，集中说明 Codex / Claude 双引擎、跨引擎 transcript 交接、`bridgectl session resume` 的 Codex-only 边界和 Autopilot 继承规则。
 - 新增 Discord 双向文件传输说明：上传附件镜像到绑定目录 `inbox/`，支持自然语言“把 report.pdf 发给我”、`!sendfile` 候选选择，以及 Codex 通过 `BRIDGE_SEND_FILE` 协议主动回传单个文件。
 - 新增文档化说明 `!web`、`--skip-git-check`、启动自动恢复、`app-server` / `legacy-exec` 驱动切换和管理员权限边界。
 - 新增 `!status` 的完整 Resume ID 恢复入口，以及 `bridgectl session status/send/resume` 的本机续聊文档说明。
@@ -14,6 +16,7 @@
 ### Changed
 
 - README、`docs/QUICKSTART.md`、`docs/DEPLOYMENT.md`、`docs/MACOS-deploy.md` 已统一到当前实际行为：文件收发、代理自动探测、LaunchAgent 原子重启、任务恢复、Web 链接和管理员判定都已补齐。
+- 项目名称和用户界面从 Codex Discord Bridge 调整为 CC Bridge；`bridgectl` 保留为兼容 CLI 名称。
 - Git 文档默认口径改为自建 GitLab；新增 `docs/GIT.md`，旧 `docs/GITEE.md` 改为兼容提示入口。
 - `bridgectl` 的文档安装方式已统一更新为当前行为：`setup` / `deploy` / `install-service` 自动安装到 PATH，不再要求手动 `npm link`。
 - 本机 `session resume` 的终端交互文档已补齐，包括多行粘贴整段发送、`/status` 和 `/exit` 的使用方式。
@@ -21,6 +24,7 @@
 
 ### Fixed
 
+- macOS 管理脚本现在允许只安装 Codex 或 Claude 其中一个引擎，并会兼容识别旧 `codex-discord-bridge.pid` PID 文件，避免重命名后重启时漏停旧进程。
 - 修复 `!guide` 在复杂任务中会把原任务整体替换掉的问题；现在会先处理中途引导，再继续原任务。
 - 状态面板、实时进度和队列展示现在会区分“当前引导”和“原任务”。
 - 文档中仍指向 Gitee、遗漏 `!web` / `!queue insert` / 管理员规则 / 非 Git 目录绑定说明的内容已补齐。

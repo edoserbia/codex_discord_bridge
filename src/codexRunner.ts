@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import readline from 'node:readline';
 
 import type { AppConfig } from './config.js';
-import type { ChannelBinding, CodexDriverMode, CodexRunInput, CodexRunResult, CollabAgentState, CollabAgentStatus, CollabToolCall, CollabToolName, CollabToolStatus, CommandRecord, PlanItem } from './types.js';
+import type { ChannelBinding, CodexDriverMode, CodexRunInput, CodexRunResult, CollabAgentState, CollabAgentStatus, CollabToolCall, CollabToolName, CollabToolStatus, CommandRecord, ExecutionDriverMode, PlanItem } from './types.js';
 
 import { buildCodexChildEnv } from './codexChildEnv.js';
 import { normalizeCodexDiagnosticLine } from './codexDiagnostics.js';
@@ -29,7 +29,7 @@ export interface CodexRunHooks {
 
 export interface RunningCodexJob {
   pid: number | undefined;
-  driverMode: CodexDriverMode;
+  driverMode: ExecutionDriverMode;
   cancel: () => void;
   steer?: ((prompt: string) => Promise<void>) | undefined;
   done: Promise<CodexRunResult>;

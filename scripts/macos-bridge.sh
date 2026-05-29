@@ -8,8 +8,10 @@ ENV_FILE="${ROOT_DIR}/.env"
 ENV_EXAMPLE_FILE="${ROOT_DIR}/.env.example"
 RUN_DIR="${ROOT_DIR}/.run"
 LOG_DIR="${ROOT_DIR}/logs"
-PID_FILE="${RUN_DIR}/codex-discord-bridge.pid"
-LOG_FILE="${LOG_DIR}/codex-discord-bridge.log"
+PID_FILE="${RUN_DIR}/cc-bridge.pid"
+LEGACY_PID_FILE="${RUN_DIR}/codex-discord-bridge.pid"
+LOG_FILE="${LOG_DIR}/cc-bridge.log"
+LEGACY_LOG_FILE="${LOG_DIR}/codex-discord-bridge.log"
 OPENCLAW_CONFIG_PATH="${OPENCLAW_CONFIG_PATH:-${HOME}/.openclaw/openclaw.json}"
 DEFAULT_ALLOWED_ROOTS="$HOME/work,$HOME/projects"
 SECRET_DIR="${HOME}/.codex-tunning"
@@ -50,7 +52,7 @@ print_error() {
 
 usage() {
   cat <<USAGE
-Codex Discord Bridge macOS 管理脚本
+CC Bridge macOS 管理脚本
 
 用法：
   ./scripts/macos-bridge.sh doctor
@@ -99,6 +101,33 @@ require_command() {
   local cmd="$1"
   if ! command -v "$cmd" >/dev/null 2>&1; then
     print_error "缺少命令：${cmd}"
+    exit 1
+  fi
+}
+
+check_optional_engine_commands() {
+  local codex_cmd claude_cmd has_engine=0
+  codex_cmd="$(read_env_value 'CODEX_COMMAND' || true)"
+  claude_cmd="$(read_env_value 'CLAUDE_COMMAND' || true)"
+  codex_cmd="${codex_cmd:-codex}"
+  claude_cmd="${claude_cmd:-claude}"
+
+  if command -v "${codex_cmd}" >/dev/null 2>&1; then
+    has_engine=1
+    print_info "codex: $("${codex_cmd}" --version 2>/dev/null || printf '已安装')"
+  else
+    print_warn "未检测到 Codex CLI：${codex_cmd}；Codex 引擎不可用。"
+  fi
+
+  if command -v "${claude_cmd}" >/dev/null 2>&1; then
+    has_engine=1
+    print_info "claude: $("${claude_cmd}" --version 2>/dev/null || printf '已安装')"
+  else
+    print_warn "未检测到 Claude CLI：${claude_cmd}；Claude 引擎不可用。"
+  fi
+
+  if [[ "${has_engine}" != '1' ]]; then
+    print_error '至少需要安装并登录 Codex CLI 或 Claude CLI 其中一个。'
     exit 1
   fi
 }
@@ -220,16 +249,16 @@ append_block_if_missing() {
 persist_shell_path_entry() {
   local file_path="$1" install_dir="$2" path_literal='' marker='' block=''
   path_literal="$(shell_path_literal_for_dir "${install_dir}")"
-  marker='# >>> codex-discord-bridge bridgectl >>>'
+  marker='# >>> cc-bridge bridgectl >>>'
   printf -v block '%s\n' \
-    '# >>> codex-discord-bridge bridgectl >>>' \
+    '# >>> cc-bridge bridgectl >>>' \
     "if [ -d \"${path_literal}\" ]; then" \
     '  case ":$PATH:" in' \
     "    *\":${path_literal}:\"*) ;;" \
     "    *) export PATH=\"${path_literal}:\$PATH\" ;;" \
     '  esac' \
     'fi' \
-    '# <<< codex-discord-bridge bridgectl <<<'
+    '# <<< cc-bridge bridgectl <<<'
   append_block_if_missing "${file_path}" "${marker}" "${block}"
 }
 
@@ -309,14 +338,16 @@ EOF
 }
 
 is_running() {
-  local pid=''
+  local pid='' pid_file=''
 
-  if [[ -f "${PID_FILE}" ]]; then
-    pid="$(cat "${PID_FILE}")"
+  for pid_file in "${PID_FILE}" "${LEGACY_PID_FILE}"; do
+    [[ -f "${pid_file}" ]] || continue
+    pid="$(cat "${pid_file}")"
     if [[ -n "${pid}" ]] && kill -0 "${pid}" >/dev/null 2>&1; then
+      printf '%s\n' "${pid}" > "${PID_FILE}"
       return 0
     fi
-  fi
+  done
 
   pid="$(current_running_pid || true)"
   if [[ -n "${pid}" ]] && kill -0 "${pid}" >/dev/null 2>&1; then
@@ -325,6 +356,7 @@ is_running() {
   fi
 
   rm -f "${PID_FILE}"
+  rm -f "${LEGACY_PID_FILE}" >/dev/null 2>&1 || true
   return 1
 }
 
@@ -341,6 +373,7 @@ stop_process_by_pidfile() {
   for _ in {1..20}; do
     if ! kill -0 "${pid}" >/dev/null 2>&1; then
       rm -f "${PID_FILE}"
+      rm -f "${LEGACY_PID_FILE}" >/dev/null 2>&1 || true
       print_info '服务已停止'
       return 0
     fi
@@ -350,6 +383,7 @@ stop_process_by_pidfile() {
   print_warn 'SIGTERM 后仍未退出，发送 SIGKILL'
   kill -9 "${pid}" >/dev/null 2>&1 || true
   rm -f "${PID_FILE}"
+  rm -f "${LEGACY_PID_FILE}" >/dev/null 2>&1 || true
   print_info '服务已强制停止'
 }
 
@@ -490,6 +524,7 @@ const defaults = new Map([
   ['COMMAND_PREFIX', '!'],
   ['DATA_DIR', './data'],
   ['CODEX_COMMAND', 'codex'],
+  ['CLAUDE_COMMAND', 'claude'],
   ['DEFAULT_CODEX_SANDBOX', 'danger-full-access'],
   ['DEFAULT_CODEX_APPROVAL', 'never'],
   ['DEFAULT_CODEX_SEARCH', 'true'],
@@ -1169,15 +1204,16 @@ service_bootstrapped_pid() {
 }
 
 current_running_pid() {
-  local pid installed_mode
+  local pid installed_mode pid_file
 
-  if [[ -f "${PID_FILE}" ]]; then
-    pid="$(cat "${PID_FILE}")"
+  for pid_file in "${PID_FILE}" "${LEGACY_PID_FILE}"; do
+    [[ -f "${pid_file}" ]] || continue
+    pid="$(cat "${pid_file}")"
     if [[ -n "${pid}" ]] && kill -0 "${pid}" >/dev/null 2>&1; then
       printf '%s\n' "${pid}"
       return 0
     fi
-  fi
+  done
 
   installed_mode="$(detect_installed_service_mode || true)"
   if [[ -n "${installed_mode}" ]]; then
@@ -1459,6 +1495,7 @@ uninstall_launchd_mode() {
   rm -f "${plist_path}"
   if ! is_running; then
     rm -f "${PID_FILE}" || true
+    rm -f "${LEGACY_PID_FILE}" || true
   fi
   print_info "已卸载 $(service_mode_label "${mode}")"
 }
@@ -1468,12 +1505,12 @@ run_doctor() {
   augment_launch_path
   require_command node
   require_command npm
-  require_command codex
   check_node_version
+  ensure_env_file
+  check_optional_engine_commands
 
   print_info "Node.js: $(node -v)"
   print_info "npm: $(npm -v)"
-  print_info "codex: $(codex --version)"
   print_info "服务标签：${SERVICE_LABEL}"
 
   if [[ -f "${OPENCLAW_CONFIG_PATH}" ]]; then
@@ -1584,10 +1621,10 @@ run_service_run() {
   require_macos
   augment_launch_path
   require_command node
-  require_command codex
   require_command curl
-  load_secret_env
   ensure_env_file
+  check_optional_engine_commands
+  load_secret_env
   migrate_project_token_to_secret_env
   auto_configure_bridge_proxy
   validate_required_env
@@ -1614,10 +1651,10 @@ run_start_manual() {
   augment_launch_path
   require_command node
   require_command npm
-  require_command codex
   require_command curl
-  load_secret_env
   ensure_env_file
+  check_optional_engine_commands
+  load_secret_env
   migrate_project_token_to_secret_env
   auto_configure_bridge_proxy
   validate_required_env

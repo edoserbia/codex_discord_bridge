@@ -57,6 +57,8 @@ import type {
   DashboardConversation,
   DeferredDiscordReply,
   DeferredSendPayload,
+  EngineName,
+  ExecutionDriverMode,
   LocalSessionSendResult,
   PromptTask,
   RunStatus,
@@ -69,6 +71,7 @@ import { appendBridgeFileSendInstructions, extractBridgeFileSendDirective } from
 import { diagnoseCodexFailure, filterDiagnosticStderr, isIgnorableCodexStderrLine } from './codexDiagnostics.js';
 import { loadCodexGlobalModel, resolveCodexConfigPath, writeCodexGlobalModel } from './codexConfig.js';
 import { isCommandMessage, parseCommand } from './commandParser.js';
+import { buildEngineContextPrompt, shouldInjectEngineContext } from './engineContext.js';
 import { appendBridgeProjectContext } from './projectContext.js';
 import {
   detectNaturalLanguageFileRequest,
@@ -171,7 +174,7 @@ class PendingRunningCodexJob implements RunningCodexJob {
     return this.currentJob?.pid;
   }
 
-  get driverMode(): CodexDriverMode {
+  get driverMode(): ExecutionDriverMode {
     return this.currentJob?.driverMode ?? this.preferredDriverMode;
   }
 
@@ -245,7 +248,12 @@ function hasBindingExecutionChanged(previous: ChannelBinding | undefined, next: 
 
   return previous.projectName !== next.projectName
     || previous.workspacePath !== next.workspacePath
+    || previous.engine !== next.engine
     || JSON.stringify(previous.codex) !== JSON.stringify(next.codex);
+}
+
+function resolveTaskEngine(task: PromptTask, binding: ChannelBinding): EngineName {
+  return task.engine ?? binding.engine ?? 'codex';
 }
 
 function buildGuidancePrompt(rootPrompt: string, guidancePrompt: string): string {
@@ -368,8 +376,13 @@ function isTerminalRunStatus(status: RunStatus): boolean {
 }
 
 function buildRunInputFromTask(task: PromptTask, binding: ChannelBinding): CodexRunInput {
-  const prompt = appendBridgeProjectContext(task.effectivePrompt, binding);
+  return buildRunInputFromPrompt(task, binding, task.effectivePrompt);
+}
+
+function buildRunInputFromPrompt(task: PromptTask, binding: ChannelBinding, effectivePrompt: string): CodexRunInput {
+  const prompt = appendBridgeProjectContext(effectivePrompt, binding);
   return {
+    engine: resolveTaskEngine(task, binding),
     prompt: appendBridgeFileSendInstructions(prompt),
     imagePaths: task.attachments.filter((item) => item.isImage).map((item) => item.localPath),
     extraAddDirs: [
@@ -542,6 +555,7 @@ export class DiscordCodexBridge {
       guildId: resolvedGuildId,
       projectName: request.projectName,
       workspacePath: resolvedWorkspace,
+      engine: options.engine,
       codex: codexOptions,
       modelScope,
       createdAt: existingBinding?.createdAt ?? now,
@@ -597,6 +611,8 @@ export class DiscordCodexBridge {
   async resetConversation(conversationId: string, bindingChannelId?: string): Promise<ConversationSessionState> {
     return this.store.updateSession(conversationId, {
       codexThreadId: undefined,
+      claudeSessionId: undefined,
+      lastEngine: undefined,
       driver: undefined,
       fallbackActive: undefined,
     }, bindingChannelId);
@@ -653,6 +669,8 @@ export class DiscordCodexBridge {
 
       await this.store.updateSession(session.conversationId, {
         codexThreadId: undefined,
+        claudeSessionId: undefined,
+        lastEngine: undefined,
         driver: undefined,
         fallbackActive: undefined,
         lastRunAt: undefined,
@@ -693,7 +711,7 @@ export class DiscordCodexBridge {
       projectName: binding.projectName,
       workspacePath: binding.workspacePath,
       codexThreadId: normalizedThreadId,
-      driver: session.driver,
+      driver: session.driver === 'legacy-exec' || session.driver === 'app-server' ? session.driver : undefined,
       fallbackActive: session.fallbackActive,
       lastRunAt: session.lastRunAt,
       lastPromptBy: session.lastPromptBy,
@@ -734,6 +752,7 @@ export class DiscordCodexBridge {
     const taskId = randomUUID();
     const task: PromptTask = {
       id: taskId,
+      engine: 'codex',
       prompt: normalizedPrompt,
       effectivePrompt: normalizedPrompt,
       rootPrompt: normalizedPrompt,
@@ -769,6 +788,8 @@ export class DiscordCodexBridge {
       conversationId: session.conversationId,
       bindingChannelId: session.bindingChannelId,
       codexThreadId: session.codexThreadId,
+      claudeSessionId: session.claudeSessionId,
+      lastEngine: session.lastEngine,
       statusMessageId: session.statusMessageId,
       lastRunAt: session.lastRunAt,
       lastPromptBy: session.lastPromptBy,
@@ -1204,7 +1225,7 @@ export class DiscordCodexBridge {
     return directive.cleanText.trim()
       || directive.caption?.trim()
       || finalMessage.trim()
-      || '本轮已完成，但 Codex 没有返回文本消息。';
+      || `本轮已完成，但 ${result.engine === 'claude' ? 'Claude' : 'Codex'} 没有返回文本消息。`;
   }
 
   private getTranscriptSourceForTask(task: PromptTask): TranscriptEvent['source'] {
@@ -1617,6 +1638,13 @@ export class DiscordCodexBridge {
       case 'guide':
         await this.handleGuideCommand(message, resolved, command.prompt);
         return;
+      case 'prompt':
+        if (!resolved) {
+          await message.reply('当前频道未绑定项目。先执行 `!bind`。');
+          return;
+        }
+        await this.enqueuePrompt(message, resolved, command.prompt, 'normal', command.engine);
+        return;
       case 'sendfile':
         if (!resolved) {
           await message.reply('当前频道未绑定项目。先执行 `!bind`。');
@@ -1731,6 +1759,7 @@ export class DiscordCodexBridge {
       [
         `已绑定当前频道到项目 **${savedBinding.projectName}**。`,
         `目录：\`${savedBinding.workspacePath}\``,
+        `默认引擎：${savedBinding.engine ?? 'codex'}`,
         `执行模式：sandbox=\`${savedBinding.codex.sandboxMode}\` · approval=\`${savedBinding.codex.approvalPolicy}\` · search=${savedBinding.codex.search ? 'on' : 'off'}`,
         `模型：${this.formatBindingModelSummary(savedBinding, globalModel)}`,
         autopilotProject?.threadChannelId
@@ -1738,8 +1767,8 @@ export class DiscordCodexBridge {
           : 'Autopilot 线程：创建失败或当前频道不支持线程，请检查频道类型与权限。',
         'Autopilot 默认已创建但项目级调度默认暂停；可用 `!autopilot project on` 开启，`!autopilot` 查看完整说明。',
         executionChanged
-          ? '检测到绑定配置已变更，已重置当前频道及其线程的 Codex 会话；下一条消息会按新权限新建会话。'
-          : '现在主频道和其下线程都可以直接控制 Codex。',
+          ? '检测到绑定配置已变更，已重置当前频道及其线程的引擎会话；下一条消息会按新配置新建会话。'
+          : '现在主频道和其下线程都可以直接控制所选引擎。',
       ].join('\n'),
     );
   }
@@ -2136,7 +2165,7 @@ export class DiscordCodexBridge {
 
     const session = await this.resetConversation(resolved.conversationId, resolved.bindingChannelId);
     await this.refreshStatusPanel(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
-    await message.reply('当前会话的 Codex 上下文已重置。下一条消息会开启新会话。');
+    await message.reply('当前会话的 Codex/Claude 上下文已重置。下一条消息会按默认引擎开启新会话。');
   }
 
   private async handleGuideCommand(
@@ -2169,7 +2198,7 @@ export class DiscordCodexBridge {
       this.scheduleRuntimeStateSave(resolved.conversationId, true);
       await activeJob.steer(prompt);
       await message.react('🧭').catch(() => undefined);
-      await message.reply('已将你的新消息作为引导项插入当前工作，Codex 将继续在当前轮次处理中途引导。');
+      await message.reply('已将你的新消息作为引导项插入当前工作，当前引擎将继续在当前轮次处理中途引导。');
       const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
       await this.refreshRuntimeViews(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
       return;
@@ -3202,6 +3231,7 @@ export class DiscordCodexBridge {
     const runtime = this.getRuntime(channel.id);
     const task: PromptTask = {
       id: randomUUID(),
+      engine: binding.engine,
       prompt: options.displayPrompt,
       effectivePrompt: options.effectivePrompt,
       rootPrompt: options.displayPrompt,
@@ -3231,6 +3261,7 @@ export class DiscordCodexBridge {
     resolved: ResolvedConversation,
     prompt: string,
     mode: 'normal' | 'guidance' = 'normal',
+    engine?: EngineName,
   ): Promise<void> {
     const runtime = this.getRuntime(resolved.conversationId);
     const taskId = randomUUID();
@@ -3256,6 +3287,7 @@ export class DiscordCodexBridge {
 
     const task: PromptTask = {
       id: taskId,
+      engine: mode === 'guidance' ? activeTask?.engine : engine,
       prompt,
       effectivePrompt,
       rootPrompt,
@@ -3306,7 +3338,7 @@ export class DiscordCodexBridge {
           runtime.activeRun.cancellationReason = 'guidance';
           this.scheduleRuntimeStateSave(resolved.conversationId, true);
 
-          if (!runtime.activeRun.codexThreadId) {
+          if (!runtime.activeRun.codexThreadId && runtime.activeRun.engine !== 'claude') {
             await this.waitForConversationThreadId(resolved.conversationId, 1_500, activeTaskId);
           }
 
@@ -3365,13 +3397,16 @@ export class DiscordCodexBridge {
       return;
     }
 
+    const selectedEngine = resolveTaskEngine(task, binding);
+    const engineLabel = selectedEngine === 'claude' ? 'Claude' : 'Codex';
     const nextRun: ActiveRunState = {
       task,
+      engine: selectedEngine,
       driverMode: 'legacy-exec',
       status: 'starting',
       startedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      latestActivity: task.recovery ? '正在准备自动恢复' : '准备启动 Codex',
+      latestActivity: task.recovery ? '正在准备自动恢复' : `准备启动 ${engineLabel}`,
       agentMessages: [],
       reasoningSummaries: [],
       planItems: [],
@@ -3379,11 +3414,12 @@ export class DiscordCodexBridge {
       timeline: [
         task.recovery
           ? `♻️ 检测到任务中断，准备自动恢复：${this.describeRecoveryTask(task)}`
-          : '⏳ 已收到请求，准备启动 Codex',
+          : `⏳ 已收到请求，准备启动 ${engineLabel}`,
       ],
       stderr: [],
       usedResume: false,
       codexThreadId: undefined,
+      claudeSessionId: undefined,
       cancellationReason: undefined,
     };
 
@@ -3409,11 +3445,23 @@ export class DiscordCodexBridge {
       const activeRun = runtime.activeRun;
       return activeRun?.task.id === task.id ? activeRun : undefined;
     };
-    const resumableThreadId = !session.driver || session.driver === preferredDriverMode
-      ? session.codexThreadId
-      : undefined;
+    const canResumeInitialCodexThread = selectedEngine === 'codex'
+      && (
+        !session.driver
+        || session.driver === preferredDriverMode
+        || session.driver === 'claude-cli'
+      );
+    const resumableThreadId = selectedEngine === 'claude'
+      ? session.claudeSessionId
+      : canResumeInitialCodexThread
+        ? session.codexThreadId
+        : undefined;
     nextRun.usedResume = Boolean(resumableThreadId);
-    nextRun.codexThreadId = resumableThreadId;
+    if (selectedEngine === 'claude') {
+      nextRun.claudeSessionId = resumableThreadId;
+    } else {
+      nextRun.codexThreadId = resumableThreadId;
+    }
 
     let currentSession = await this.store.updateSession(conversationId, {
       lastRunAt: nextRun.startedAt,
@@ -3432,7 +3480,7 @@ export class DiscordCodexBridge {
       await this.sendDriverStatusNotice(channel, 'app-server 已恢复，后续请求将继续使用官方线程/轮次语义。');
     };
     const hooks: CodexRunHooks = {
-      onThreadStarted: async (codexThreadId: string) => {
+      onThreadStarted: async (nativeSessionId: string) => {
         const activeRun = getCurrentRun();
         if (!activeRun) {
           return;
@@ -3447,15 +3495,27 @@ export class DiscordCodexBridge {
         }
 
         this.touchActiveRun(activeRun);
-        activeRun.codexThreadId = codexThreadId;
-        this.pushRunTimeline(runtime, `🧵 Codex 会话已建立：${codexThreadId.slice(0, 8)}`);
-        const nextSession = await this.store.updateSession(conversationId, { codexThreadId }, task.bindingChannelId);
+        const activeEngine = activeRun.engine ?? selectedEngine;
+        const patch = activeEngine === 'claude'
+          ? { claudeSessionId: nativeSessionId, lastEngine: activeEngine }
+          : { codexThreadId: nativeSessionId, lastEngine: activeEngine };
+        if (activeEngine === 'claude') {
+          activeRun.claudeSessionId = nativeSessionId;
+        } else {
+          activeRun.codexThreadId = nativeSessionId;
+        }
+        this.pushRunTimeline(runtime, `🧵 ${activeEngine === 'claude' ? 'Claude' : 'Codex'} 会话已建立：${nativeSessionId.slice(0, 8)}`);
+        const nextSession = await this.store.updateSession(conversationId, patch, task.bindingChannelId);
         this.scheduleRuntimeStateSave(conversationId);
         this.scheduleRuntimeViewRefresh(channel, binding, nextSession, runtime, isThreadConversation);
       },
       onActivity: async (activity: string) => {
         const activeRun = getCurrentRun();
         if (!activeRun) {
+          return;
+        }
+
+        if (activity === 'Codex 轮次已提交，等待模型响应' && activeRun.currentCommand) {
           return;
         }
 
@@ -3606,8 +3666,33 @@ export class DiscordCodexBridge {
       while (true) {
         attemptsUsed += 1;
         const attemptSession = this.store.getSession(conversationId) ?? currentSession;
-        const shouldResumeOnPreferredDriver = !attemptSession.driver || attemptSession.driver === preferredDriverMode;
-        const existingThreadId = shouldResumeOnPreferredDriver ? attemptSession.codexThreadId : undefined;
+        const attemptEngine = resolveTaskEngine(currentTask, binding);
+        const shouldResumeOnPreferredDriver = attemptEngine === 'codex'
+          && attemptSession.driver !== 'claude-cli'
+          && (!attemptSession.driver || attemptSession.driver === preferredDriverMode);
+        const canResumeCodexThread = attemptEngine === 'codex'
+          && (shouldResumeOnPreferredDriver || attemptSession.driver === 'claude-cli');
+        const existingThreadId = attemptEngine === 'claude'
+          ? attemptSession.claudeSessionId
+          : canResumeCodexThread
+            ? attemptSession.codexThreadId
+            : undefined;
+        const transcriptEvents = await this.transcriptStore.listEvents(conversationId);
+        const shouldInjectContext = shouldInjectEngineContext({
+          currentEngine: attemptEngine,
+          lastEngine: attemptSession.lastEngine,
+          hasNativeSession: Boolean(existingThreadId),
+          transcriptEventCount: transcriptEvents.length,
+        });
+        const effectivePrompt = shouldInjectContext
+          ? buildEngineContextPrompt({
+              currentPrompt: currentTask.effectivePrompt,
+              previousEngine: attemptSession.lastEngine,
+              currentEngine: attemptEngine,
+              events: transcriptEvents,
+            })
+          : currentTask.effectivePrompt;
+        runInput = buildRunInputFromPrompt(currentTask, binding, effectivePrompt);
         const attemptLimit = this.getAttemptLimitForFailureKind(pendingRetryKind);
 
         if (attemptsUsed > 1 && runtime.activeRun && pendingRetryKind) {
@@ -3621,6 +3706,7 @@ export class DiscordCodexBridge {
           runInput = buildRunInputFromTask(currentTask, binding);
           this.touchActiveRun(runtime.activeRun);
           runtime.activeRun.task = currentTask;
+          runtime.activeRun.engine = resolveTaskEngine(currentTask, binding);
           runtime.activeRun.status = 'starting';
           runtime.activeRun.latestActivity = retryDescription.latestActivity;
           runtime.activeRun.currentCommand = undefined;
@@ -3630,7 +3716,7 @@ export class DiscordCodexBridge {
           await this.announceRecoveryStart(channel, currentTask);
         }
 
-        if (!shouldResumeOnPreferredDriver && attemptSession.codexThreadId) {
+        if (attemptEngine === 'codex' && !canResumeCodexThread && attemptSession.codexThreadId) {
           currentSession = await this.store.updateSession(conversationId, {
             codexThreadId: undefined,
           }, task.bindingChannelId);
@@ -3638,19 +3724,21 @@ export class DiscordCodexBridge {
 
         if (runtime.activeRun?.cancellationReason) {
           pendingJob.clearJob();
-          result = buildCancelledBeforeStartResult(nextRun.usedResume);
+          result = buildCancelledBeforeStartResult(nextRun.usedResume, attemptEngine);
           break;
         }
 
         const job = this.runner.start(binding, runInput, existingThreadId, hooks);
         pendingJob.setJob(job);
-        const startedInFallback = preferredDriverMode === 'app-server' && job.driverMode === 'legacy-exec';
+        const startedInFallback = attemptEngine === 'codex' && preferredDriverMode === 'app-server' && job.driverMode === 'legacy-exec';
         nextRun.driverMode = job.driverMode;
+        nextRun.engine = attemptEngine;
         currentSession = await this.store.updateSession(conversationId, {
           driver: job.driverMode,
           fallbackActive: startedInFallback,
+          lastEngine: attemptEngine,
         }, currentTask.bindingChannelId);
-        pendingRecoveryNotice = Boolean(attemptSession.fallbackActive) && job.driverMode === 'app-server';
+        pendingRecoveryNotice = attemptEngine === 'codex' && Boolean(attemptSession.fallbackActive) && job.driverMode === 'app-server';
         this.logCodexAttemptStart(binding, currentTask, conversationId, attemptsUsed, attemptLimit, job.pid, existingThreadId);
 
         await channel.sendTyping().catch(() => undefined);
@@ -3695,7 +3783,9 @@ export class DiscordCodexBridge {
               runtime.activeRun.latestActivity = retryDescription.latestActivity;
             }
 
-            nextSession = await this.store.updateSession(conversationId, { codexThreadId: undefined }, currentTask.bindingChannelId);
+            nextSession = await this.store.updateSession(conversationId, attemptEngine === 'claude'
+              ? { claudeSessionId: undefined }
+              : { codexThreadId: undefined }, currentTask.bindingChannelId);
           }
 
           this.scheduleRuntimeStateSave(conversationId, true);
@@ -3726,11 +3816,16 @@ export class DiscordCodexBridge {
       }
 
       if (runtime.activeRun) {
+        const activeEngine = runtime.activeRun.engine ?? resolveTaskEngine(currentTask, binding);
         const stoppedByAutopilotPause = cancellationReason === 'autopilot_disabled';
         this.touchActiveRun(runtime.activeRun);
         runtime.activeRun.exitCode = result.exitCode;
         runtime.activeRun.signal = result.signal;
-        runtime.activeRun.codexThreadId = result.codexThreadId;
+        if (activeEngine === 'claude') {
+          runtime.activeRun.claudeSessionId = result.claudeSessionId;
+        } else {
+          runtime.activeRun.codexThreadId = result.codexThreadId;
+        }
         runtime.activeRun.status = runtime.activeRun.status === 'cancelled'
           ? 'cancelled'
           : result.success
@@ -3754,6 +3849,18 @@ export class DiscordCodexBridge {
           );
         }
       }
+
+      const completedEngine = resolveTaskEngine(currentTask, binding);
+      const completedSessionPatch: Partial<Omit<ConversationSessionState, 'conversationId' | 'bindingChannelId' | 'updatedAt'>> = {
+        lastEngine: completedEngine,
+      };
+      if (completedEngine === 'claude' && result.claudeSessionId) {
+        completedSessionPatch.claudeSessionId = result.claudeSessionId;
+      }
+      if (completedEngine === 'codex' && result.codexThreadId) {
+        completedSessionPatch.codexThreadId = result.codexThreadId;
+      }
+      nextSession = await this.store.updateSession(conversationId, completedSessionPatch, currentTask.bindingChannelId);
 
       await this.safeRefreshProgressMessage(channel, binding, runtime);
       nextSession = await this.recordTranscriptForCompletedTask(
@@ -4082,13 +4189,14 @@ export class DiscordCodexBridge {
     console.log(
       [
         '[codex-run]',
+        `engine=${resolveTaskEngine(task, binding)}`,
         `project=${binding.projectName}`,
         `conversation=${conversationId}`,
         `task=${task.id.slice(0, 8)}`,
         `attempt=${attempt}/${this.formatAttemptLimit(attemptLimit)}`,
         `pid=${pid ?? 'null'}`,
         `resume=${existingThreadId ? 'true' : 'false'}`,
-        `thread=${existingThreadId ?? 'new'}`,
+        `${resolveTaskEngine(task, binding) === 'claude' ? 'session' : 'thread'}=${existingThreadId ?? 'new'}`,
       ].join(' '),
     );
   }
@@ -4113,6 +4221,7 @@ export class DiscordCodexBridge {
     log(
       [
         '[codex-run]',
+        `engine=${resolveTaskEngine(task, binding)}`,
         `project=${binding.projectName}`,
         `conversation=${conversationId}`,
         `task=${task.id.slice(0, 8)}`,
@@ -4697,18 +4806,20 @@ function summarizeCollabAgentStates(item: CollabToolCall): string {
     .join(' · ');
 }
 
-function buildCancelledBeforeStartResult(usedResume: boolean): CodexRunResult {
+function buildCancelledBeforeStartResult(usedResume: boolean, engine: EngineName = 'codex'): CodexRunResult {
   return {
+    engine: engine === 'claude' ? 'claude' : undefined,
     success: false,
     exitCode: null,
     signal: null,
     codexThreadId: undefined,
+    claudeSessionId: undefined,
     usedResume,
     turnCompleted: false,
     agentMessages: [],
     reasoning: [],
     planItems: [],
-    stderr: ['Codex process cancelled before start.'],
+    stderr: [`${engine === 'claude' ? 'Claude' : 'Codex'} process cancelled before start.`],
     commands: [],
   };
 }

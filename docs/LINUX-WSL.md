@@ -12,6 +12,7 @@
 Linux / WSL 当前可以稳定使用这些能力：
 
 - Discord 主频道绑定项目、线程拆分独立会话
+- Codex / Claude 双引擎：绑定默认引擎，或用 `!claude` / `!codex` 单次覆盖
 - `!status` 返回 Resume ID，并在本机用 `bridgectl session resume <id>` 接回同一会话
 - Web 管理面板
 - `bridgectl` CLI
@@ -46,6 +47,7 @@ git --version
 node -v
 npm -v
 codex --version
+claude --version
 ```
 
 要求如下：
@@ -53,7 +55,7 @@ codex --version
 - Bash
 - Git
 - Node.js `>= 20.11`
-- 已安装并登录的 `codex` CLI
+- 已安装并登录的 `codex` CLI 或 `claude` CLI；如果两个引擎都要用，就两个都安装并登录
 - 一个可用的 Discord Bot
 - Bot 已加入目标 Discord 服务器
 - Bot 已启用 **Message Content Intent**
@@ -71,6 +73,7 @@ codex --version
 | 允许绑定的项目根目录 | 你自己本机或 WSL 中实际存在的目录 | 项目 `.env` 里的 `ALLOWED_WORKSPACE_ROOTS=...` | 限制 Discord 只能绑定这些目录 |
 | Web 面板 token | 你自己生成一串随机字符串 | 项目 `.env` 里的 `WEB_AUTH_TOKEN=...` | 保护本机 Web 管理面板 |
 | 代理地址（可选） | 你本机实际可用的代理地址，例如 Clash / VPN 暴露的 HTTP 代理 | 项目 `.env` 里的 `CODEX_DISCORD_BRIDGE_PROXY=...` | 让 bridge 能连 Discord 和下载附件 |
+| Codex / Claude 命令（可选） | WSL/Linux 里的实际 CLI 命令或绝对路径 | 项目 `.env` 里的 `CODEX_COMMAND=...` / `CLAUDE_COMMAND=...` | 指定 Bridge 调用哪个引擎 |
 | Resume ID | 在 Discord 当前频道或线程发送 `!status` | 不写入配置；直接用于 `bridgectl session resume <Resume ID>` | 把当前会话接回本机 |
 | 频道 ID / 线程 ID（可选） | Discord 打开 `Developer Mode` 后，右键频道或线程 → `Copy Channel ID` | 不写入配置；直接用于 `bridgectl ... --channel <频道ID>` | 从本机 CLI 精确指定项目 |
 | 项目名（可选） | `!bind <project> ...` 的第一个参数，或发送 `!projects` 查看 | 不写入配置；直接用于 `bridgectl ... --project <项目名>` | 从本机 CLI 按项目名选择绑定 |
@@ -78,8 +81,8 @@ codex --version
 ## 四、拉代码并安装依赖
 
 ```bash
-git clone https://<git-host>/<owner-or-namespace>/codex-discord-bridge.git
-cd codex-discord-bridge
+git clone https://<git-host>/<owner-or-namespace>/cc-bridge.git
+cd cc-bridge
 npm ci
 cp .env.example .env
 ```
@@ -124,6 +127,8 @@ ALLOWED_WORKSPACE_ROOTS=/home/<user>/workspaces,/home/<user>/projects
 DISCORD_ADMIN_USER_IDS=123456789012345678
 WEB_PORT=3769
 WEB_AUTH_TOKEN=replace-with-a-long-random-string
+CODEX_COMMAND=codex
+CLAUDE_COMMAND=claude
 
 # 如不需要代理，可以留空
 # CODEX_DISCORD_BRIDGE_PROXY=http://127.0.0.1:7890
@@ -221,7 +226,7 @@ bridgectl autopilot status
 先到一个普通文本频道，发送：
 
 ```text
-!bind demo "/home/<user>/workspaces/demo" --sandbox danger-full-access --approval never --search off
+!bind demo "/home/<user>/workspaces/demo" --engine claude --sandbox danger-full-access --approval never --search off
 ```
 
 如果你的目录不是 Git 仓库，建议直接加上：
@@ -233,7 +238,7 @@ bridgectl autopilot status
 完整示例：
 
 ```text
-!bind demo "/home/<user>/workspaces/demo" --sandbox danger-full-access --approval never --search off --skip-git-check on
+!bind demo "/home/<user>/workspaces/demo" --engine claude --sandbox danger-full-access --approval never --search off --skip-git-check on
 ```
 
 然后再发一条普通消息，例如：
@@ -250,6 +255,15 @@ bridgectl autopilot status
 说明 Linux / WSL 这条链路已经打通。
 
 这条实时进度消息会优先显示最新回复草稿、最新计划状态和最新分析摘要；即使消息很长，也会尽量保留这些最新内容，而不是只保留前面的旧内容。
+
+如果你想临时换引擎，不需要重新绑定：
+
+```text
+!codex 用 Codex 接着做实现
+!claude 用 Claude 检查刚才的方案
+```
+
+Bridge 会分别保留 Codex thread 和 Claude session。跨引擎时会把最近 transcript 摘要带给新引擎，避免换引擎后上下文突然断掉。
 
 ## 十一、从 Discord 里拿到什么信息，以及它们填到哪里
 
@@ -337,7 +351,7 @@ bridgectl autopilot project run --project demo
 - 所有命令都在 WSL 的 Bash 里执行，不是在 PowerShell 里执行
 - `ALLOWED_WORKSPACE_ROOTS` 和 `!bind` 里的路径，都尽量写 WSL Linux 路径
 - 推荐把项目放在 `/home/<user>/...`，不要默认放在 `/mnt/c/...`
-- bridge 是在 WSL 里启动 `codex` CLI，所以 `codex` 也必须安装并登录在 WSL 里
+- bridge 是在 WSL 里启动 `codex` / `claude` CLI，所以对应 CLI 也必须安装并登录在 WSL 里
 
 ## 十三、常见问题
 

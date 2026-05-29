@@ -104,13 +104,18 @@ test('web server supports bearer auth and browser token bootstrap cookie', { con
     assert.equal(bootstrapResponse.headers.get('location'), '/');
 
     const setCookie = bootstrapResponse.headers.get('set-cookie') ?? '';
-    assert.match(setCookie, /codex_bridge_auth=secret-token/);
+    assert.match(setCookie, /cc_bridge_auth=secret-token/);
     const cookieHeader = setCookie.split(';', 1)[0];
 
     const cookieDashboardResponse = await fetch(`${webServer.getOrigin()}/api/dashboard`, {
       headers: { cookie: cookieHeader },
     });
     assert.equal(cookieDashboardResponse.status, 200);
+
+    const legacyCookieDashboardResponse = await fetch(`${webServer.getOrigin()}/api/dashboard`, {
+      headers: { cookie: 'codex_bridge_auth=secret-token' },
+    });
+    assert.equal(legacyCookieDashboardResponse.status, 200);
 
     const dashboard = await cookieDashboardResponse.json() as Array<{ binding: { channelId: string } }>;
     assert.equal(dashboard.length, 1);

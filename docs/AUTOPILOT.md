@@ -1,6 +1,6 @@
 # Autopilot
 
-这份文档专门说明 `codex-discord-bridge` 里的 Autopilot 自动迭代能力，包括：
+这份文档专门说明 `cc-bridge` 里的 Autopilot 自动迭代能力，包括：
 
 - 用户如何使用
 - 本机 CLI 如何控制
@@ -323,7 +323,7 @@ Codex 的计划项在实时进度里固定显示为：
 - 同一服务器里，Autopilot 最多会同时运行到该并行数上限
 - `!autopilot server concurrency <N>` 可以在运行期间随时调整并行数
 - 已运行中的 Autopilot 不会因为并行数调整而被取消
-- 主频道和普通线程里的手动 Codex 会话，与 Autopilot 调度彼此独立，不互相占用运行槽
+- 主频道和普通线程里的手动引擎会话，与 Autopilot 调度彼此独立，不互相占用运行槽
 
 ## 10. 当前实现结构
 

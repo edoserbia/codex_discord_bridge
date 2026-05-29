@@ -9,6 +9,7 @@ import type {
   CodexRunResult,
   ConversationSessionState,
   DashboardBinding,
+  ExecutionDriverMode,
   PlanItem,
   PromptTask,
   TranscriptEvent,
@@ -128,7 +129,7 @@ function formatBindingModelSummary(binding: ChannelBinding, globalModel: string 
     return `\`${normalizedGlobalModel}\`（跟随全局）`;
   }
 
-  return '未显式指定（跟随 Codex 默认配置）';
+  return '未显式指定（跟随所选引擎默认配置）';
 }
 
 function formatTaskSummary(task: PromptTask, maxLength = 90): string {
@@ -244,9 +245,11 @@ function formatNamedCollabAgentState(state: CollabToolCall['agentsStates'][strin
 
 export function formatHelp(prefix: string): string {
   return [
-    '🤖 **Codex Discord Bridge 帮助**',
+    '🤖 **CC Bridge 帮助**',
     '',
-    `- 绑定频道：\`${prefix}bind <项目名> <目录> [--sandbox ...] [--approval ...] [--search on|off]\``,
+    `- 绑定频道：\`${prefix}bind <项目名> <目录> [--engine codex|claude] [--sandbox ...] [--approval ...] [--search on|off]\``,
+    `- 单次使用 Claude：\`${prefix}claude <请求内容>\``,
+    `- 单次使用 Codex：\`${prefix}codex <请求内容>\``,
     '  如果主绑定目录不存在，bridge 会先自动创建该目录',
     `- 发送文件：\`${prefix}sendfile <文件名/相对路径>\``,
     `- 发送候选序号：\`${prefix}sendfile 2\``,
@@ -267,11 +270,12 @@ export function formatHelp(prefix: string): string {
     `- 解绑频道：\`${prefix}unbind\``,
     `- 查看所有项目：\`${prefix}projects\``,
     '',
-    '绑定成功后，主频道和其下 Discord 线程里的普通消息都会直接作为 Codex prompt 发送。',
+    '绑定成功后，主频道和其下 Discord 线程里的普通消息都会按绑定的默认引擎发送。未指定时默认使用 Codex。',
+    '默认引擎可在绑定时用 `--engine claude` 或 `--engine codex` 指定；也可用 `!claude` / `!codex` 对单次请求覆盖。',
     '绑定后还会自动创建一个 Autopilot 项目线程；可在主频道或线程里用 `!autopilot` 查看自动迭代用法。',
     '现在会在频道里持续更新实时进度、命令执行和计划状态。',
     'Subagent 支持已默认开启；如果你还希望 Codex 把 AGENTS.md 的层级说明显式透传给子代理，可在绑定时追加 `--config features.child_agents_md=true`。',
-    '模型切换不会自动 reset 当前会话；如果项目正在运行，本轮继续用旧模型，下一轮开始使用新模型。',
+    '模型切换不会自动 reset 当前会话；如果项目正在运行，本轮继续用旧模型，下一轮开始使用新模型。模型命令目前主要面向 Codex；Claude 会复用绑定上的 model 参数传给 Claude CLI。',
     '如果当前任务正在运行，可用 `!guide <内容>` 插入中途引导，bridge 会中断当前步骤，先处理引导，再按同一会话继续原任务。',
     '图片附件会自动透传到 `codex -i`；上传的附件会同步到绑定目录里的 `inbox/` 子目录，普通文件也会保留一份 bridge 本地缓存。',
     '上传和发回文件时会尽量保留原文件名；只有目标位置已存在同名文件时，才会在扩展名前追加一段随机后缀。',
@@ -280,7 +284,8 @@ export function formatHelp(prefix: string): string {
     '显式绝对路径只允许管理员使用，例如 `!sendfile /absolute/path/to/report.pdf`。',
     '',
     '示例：',
-    `\`${prefix}bind api "/path/to/workspaces/api" --sandbox danger-full-access --approval never --search on\``,
+    `\`${prefix}bind api "/path/to/workspaces/api" --engine claude --sandbox danger-full-access --approval never --search on\``,
+    `\`${prefix}codex 修复刚才的测试失败\``,
     `\`把 report.pdf 发给我\``,
     `\`${prefix}sendfile report.pdf\``,
   ].join('\n');
@@ -311,7 +316,7 @@ export function formatAutopilotHelp(prefix: string): string {
     '看板规则：Autopilot 通过项目目录里的 `.codex/autopilot/board.json` 和 `docs/AUTOPILOT_BOARD.md` 持久化看板；线程总结只同步变化项。',
     '调度规则：只有服务级和项目级都开启时，项目才会按配置周期自动运行。',
     '并行规则：服务级并行数可随时调整；已运行中的 Autopilot 不会被中断，新配置立即影响后续调度。',
-    '隔离规则：主频道和普通线程里的手动 Codex 会话，与 Autopilot 调度彼此独立，不互相占用运行槽。',
+    '隔离规则：主频道和普通线程里的手动引擎会话，与 Autopilot 调度彼此独立，不互相占用运行槽。',
     '手动执行规则：`!autopilot project run` 会立即运行 1 次，并按本轮完成时间刷新下一次周期时间。',
     '时长格式支持：`30m`、`2h`、`1d`、`90m`；纯数字默认按分钟处理。',
     `兼容简写：\`${prefix}autopilot on|off|clear|concurrency 2\` 等价于服务级命令。`,
@@ -462,6 +467,7 @@ export function formatStatus(
 ): string {
   const driverLabel = formatDriverLabel(runtime.activeRun?.driverMode ?? session.driver ?? preferredDriver, session.fallbackActive);
   const resumeId = session.codexThreadId?.trim();
+  const defaultEngine = binding.engine ?? 'codex';
   const resumeLines = resumeId
     ? [
         '🔐 **Resume**',
@@ -473,21 +479,23 @@ export function formatStatus(
     : [
         '🔐 **Resume**',
         'Resume ID：尚未建立',
-        '先发送一条普通消息，等 bridge 建立 Codex 会话后再回来复制本机继续命令。',
+        '先发送一条普通消息，等 bridge 建立 Codex 会话后再回来复制本机继续命令。`bridgectl session resume` 当前接回的是 Codex Resume ID。',
         `来源会话：\`${session.conversationId}\``,
         '',
       ];
   const lines = [
     ...resumeLines,
-    '🤖 **Codex Bridge 状态面板**',
+    '🤖 **CC Bridge 状态面板**',
     `项目：**${binding.projectName}**`,
     `目录：\`${binding.workspacePath}\``,
+    `默认引擎：${defaultEngine}`,
     `执行模式：sandbox=\`${binding.codex.sandboxMode}\` · approval=\`${binding.codex.approvalPolicy}\` · search=${binding.codex.search ? 'on' : 'off'}`,
     `模型：${formatBindingModelSummary(binding, globalModel)}`,
     `驱动：${driverLabel}`,
     `会话类型：${isThreadConversation ? 'Discord 线程会话' : '频道主会话'}`,
     `状态：${formatActiveStatus(runtime)}`,
     `Codex 会话：${session.codexThreadId ? `\`${shortId(session.codexThreadId)}\`` : '未建立'}`,
+    `Claude 会话：${session.claudeSessionId ? `\`${shortId(session.claudeSessionId)}\`` : '未建立'}`,
     `队列：${runtime.queue.length}`,
   ];
 
@@ -502,7 +510,7 @@ export function formatStatus(
     if (shouldRenderTaskContext(runtime.activeRun)) {
       appendTaskContextLines(lines, runtime.activeRun.task, '当前请求', 180);
     } else {
-      lines.push('当前请求：已接收，正在建立 Codex 会话');
+      lines.push(`当前请求：已接收，正在建立 ${runtime.activeRun.engine === 'claude' ? 'Claude' : 'Codex'} 会话`);
     }
     lines.push(`活动：${formatClockTimestamp(runtime.activeRun.updatedAt)} ${truncate(runtime.activeRun.latestActivity, 180)}`);
 
@@ -559,8 +567,9 @@ export function formatProgressMessage(
 
   const lines = [
     formatSectionDivider('过程进度', '-'),
-    '🛰️ **Codex 实时进度**',
+    '🛰️ **CC Bridge 实时进度**',
     `项目：**${truncate(binding.projectName, 80)}**`,
+    `引擎：${activeRun.engine ?? activeRun.task.engine ?? binding.engine ?? 'codex'}`,
     `请求人：${truncate(activeRun.task.requestedBy, 80)}`,
     `状态：${formatActiveStatus(runtime)}`,
     `驱动：${formatDriverLabel(activeRun.driverMode, preferredDriver === 'app-server' && activeRun.driverMode === 'legacy-exec')}`,
@@ -586,7 +595,7 @@ export function formatProgressMessage(
   if (shouldRenderTaskContext(activeRun)) {
     appendTaskContextLines(lines, activeRun.task, '请求', 90);
   } else {
-    lines.push('请求：已接收，正在建立 Codex 会话');
+    lines.push(`请求：已接收，正在建立 ${activeRun.engine === 'claude' ? 'Claude' : 'Codex'} 会话`);
   }
 
   appendTimelineLines(lines, activeRun.timeline, 8);
@@ -615,7 +624,7 @@ export function formatProgressMessage(
   return truncate(lines.join('\n'), 1900);
 }
 
-function formatDriverLabel(driver: 'legacy-exec' | 'app-server', fallbackActive: boolean | undefined): string {
+function formatDriverLabel(driver: ExecutionDriverMode, fallbackActive: boolean | undefined): string {
   return `${driver}${fallbackActive && driver === 'legacy-exec' ? '（fallback）' : ''}`;
 }
 
@@ -639,7 +648,7 @@ export function formatSuccessReply(
 ): string {
   const finalMessage = options.finalMessage?.trim()
     || result.agentMessages.at(-1)?.trim()
-    || '本轮已完成，但 Codex 没有返回文本消息。';
+    || `本轮已完成，但 ${result.engine === 'claude' ? 'Claude' : 'Codex'} 没有返回文本消息。`;
 
   return [
     formatSectionDivider('最终总结', '='),
@@ -929,9 +938,11 @@ export function formatDashboardHtml(data: DashboardBinding[]): string {
           <td>${conversation.queueLength}</td>
           <td>${conversation.lastPromptBy ?? ''}</td>
           <td>${conversation.lastRunAt ?? ''}</td>
+          <td>${conversation.lastEngine ?? binding.engine ?? 'codex'}</td>
           <td>${conversation.codexThreadId ? shortId(conversation.codexThreadId) : ''}</td>
+          <td>${conversation.claudeSessionId ? shortId(conversation.claudeSessionId) : ''}</td>
         </tr>`).join('')
-      : '<tr><td colspan="6">暂无会话</td></tr>';
+      : '<tr><td colspan="8">暂无会话</td></tr>';
 
     return `
       <section class="card">
@@ -940,7 +951,7 @@ export function formatDashboardHtml(data: DashboardBinding[]): string {
         <p><strong>目录:</strong> <code>${binding.workspacePath}</code></p>
         <table>
           <thead>
-            <tr><th>Conversation</th><th>Status</th><th>Queue</th><th>User</th><th>Last Run</th><th>Codex</th></tr>
+            <tr><th>Conversation</th><th>Status</th><th>Queue</th><th>User</th><th>Last Run</th><th>Engine</th><th>Codex</th><th>Claude</th></tr>
           </thead>
           <tbody>${conversationRows}</tbody>
         </table>
@@ -952,7 +963,7 @@ export function formatDashboardHtml(data: DashboardBinding[]): string {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Codex Discord Bridge</title>
+  <title>CC Bridge</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 24px; background: #0b1020; color: #eef2ff; }
     h1 { margin-bottom: 8px; }
@@ -967,7 +978,7 @@ export function formatDashboardHtml(data: DashboardBinding[]): string {
   </style>
 </head>
 <body>
-  <h1>Codex Discord Bridge 面板</h1>
+  <h1>CC Bridge 面板</h1>
   <p class="muted">创建/查看 Discord 频道到项目目录的映射，并查看当前会话运行状态。</p>
   <form id="bind-form">
     <input name="channelId" placeholder="Discord 频道 ID" required />

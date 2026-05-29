@@ -141,7 +141,7 @@ test('bridge status defaults to app-server for a fresh app-server session before
     await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
     await dispatch(bridge, createUserMessage(rootChannel, '!status', { userId: 'admin-user' }));
 
-    await waitFor(() => rootChannel.sent.some((message) => /Codex Bridge 状态面板/.test(message.content)), 15_000);
+    await waitFor(() => rootChannel.sent.some((message) => /CC Bridge 状态面板/.test(message.content)), 15_000);
     assert.ok(rootChannel.sent.some((message) => /驱动：app-server/.test(message.content)));
   } finally {
     await (bridge as any).stop?.();
@@ -163,7 +163,7 @@ test('bridge status shows that no resume id exists before the first Codex turn',
     await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
     await dispatch(bridge, createUserMessage(rootChannel, '!status', { userId: 'admin-user' }));
 
-    await waitFor(() => rootChannel.sent.some((message) => /Codex Bridge 状态面板/.test(message.content)), 15_000);
+    await waitFor(() => rootChannel.sent.some((message) => /CC Bridge 状态面板/.test(message.content)), 15_000);
     assert.ok(rootChannel.sent.some((message) => /Resume ID：尚未建立/.test(message.content)));
     assert.ok(rootChannel.sent.some((message) => /先发送一条普通消息/.test(message.content)));
   } finally {
@@ -665,8 +665,8 @@ test('bridge keeps live reasoning, command, and subagent progress in app-server 
     await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
     await dispatch(bridge, createUserMessage(rootChannel, '[app-rich] show me live progress'));
 
-    await waitFor(() => rootChannel.sent.some((message) => /Codex 实时进度/.test(message.content)), 15_000);
-    const progressMessage = rootChannel.sent.find((message) => /Codex 实时进度/.test(message.content));
+    await waitFor(() => rootChannel.sent.some((message) => /CC Bridge 实时进度/.test(message.content)), 15_000);
+    const progressMessage = rootChannel.sent.find((message) => /CC Bridge 实时进度/.test(message.content));
     assert.ok(progressMessage);
 
     await waitFor(() => /Inspecting request and planning next steps\./.test(progressMessage!.content), 15_000);
@@ -701,8 +701,8 @@ test('bridge shows native Codex compact status in app-server progress', { concur
     await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
     await dispatch(bridge, createUserMessage(rootChannel, '[app-compact] show compact status'));
 
-    await waitFor(() => rootChannel.sent.some((message) => /Codex 实时进度/.test(message.content)), 15_000);
-    const progressMessage = rootChannel.sent.find((message) => /Codex 实时进度/.test(message.content));
+    await waitFor(() => rootChannel.sent.some((message) => /CC Bridge 实时进度/.test(message.content)), 15_000);
+    const progressMessage = rootChannel.sent.find((message) => /CC Bridge 实时进度/.test(message.content));
     assert.ok(progressMessage);
 
     await waitFor(() => /Codex 已压缩上下文/.test(progressMessage!.content), 15_000);
@@ -728,8 +728,8 @@ test('bridge keeps streaming app-server deltas out of the process timeline while
     await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
     await dispatch(bridge, createUserMessage(rootChannel, '[app-rich-stream] show step progress'));
 
-    await waitFor(() => rootChannel.sent.some((message) => /Codex 实时进度/.test(message.content)), 15_000);
-    const progressMessage = rootChannel.sent.find((message) => /Codex 实时进度/.test(message.content));
+    await waitFor(() => rootChannel.sent.some((message) => /CC Bridge 实时进度/.test(message.content)), 15_000);
+    const progressMessage = rootChannel.sent.find((message) => /CC Bridge 实时进度/.test(message.content));
     assert.ok(progressMessage);
 
     await waitFor(() => /Inspecting request and planning next steps\./.test(progressMessage!.content), 15_000);
@@ -764,17 +764,18 @@ test('bridge shows raw app-server exec command progress for TMP instead of stayi
     await dispatch(bridge, createUserMessage(rootChannel, `!bind tmp "${workspace}"`, { userId: 'admin-user' }));
     await dispatch(bridge, createUserMessage(rootChannel, '[app-raw-exec-command] [app-hang-after-raw-exec] reproduce TMP long command progress'));
 
-    await waitFor(() => rootChannel.sent.some((message) => /Codex 实时进度/.test(message.content)), 15_000);
-    const progressMessage = rootChannel.sent.find((message) => /Codex 实时进度/.test(message.content));
+    await waitFor(() => rootChannel.sent.some((message) => /CC Bridge 实时进度/.test(message.content)), 15_000);
+    const progressMessage = rootChannel.sent.find((message) => /CC Bridge 实时进度/.test(message.content));
     assert.ok(progressMessage);
 
-    await waitFor(() => /当前命令：`sleep 1800; ssh westd-pro6000 status`/.test(progressMessage!.content), 15_000);
+    await waitFor(() => /当前命令：`sleep 1800; ssh westd-pro6000 status`/.test(progressMessage!.content)
+      && /最新活动：.*正在执行命令/.test(progressMessage!.content), 15_000);
     assert.match(progressMessage!.content, /项目：\*\*tmp\*\*/);
     assert.match(progressMessage!.content, /最新活动：.*正在执行命令/);
     assert.doesNotMatch(progressMessage!.content, /最新活动：.*准备启动 Codex/);
 
     await dispatch(bridge, createUserMessage(rootChannel, '!reset', { userId: 'admin-user' }));
-    await waitFor(() => rootChannel.sent.some((message) => /Codex 上下文已重置/.test(message.content)), 15_000);
+    await waitFor(() => rootChannel.sent.some((message) => /Codex\/Claude 上下文已重置/.test(message.content)), 15_000);
   } finally {
     await (bridge as any).stop?.();
     await cleanupDir(rootDir);
@@ -900,7 +901,7 @@ test('bridge reset releases a hung app-server run so queued prompts can start', 
     await waitFor(() => (bridge as any).getDashboardData().some((entry: any) => entry.conversations.some((conversation: any) => ['starting', 'running'].includes(conversation.status))), 15_000);
 
     await dispatch(bridge, createUserMessage(rootChannel, '!reset', { userId: 'admin-user' }));
-    await waitFor(() => rootChannel.sent.some((message) => /Codex 上下文已重置/.test(message.content)), 15_000);
+    await waitFor(() => rootChannel.sent.some((message) => /Codex\/Claude 上下文已重置/.test(message.content)), 15_000);
 
     await dispatch(bridge, createUserMessage(rootChannel, 'new prompt after hung reset'));
     await waitFor(() => rootChannel.sent.some((message) => /app-server ok: new prompt after hung reset/.test(message.content)), 15_000);
@@ -999,7 +1000,7 @@ test('bridge progress cards keep the current driver mode visible and render name
     await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
     await dispatch(bridge, createUserMessage(rootChannel, '[app-rich] show me progress'));
 
-    await waitFor(() => rootChannel.sent.some((message) => /🛰️ \*\*Codex 实时进度\*\*/.test(message.content)
+    await waitFor(() => rootChannel.sent.some((message) => /🛰️ \*\*CC Bridge 实时进度\*\*/.test(message.content)
       && /驱动：app-server/.test(message.content)
       && /auth-scout/.test(message.content)), 15_000);
   } finally {
@@ -1023,7 +1024,7 @@ test('bridge keeps legacy fallback mode visible in the live progress card after 
     await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
     await dispatch(bridge, createUserMessage(rootChannel, '[cancel] first prompt'));
 
-    await waitFor(() => rootChannel.sent.some((message) => /🛰️ \*\*Codex 实时进度\*\*/.test(message.content)
+    await waitFor(() => rootChannel.sent.some((message) => /🛰️ \*\*CC Bridge 实时进度\*\*/.test(message.content)
       && /驱动：legacy-exec（fallback）/.test(message.content)), 15_000);
   } finally {
     await dispatch(bridge, createUserMessage(rootChannel, '!cancel', { userId: 'admin-user' })).catch(() => undefined);
@@ -1329,7 +1330,7 @@ test('bridge reset cancels a run that is still waiting to attach its real job ha
     await waitFor(() => (bridge as any).getDashboardData().some((entry: any) => entry.conversations.some((conversation: any) => conversation.status === 'starting')), 15_000);
 
     await dispatch(bridge, createUserMessage(rootChannel, '!reset', { userId: 'admin-user' }));
-    await waitFor(() => rootChannel.sent.some((message) => /Codex 上下文已重置/.test(message.content)), 15_000);
+    await waitFor(() => rootChannel.sent.some((message) => /Codex\/Claude 上下文已重置/.test(message.content)), 15_000);
 
     await promptDispatch;
     await new Promise((resolve) => setTimeout(resolve, 3_500));
@@ -1530,7 +1531,7 @@ test('autopilot respects a single-slot concurrency setting and posts timestamped
   assert.ok(!threadB.sent.some((message) => /Autopilot 已启动/.test(message.content)));
   await waitFor(() => threadA.sent.some((message) => /Autopilot 本轮结束/.test(message.content)), AUTOPILOT_FINISH_TIMEOUT_MS);
   assert.ok(threadA.sent.some((message) => /\[\d{2}:\d{2}\]/.test(message.content)));
-  await waitFor(() => threadA.sent.some((message) => /Codex 实时进度/.test(message.content)), 15_000);
+  await waitFor(() => threadA.sent.some((message) => /CC Bridge 实时进度/.test(message.content)), 15_000);
   await waitFor(() => threadA.sent.some((message) => /当前命令：/.test(message.content)), 15_000);
   await waitFor(() => threadA.sent.some((message) => /请求：优先补测试和稳定性，不要做大功能/.test(message.content)), 15_000);
   assert.ok(threadA.sent.some((message) => /看板变化：/.test(message.content)));
@@ -1590,12 +1591,12 @@ test('bridge posts live progress with reasoning summary and plan updates', { con
 
   await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
   await dispatch(bridge, createUserMessage(rootChannel, '[plan] show me live progress'));
-  await waitFor(() => findSent(rootChannel, /Codex 实时进度/));
+  await waitFor(() => findSent(rootChannel, /CC Bridge 实时进度/));
   await waitFor(() => findSent(rootChannel, /计划：/));
   await waitFor(() => findSent(rootChannel, /分析摘要：/));
   await waitFor(() => findSent(rootChannel, /最近更新：\[\d{2}:\d{2}\]/));
 
-  assert.ok(rootChannel.sent.some((message) => /Codex 实时进度/.test(message.content)));
+  assert.ok(rootChannel.sent.some((message) => /CC Bridge 实时进度/.test(message.content)));
   assert.ok(rootChannel.sent.some((message) => /Create a short plan/.test(message.content)));
   assert.ok(rootChannel.sent.some((message) => /\[\d{2}:\d{2}\] 🔄 Codex 正在分析请求/.test(message.content)));
   await cleanupDir(rootDir);
@@ -1611,8 +1612,8 @@ test('bridge updates plan checkmarks live when todo items complete', { concurren
   await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
   await dispatch(bridge, createUserMessage(rootChannel, '[plan-live] show checkmarks'));
 
-  await waitFor(() => rootChannel.sent.some((message) => /Codex 实时进度/.test(message.content) && /- □ Patch code/.test(message.content)), 15_000);
-  const progressMessage = rootChannel.sent.find((message) => /Codex 实时进度/.test(message.content));
+  await waitFor(() => rootChannel.sent.some((message) => /CC Bridge 实时进度/.test(message.content) && /- □ Patch code/.test(message.content)), 15_000);
+  const progressMessage = rootChannel.sent.find((message) => /CC Bridge 实时进度/.test(message.content));
   assert.ok(progressMessage);
 
   await waitFor(() => /- ✓ Patch code/.test(progressMessage!.content), 15_000);
@@ -1631,8 +1632,8 @@ test('bridge keeps final plan checkmarks when the todo list finishes right befor
   await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
   await dispatch(bridge, createUserMessage(rootChannel, '[plan-fast] show the final checkmarks'));
 
-  await waitFor(() => rootChannel.sent.some((message) => /Codex 实时进度/.test(message.content)), 15_000);
-  const progressMessage = rootChannel.sent.find((message) => /Codex 实时进度/.test(message.content));
+  await waitFor(() => rootChannel.sent.some((message) => /CC Bridge 实时进度/.test(message.content)), 15_000);
+  const progressMessage = rootChannel.sent.find((message) => /CC Bridge 实时进度/.test(message.content));
   assert.ok(progressMessage);
 
   await waitFor(() => findSent(rootChannel, /ok: \[plan-fast\] show the final checkmarks/), 15_000);
@@ -1653,10 +1654,10 @@ test('bridge keeps final plan checkmarks when completion lands inside the refres
   await dispatch(bridge, createUserMessage(rootChannel, '[plan-race] show the final checkmarks'));
 
   await waitFor(
-    () => rootChannel.sent.some((message) => /Codex 实时进度/.test(message.content) && /- □ Patch code/.test(message.content)),
+    () => rootChannel.sent.some((message) => /CC Bridge 实时进度/.test(message.content) && /- □ Patch code/.test(message.content)),
     15_000,
   );
-  const progressMessage = rootChannel.sent.find((message) => /Codex 实时进度/.test(message.content));
+  const progressMessage = rootChannel.sent.find((message) => /CC Bridge 实时进度/.test(message.content));
   assert.ok(progressMessage);
 
   await waitFor(() => findSent(rootChannel, /ok: \[plan-race\] show the final checkmarks/), 15_000);
@@ -1677,10 +1678,10 @@ test('bridge shows subagent activity in live progress updates', { concurrency: f
   await dispatch(bridge, createUserMessage(rootChannel, '[subagent] coordinate a helper'));
 
   await waitFor(
-    () => rootChannel.sent.some((message) => /Codex 实时进度/.test(message.content) && /子代理：/.test(message.content)),
+    () => rootChannel.sent.some((message) => /CC Bridge 实时进度/.test(message.content) && /子代理：/.test(message.content)),
     20_000,
   );
-  const progressMessage = rootChannel.sent.find((message) => /Codex 实时进度/.test(message.content) && /子代理：/.test(message.content));
+  const progressMessage = rootChannel.sent.find((message) => /CC Bridge 实时进度/.test(message.content) && /子代理：/.test(message.content));
   assert.ok(progressMessage);
   await waitFor(() => /等待子代理/.test(progressMessage!.content), 20_000);
   assert.match(progressMessage!.content, /拉起子代理/);

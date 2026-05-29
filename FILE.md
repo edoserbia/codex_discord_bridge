@@ -38,5 +38,5 @@
 | --- | --- | --- |
 | `data/state.json` | 持久化绑定与会话状态 | 输入：bridge 状态变更；输出：下次启动恢复 |
 | `data/attachments/` | 普通附件下载缓存目录 | 输入：Discord 附件；输出：供 Codex 读取的本地文件 |
-| `logs/codex-discord-bridge.log` | 服务运行日志 | 输入：bridge/launchd 输出；输出：排障信息 |
-| `.run/codex-discord-bridge.pid` | 当前服务 PID | 输入：服务启动；输出：状态查询与重启控制 |
+| `logs/cc-bridge.log` | 服务运行日志 | 输入：bridge/launchd 输出；输出：排障信息 |
+| `.run/cc-bridge.pid` | 当前服务 PID | 输入：服务启动；输出：状态查询与重启控制 |

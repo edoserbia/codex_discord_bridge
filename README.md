@@ -1,6 +1,6 @@
-# Codex Discord Bridge
+# CC Bridge
 
-把本机 `codex` CLI 接到 Discord 文本频道、线程和本机终端上，让你可以在手机、桌面端和 Terminal 之间共享同一条 Codex 会话，同时保留实时进度、任务队列、文件收发、Autopilot 自动迭代和 Web 管理面板。
+把本机 `codex` / `claude` CLI 接到 Discord 文本频道、线程和本机终端上，让你可以在手机、桌面端和 Terminal 之间驱动 Codex 或 Claude，同时保留实时进度、任务队列、文件收发、Autopilot 自动迭代和 Web 管理面板。
 
 > 当前版本：`0.3.3`
 >
@@ -8,22 +8,24 @@
 
 ## 为什么要用
 
-原生 Codex CLI 很适合在本机连续工作，但很多人希望同时拥有：
+原生 Codex CLI 和 Claude CLI 都很适合在本机连续工作，但很多人希望同时拥有：
 
-- 在 Discord 里直接发消息驱动本机 Codex
+- 在 Discord 里直接发消息驱动本机 Codex 或 Claude
+- 绑定项目时选择默认引擎，单次请求时也能临时切换引擎
 - 一个项目对应一个频道，一个任务对应一个线程
 - 在手机上看到中间过程，而不是只看到最终答案
 - 遇到复杂任务时，随时从 Discord 切回本机 Terminal 接着同一个会话继续
 - 让自动巡检、补测试、低风险修复这类工作按周期自己跑
 
-`codex-discord-bridge` 就是把这些能力合到同一个控制面里。
+`cc-bridge` 就是把这些能力合到同一个控制面里。
 
 ## 功能概览
 
 | 能力 | 说明 |
 | --- | --- |
 | 频道绑定项目 | 一个 Discord 主频道绑定一个本地工作目录 |
-| 线程独立会话 | 主频道下的每个线程自动继承目录，但拥有自己的 Codex 会话 |
+| 双引擎 | 支持 Codex 和 Claude；可用 `--engine claude|codex` 设置绑定默认引擎，也可用 `!claude` / `!codex` 单次覆盖 |
+| 线程独立会话 | 主频道下的每个线程自动继承目录，但拥有自己的 Bridge 会话；Codex 和 Claude 分别保留各自原生 session |
 | `!status` 恢复入口 | 返回完整 Resume ID 和可直接复制的 `bridgectl session resume <id>` |
 | 本机续聊 | 通过 `bridgectl session status/send/resume` 在 Terminal 接回同一会话 |
 | Transcript 同步 | 本机续聊和 Discord 发起的消息都能同步回 Discord，保留完整记录；最终总结回复遇到瞬时写入失败也会补发 |
@@ -41,22 +43,24 @@
 这个项目的核心模型很简单：
 
 - 一个 Discord 主频道 = 一个项目目录
-- 一个 Discord 线程 = 该项目下的一条独立 Codex 会话
-- `!status` = 当前会话的恢复入口
+- 一个 Discord 线程 = 该项目下的一条独立 Bridge 会话
+- Codex 和 Claude 在同一条 Bridge 会话内各自保留原生 session；切换引擎时，Bridge 会用最近 transcript 做上下文交接
+- `!status` = 当前 Codex 会话的本机恢复入口
 - `bridgectl` = 本机控制同一 bridge 服务的 CLI
 
 示例：
 
 - `#proj-api` -> `/path/to/workspaces/api`
 - `#proj-app` -> `/path/to/workspaces/app`
-- `#proj-api` 里的线程 `修登录` -> `api` 项目下的一条独立 Codex 会话
-- `#proj-api` 里的线程 `写文档` -> `api` 项目下的另一条独立 Codex 会话
+- `#proj-api` 里的线程 `修登录` -> `api` 项目下的一条独立 Bridge 会话
+- `#proj-api` 里的线程 `写文档` -> `api` 项目下的另一条独立 Bridge 会话
 
 这样做的结果是：
 
 - 项目维度在频道里管理
 - 任务维度在线程里管理
-- 同一条会话既能在 Discord 里继续，也能在 Terminal 里继续
+- Codex 会话既能在 Discord 里继续，也能通过 `bridgectl session resume` 在 Terminal 里继续
+- Claude 会话通过 Discord 侧持续恢复；切回 Codex 时不会丢掉之前的 Codex thread
 
 ## 平台支持
 
@@ -70,12 +74,14 @@
 
 - macOS，或 Linux / WSL
 - Node.js `>= 20.11`
-- 已安装并登录的 `codex` CLI
+- 已安装并登录的 `codex` CLI 或 `claude` CLI；如果两个引擎都要用，就两个都安装并登录
 - 一个可用的 Discord Bot
 - Bot 已加入目标 Discord 服务器
 - Bot 已启用 **Message Content Intent**
 
 当前版本已经按 `codex-cli 0.116.0` 做过验证。
+
+Claude CLI 默认命令名是 `claude`，也可以通过 `.env` 中的 `CLAUDE_COMMAND=/path/to/claude` 覆盖。
 
 ## Codex CLI 兼容性
 
@@ -101,6 +107,23 @@ destructive_enabled = true
 
 在 `codex-cli 0.116.0` 上，这组旧键会让 `codex app-server` 报权限配置不兼容，并导致 bridge 回退到 `legacy-exec`。
 
+## Claude CLI 兼容性
+
+Claude 引擎通过本机 Claude CLI 执行，默认命令为：
+
+```dotenv
+CLAUDE_COMMAND=claude
+```
+
+Bridge 会使用 Claude CLI 的 stream-json 输出，并为 Claude 单独保存 `claudeSessionId`。当你从 Codex 切到 Claude，或从 Claude 切回 Codex，Bridge 会把当前 Discord 会话最近的 transcript 摘要注入到新引擎，让任务能延续上下文；但两边并不是同一个原生 session。
+
+权限和模型参数按绑定配置保守映射：
+
+- `--engine claude` 让普通消息默认走 Claude
+- `!claude <请求>` 只让当前这一条走 Claude
+- 绑定上的 `model` 会传给 Claude CLI 的 `--model`
+- 当绑定使用 `--sandbox danger-full-access --approval never` 时，Claude CLI 会使用 bypass permissions 模式
+
 ## 快速开始
 
 先选安装路线：
@@ -114,14 +137,14 @@ destructive_enabled = true
 如果你在 macOS：
 
 ```bash
-cd /path/to/codex-discord-bridge
+cd /path/to/cc-bridge
 ./scripts/macos-bridge.sh deploy
 ```
 
 如果你在 Linux / WSL，推荐按这条路线走：
 
 ```bash
-cd /path/to/codex-discord-bridge
+cd /path/to/cc-bridge
 npm ci
 cp .env.example .env
 npm run check
@@ -202,21 +225,23 @@ http://127.0.0.1:3769/?token=<YOUR_WEB_AUTH_TOKEN>
 在普通文本频道发送：
 
 ```text
-!bind api "/path/to/workspaces/api" --sandbox danger-full-access --approval never --search off
+!bind api "/path/to/workspaces/api" --engine claude --sandbox danger-full-access --approval never --search off
 ```
 
 说明：
 
 - `!bind` 必须在普通文本频道里执行
 - 线程会自动继承主频道绑定，不需要重复绑定
+- 不写 `--engine` 时默认使用 Codex
+- 写 `--engine claude` 后，普通消息默认使用 Claude
 - 如果目标目录不存在，bridge 会先自动创建再完成绑定
 - 如果目标目录不是 Git 仓库，建议显式加上 `--skip-git-check on`，避免 `app-server` 因仓库检查回退到 `legacy-exec`
 
-### 2. 像普通聊天一样驱动 Codex
+### 2. 像普通聊天一样驱动默认引擎
 
-绑定完成后，该主频道中的普通消息会直接变成 Codex prompt。你会同时看到：
+绑定完成后，该主频道中的普通消息会直接发给绑定默认引擎。你会同时看到：
 
-- 一条持续更新的“Codex 实时进度”消息
+- 一条持续更新的“CC Bridge 实时进度”消息
 - 一条本轮最终结果回复
 
 如果最终结果回复在发送到 Discord 时碰到短暂网络抖动或连接中断，bridge 会先把这条回复加入待补发队列，恢复后自动重试，避免频道里只剩过程消息而丢掉总结性回复。
@@ -233,20 +258,31 @@ http://127.0.0.1:3769/?token=<YOUR_WEB_AUTH_TOKEN>
 
 补充说明：
 
-- Bridge 现在会同时兼容传统 `app-server` delta 事件和较新的 Codex live event 形态，所以真实运行中的计划、分析和回复草稿会持续刷新，而不是只在最后一次性出现。
+- Codex 引擎会兼容传统 `app-server` delta 事件和较新的 Codex live event 形态，所以真实运行中的计划、分析和回复草稿会持续刷新，而不是只在最后一次性出现。
 - 当实时进度消息过长时，bridge 会优先保留“最新回复草稿”和“最新计划状态”，避免旧内容把最新状态挤到 `...` 之后看不见。
 
-### 3. 在线程里拆分任务
+### 3. 单次切换 Codex / Claude
+
+绑定默认引擎之外，每条请求也可以临时指定引擎：
+
+```text
+!claude 检查这个测试为什么失败
+!codex 按刚才的结论实现修复
+```
+
+切换引擎不会清掉另一边的原生 session。比如先用 Codex 做一轮，再用 Claude 分析，再切回 Codex，Bridge 会继续复用原来的 Codex thread，并把 Claude 侧最近 transcript 摘要带回 Codex prompt。
+
+### 4. 在线程里拆分任务
 
 在已绑定主频道下创建线程并继续发送消息后：
 
 - 线程继承主频道的项目目录
 - 每个线程都有自己的队列、状态和进度面板
-- 每个线程都有独立的 Codex 会话
+- 每个线程都有独立的 Bridge 会话；Codex 和 Claude 原生 session 也按线程隔离
 
 这意味着你可以把“修登录”“补测试”“改 README”拆成不同线程并行推进。
 
-### 4. 用 `!status` 把会话接回本机
+### 5. 用 `!status` 把 Codex 会话接回本机
 
 在 Discord 当前频道或线程发送：
 
@@ -282,7 +318,9 @@ bridgectl session send <Resume ID> "hello"
 
 本机续聊产生的用户消息和助手回复会同步回 Discord transcript，所以 Discord 端记录仍然是完整的。
 
-### 5. 运行中插入中途引导
+说明：`bridgectl session resume` 目前是 Codex Resume ID 的本机续聊入口；Claude 引擎的连续性由 Discord 侧 Bridge 会话和 Claude CLI resume 机制维护。
+
+### 6. 运行中插入中途引导
 
 如果当前任务还在执行，发送：
 
@@ -290,9 +328,9 @@ bridgectl session send <Resume ID> "hello"
 !guide 先补 README 的使用说明，再继续原任务
 ```
 
-Bridge 会中断当前步骤，在同一条 Codex 会话里先处理新增引导，然后继续原任务。只有当新引导明确要求停止或替换原任务时，bridge 才会转向新的目标。
+Bridge 会中断当前步骤，在当前引擎会话里先处理新增引导，然后继续原任务。只有当新引导明确要求停止或替换原任务时，bridge 才会转向新的目标。
 
-### 6. 文件上传和回传
+### 7. 文件上传和回传
 
 文件收发支持两条方向：
 
@@ -301,7 +339,7 @@ Bridge 会中断当前步骤，在同一条 Codex 会话里先处理新增引导
 
 行为规则：
 
-- 图片附件会自动透传给 `codex -i`
+- Codex 引擎下图片附件会自动透传给 `codex -i`
 - 所有上传文件都会缓存到 `data/attachments/<conversation>/<task>/`
 - 同时会镜像到当前绑定项目目录下的 `inbox/`
 - 回传文件时会尽量保留原文件名；只有目标位置已存在同名文件时，才会追加随机后缀
@@ -322,7 +360,7 @@ Bridge 会中断当前步骤，在同一条 Codex 会话里先处理新增引导
 !sendfile /absolute/path/to/report.pdf
 ```
 
-### 7. 开启 Autopilot
+### 8. 开启 Autopilot
 
 如果你希望 bridge 周期性处理“补测试、低风险修复、小范围清理”这类工作，最短流程如下：
 
@@ -350,6 +388,8 @@ Bridge 会中断当前步骤，在同一条 Codex 会话里先处理新增引导
 | --- | --- |
 | `!help` | 显示帮助和常见操作 |
 | `!bind <project> <path> [...]` | 把当前主频道绑定到本地目录 |
+| `!claude <内容>` | 当前这一条请求使用 Claude |
+| `!codex <内容>` | 当前这一条请求使用 Codex |
 | `!status` | 查看当前会话状态、Resume ID 和本机续聊命令 |
 | `!queue` | 查看当前会话排队情况 |
 | `!queue insert <序号>` | 把队列里的任务插到指定位置 |
@@ -487,6 +527,8 @@ sudo ./scripts/uninstall-service.sh --mode daemon
 | `DEFAULT_CODEX_APPROVAL` | 默认 approval 策略 |
 | `DEFAULT_CODEX_SEARCH` | 默认是否开启搜索 |
 | `DEFAULT_CODEX_SKIP_GIT_REPO_CHECK` | 默认是否跳过 Git 仓库检查，默认 `true` |
+| `CODEX_COMMAND` | Codex CLI 命令，默认 `codex` |
+| `CLAUDE_COMMAND` | Claude CLI 命令，默认 `claude` |
 | `WEB_PORT` | Web 面板端口，默认 `3769` |
 | `WEB_AUTH_TOKEN` | Web 面板鉴权 token |
 | `CODEX_DISCORD_BRIDGE_PROXY` | Bridge 连接 Discord 和下载附件时使用的代理 |
@@ -518,6 +560,7 @@ sudo ./scripts/uninstall-service.sh --mode daemon
 | 主题 | 文档 |
 | --- | --- |
 | 5 分钟快速上手 | [docs/QUICKSTART.md](docs/QUICKSTART.md) |
+| Codex / Claude 双引擎使用 | [docs/ENGINES.md](docs/ENGINES.md) |
 | macOS 部署、Bot 创建、自启动 | [docs/MACOS-deploy.md](docs/MACOS-deploy.md) |
 | Linux / WSL 安装、配置、运行 | [docs/LINUX-WSL.md](docs/LINUX-WSL.md) |
 | 运维、升级、日志、launchd、运行目录 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) |
@@ -531,10 +574,11 @@ sudo ./scripts/uninstall-service.sh --mode daemon
 
 1. [README.md](README.md)
 2. [docs/QUICKSTART.md](docs/QUICKSTART.md)
-3. macOS 用户继续看 [docs/MACOS-deploy.md](docs/MACOS-deploy.md)
-4. Linux / WSL 用户继续看 [docs/LINUX-WSL.md](docs/LINUX-WSL.md)
-5. [docs/AUTOPILOT.md](docs/AUTOPILOT.md)
-6. [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+3. [docs/ENGINES.md](docs/ENGINES.md)
+4. macOS 用户继续看 [docs/MACOS-deploy.md](docs/MACOS-deploy.md)
+5. Linux / WSL 用户继续看 [docs/LINUX-WSL.md](docs/LINUX-WSL.md)
+6. [docs/AUTOPILOT.md](docs/AUTOPILOT.md)
+7. [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
 ## 开发
 
@@ -551,11 +595,6 @@ npm run smoke:discord
 
 - Discord Bot Token 默认单独保存在 `~/.codex-tunning/secrets.env`
 - 项目 `.env` 默认不保存 Discord Token
-- 运行态日志、PID、状态、附件和 transcript 都保存在本地机器
-- `data/`、`logs/`、`.run/` 已在 `.gitignore` 中忽略，避免把运行态数据误提交
-- 建议把 `ALLOWED_WORKSPACE_ROOTS` 收紧到你真正愿意暴露给 Discord 的目录
-- 建议为 Web 面板配置 `WEB_AUTH_TOKEN`
-- 如果你不希望 Discord 中的 Codex 默认拥有写权限，可以把 `DEFAULT_CODEX_SANDBOX` 改回 `workspace-write` 或 `read-only`
 - 本仓库文档中的路径、Resume ID、服务标签和主机地址已尽量使用占位示例，避免泄露真实个人环境信息
 
 ## 故障排查

@@ -1,4 +1,4 @@
-import type { ApprovalPolicy, SandboxMode } from './types.js';
+import type { ApprovalPolicy, EngineName, SandboxMode } from './types.js';
 
 import { parseBooleanWord, parseDurationToMs, tokenizeCommand } from './utils.js';
 
@@ -7,6 +7,7 @@ export interface BindCommandOptions {
   profile?: string | undefined;
   sandboxMode?: SandboxMode | undefined;
   approvalPolicy?: ApprovalPolicy | undefined;
+  engine?: EngineName | undefined;
   search?: boolean | undefined;
   skipGitRepoCheck?: boolean | undefined;
   addDirs: string[];
@@ -16,6 +17,7 @@ export interface BindCommandOptions {
 export type ParsedCommand =
   | { kind: 'help' }
   | { kind: 'bind'; projectName: string; workspacePath: string; options: BindCommandOptions }
+  | { kind: 'prompt'; engine: EngineName; prompt: string }
   | { kind: 'guide'; prompt: string }
   | { kind: 'sendfile'; request: string }
   | { kind: 'sendfile'; index: number }
@@ -62,6 +64,14 @@ function parseApprovalPolicy(value: string): ApprovalPolicy {
   }
 
   throw new Error(`不支持的 approval 模式：${value}`);
+}
+
+function parseEngineName(value: string): EngineName {
+  if (value === 'codex' || value === 'claude') {
+    return value;
+  }
+
+  throw new Error(`不支持的 engine：${value}。可选值：codex、claude。`);
 }
 
 function parseAutopilotParallelism(value: string): number {
@@ -364,6 +374,19 @@ export function parseCommand(content: string, prefix: string): ParsedCommand {
       return parseAutopilotCommand(body);
     case 'model':
       return parseModelCommand(body);
+    case 'claude':
+    case 'codex': {
+      const prompt = body.slice(command.length).trim();
+      if (!prompt) {
+        throw new Error(`用法：!${command} <请求内容>`);
+      }
+
+      return {
+        kind: 'prompt',
+        engine: command,
+        prompt,
+      };
+    }
     case 'bind': {
       const projectName = tokens.shift();
       const workspacePath = tokens.shift();
@@ -392,6 +415,9 @@ export function parseCommand(content: string, prefix: string): ParsedCommand {
             break;
           case '--approval':
             options.approvalPolicy = parseApprovalPolicy(readValue(tokens, flag));
+            break;
+          case '--engine':
+            options.engine = parseEngineName(readValue(tokens, flag).toLowerCase());
             break;
           case '--search': {
             const parsed = parseBooleanWord(readValue(tokens, flag));

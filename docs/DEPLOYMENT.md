@@ -12,18 +12,18 @@
 假设项目位于：
 
 ```text
-/path/to/codex-discord-bridge
+/path/to/cc-bridge
 ```
 
 默认会涉及这些位置：
 
-- 项目环境变量：`/path/to/codex-discord-bridge/.env`
+- 项目环境变量：`/path/to/cc-bridge/.env`
 - Discord 密钥文件：`~/.codex-tunning/secrets.env`
-- 运行日志：`/path/to/codex-discord-bridge/logs/codex-discord-bridge.log`
-- PID 文件：`/path/to/codex-discord-bridge/.run/codex-discord-bridge.pid`
-- 状态文件：`/path/to/codex-discord-bridge/data/state.json`
-- Transcript 日志：`/path/to/codex-discord-bridge/data/transcripts/*.jsonl`
-- 上传附件缓存：`/path/to/codex-discord-bridge/data/attachments/`
+- 运行日志：`/path/to/cc-bridge/logs/cc-bridge.log`
+- PID 文件：`/path/to/cc-bridge/.run/cc-bridge.pid`
+- 状态文件：`/path/to/cc-bridge/data/state.json`
+- Transcript 日志：`/path/to/cc-bridge/data/transcripts/*.jsonl`
+- 上传附件缓存：`/path/to/cc-bridge/data/attachments/`
 - Web 面板：`http://127.0.0.1:3769`
 - LaunchAgent plist：`~/Library/LaunchAgents/<label>.plist`
 - LaunchDaemon plist：`/Library/LaunchDaemons/<label>.plist`
@@ -33,7 +33,7 @@
 ## 首次部署
 
 ```bash
-cd /path/to/codex-discord-bridge
+cd /path/to/cc-bridge
 ./scripts/macos-bridge.sh deploy
 ```
 
@@ -189,11 +189,14 @@ bridgectl session resume <Resume ID>
 
 ## 驱动与恢复行为
 
-- 普通文本任务默认优先使用官方 `app-server`
-- 如果 `app-server` 暂时不可用，或当前绑定目录不满足启动条件，bridge 会明确提示当前请求已回退到 `legacy-exec`
+- Codex 引擎默认优先使用官方 `app-server`
+- 如果 Codex `app-server` 暂时不可用，或当前绑定目录不满足启动条件，bridge 会明确提示当前请求已回退到 `legacy-exec`
+- Claude 引擎使用 Claude CLI，驱动显示为 `claude-cli`
+- 绑定默认引擎用 `!bind ... --engine claude|codex` 设置；单次请求可用 `!claude` / `!codex` 覆盖
+- 双引擎细节见 [docs/ENGINES.md](./ENGINES.md)
 - 进度卡会显示本轮实际驱动模式，避免“看起来像正常运行，实际上已经 fallback”这种误判
 - bridge 重启后，会优先恢复上一次中断的任务，再处理普通排队消息；Discord 中会看到恢复提示和恢复模式
-- 当前版本已兼容较新的 Codex live event 形态；真实运行中的回复草稿、计划状态和分析摘要应持续刷新，而不是只在结束时出现
+- 当前版本已兼容较新的 Codex live event 形态；Codex 真实运行中的回复草稿、计划状态和分析摘要应持续刷新，而不是只在结束时出现
 - 当 Discord 进度卡接近长度上限时，bridge 会优先保留最新回复草稿和最新计划状态，避免它们被旧内容截断
 
 ## 非 Git 目录绑定
@@ -334,18 +337,18 @@ cat ~/.codex-tunning/secrets.env
 bridgectl session resume <Resume ID>
 ```
 
-这条命令继续的仍然是同一个 bridge 会话，不会绕过 bridge 直接新开一条独立 Codex 对话；因此 transcript 记录和 Discord 展示会保持一致。
+这条命令继续的仍然是同一个 bridge 会话，不会绕过 bridge 直接新开一条独立 Codex 对话；因此 transcript 记录和 Discord 展示会保持一致。Claude 会话通过 Discord 侧 Bridge 会话和 Claude CLI resume id 保持连续。
 
 ## 文件收发规则
 
-- 图片附件会自动透传给 `codex -i`
+- Codex 引擎下图片附件会自动透传给 `codex -i`
 - 普通文件会缓存到 `data/attachments/...`，同时镜像到绑定工作区的 `inbox/`
 - 上传和发回文件时都会尽量保留原文件名；只有目标位置已存在同名文件时，才会在扩展名前追加一段随机后缀
 - 发文件回 Discord 时，默认会优先匹配 `inbox/`，再匹配其余工作区文件
 - 默认文件搜索范围是绑定工作区；自然语言 `把 report.pdf 发给我` 与 `!sendfile report.pdf` 都走这条路径
 - 如果有多个匹配，bridge 会返回编号列表，后续可用 `发第 2 个` 或 `!sendfile 2`
 - 显式绝对路径只允许管理员使用
-- 当用户要求 Codex 生成文件并直接回传时，bridge 会自动向 Codex 注入 `BRIDGE_SEND_FILE` 协议说明，让模型可以直接请求回传单个文件
+- 当用户要求模型生成文件并直接回传时，bridge 会自动注入 `BRIDGE_SEND_FILE` 协议说明，让模型可以直接请求回传单个文件
 
 如需清空本地会话状态，可以先停止服务，再删除 `data/state.json`。
 
@@ -368,7 +371,7 @@ bridgectl session resume <Resume ID>
 
 ## 权限说明
 
-默认会把 `DEFAULT_CODEX_SANDBOX` 设为 `danger-full-access`，让 Discord 中的 Codex 可以直接读写项目文件。
+默认会把 `DEFAULT_CODEX_SANDBOX` 设为 `danger-full-access`。Codex 会直接使用这些权限；Claude 引擎会把高权限绑定映射到 Claude CLI 的 bypass permissions 模式。
 
 当前文档按本机 `codex-cli 0.116.0` 验证。
 

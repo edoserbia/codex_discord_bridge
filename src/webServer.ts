@@ -8,7 +8,8 @@ import { DiscordCodexBridge } from './discordBot.js';
 import { formatDashboardHtml } from './formatters.js';
 import { buildWebAccessUrls } from './webAccess.js';
 
-const AUTH_COOKIE_NAME = 'codex_bridge_auth';
+const AUTH_COOKIE_NAME = 'cc_bridge_auth';
+const LEGACY_AUTH_COOKIE_NAME = 'codex_bridge_auth';
 
 export class AdminWebServer {
   private server: http.Server | undefined;
@@ -274,8 +275,9 @@ export class AdminWebServer {
       return true;
     }
 
-    const cookie = this.parseCookies(request.headers.cookie).get(AUTH_COOKIE_NAME);
-    return cookie === this.config.web.authToken;
+    const cookies = this.parseCookies(request.headers.cookie);
+    return cookies.get(AUTH_COOKIE_NAME) === this.config.web.authToken
+      || cookies.get(LEGACY_AUTH_COOKIE_NAME) === this.config.web.authToken;
   }
 
   private parseCookies(headerValue: string | undefined): Map<string, string> {

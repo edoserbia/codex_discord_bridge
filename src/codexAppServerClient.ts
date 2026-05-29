@@ -269,7 +269,7 @@ export class CodexAppServerClient {
 
     await this.request('initialize', {
       clientInfo: {
-        name: 'codex-discord-bridge',
+        name: 'cc-bridge',
         version: '0.3.3',
       },
       capabilities: {

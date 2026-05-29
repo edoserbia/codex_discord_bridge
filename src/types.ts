@@ -4,6 +4,12 @@ export type ApprovalPolicy = 'untrusted' | 'on-failure' | 'on-request' | 'never'
 
 export type AppServerTransport = 'auto' | 'stdio' | 'ws';
 
+export type EngineName = 'codex' | 'claude';
+
+export type CodexDriverMode = 'legacy-exec' | 'app-server';
+
+export type ExecutionDriverMode = CodexDriverMode | 'claude-cli';
+
 export interface BindingCodexOptions {
   model?: string | undefined;
   profile?: string | undefined;
@@ -20,6 +26,7 @@ export interface ChannelBinding {
   guildId: string;
   projectName: string;
   workspacePath: string;
+  engine?: EngineName | undefined;
   codex: BindingCodexOptions;
   modelScope?: 'global' | 'project' | undefined;
   createdAt: string;
@@ -71,7 +78,9 @@ export interface ConversationSessionState {
   conversationId: string;
   bindingChannelId: string;
   codexThreadId?: string | undefined;
-  driver?: CodexDriverMode | undefined;
+  claudeSessionId?: string | undefined;
+  lastEngine?: EngineName | undefined;
+  driver?: ExecutionDriverMode | undefined;
   fallbackActive?: boolean | undefined;
   statusMessageId?: string | undefined;
   transcriptHeaderMessageId?: string | undefined;
@@ -102,6 +111,7 @@ export interface AttachmentRef {
 
 export interface PromptTask {
   id: string;
+  engine?: EngineName | undefined;
   prompt: string;
   effectivePrompt: string;
   rootPrompt: string;
@@ -172,7 +182,8 @@ export type CancellationReason = 'user_cancel' | 'guidance' | 'binding_reset' | 
 
 export interface ActiveRunState {
   task: PromptTask;
-  driverMode: CodexDriverMode;
+  engine?: EngineName | undefined;
+  driverMode: ExecutionDriverMode;
   status: RunStatus;
   startedAt: string;
   updatedAt: string;
@@ -188,6 +199,7 @@ export interface ActiveRunState {
   usedResume: boolean;
   progressMessageId?: string | undefined;
   codexThreadId?: string | undefined;
+  claudeSessionId?: string | undefined;
   cancellationReason?: CancellationReason | undefined;
   exitCode?: number | null | undefined;
   signal?: NodeJS.Signals | null | undefined;
@@ -225,16 +237,19 @@ export interface ChannelRuntime {
 }
 
 export interface CodexRunInput {
+  engine?: EngineName | undefined;
   prompt: string;
   imagePaths: string[];
   extraAddDirs: string[];
 }
 
 export interface CodexRunResult {
+  engine?: EngineName | undefined;
   success: boolean;
   exitCode: number | null;
   signal: NodeJS.Signals | null;
   codexThreadId?: string | undefined;
+  claudeSessionId?: string | undefined;
   usedResume: boolean;
   turnCompleted: boolean;
   agentMessages: string[];
@@ -243,8 +258,6 @@ export interface CodexRunResult {
   stderr: string[];
   commands: CommandRecord[];
 }
-
-export type CodexDriverMode = 'legacy-exec' | 'app-server';
 
 export type AppServerPlanStatus = 'pending' | 'in_progress' | 'completed';
 
@@ -292,6 +305,8 @@ export interface DashboardConversation {
   conversationId: string;
   bindingChannelId: string;
   codexThreadId?: string | undefined;
+  claudeSessionId?: string | undefined;
+  lastEngine?: EngineName | undefined;
   statusMessageId?: string | undefined;
   lastRunAt?: string | undefined;
   lastPromptBy?: string | undefined;

@@ -24,6 +24,7 @@ export interface AppConfig {
   dataDir: string;
   codexConfigPath?: string | undefined;
   codexCommand: string;
+  claudeCommand: string;
   codexMaxAttempts: number;
   codexRateLimitMaxAttempts: number;
   codexRateLimitBaseDelayMs: number;
@@ -140,6 +141,7 @@ export function loadConfig(): AppConfig {
     dataDir: path.resolve(process.env.DATA_DIR ?? './data'),
     codexConfigPath: resolveCodexConfigPath(),
     codexCommand: process.env.CODEX_COMMAND?.trim() || 'codex',
+    claudeCommand: process.env.CLAUDE_COMMAND?.trim() || 'claude',
     codexMaxAttempts: parseMinimumInteger(process.env.CODEX_MAX_ATTEMPTS, 10, 1),
     codexRateLimitMaxAttempts: parseMinimumInteger(process.env.CODEX_RATE_LIMIT_MAX_ATTEMPTS, 0, 0),
     codexRateLimitBaseDelayMs: parseMinimumInteger(process.env.CODEX_RATE_LIMIT_BASE_DELAY_MS, 5_000, 0),

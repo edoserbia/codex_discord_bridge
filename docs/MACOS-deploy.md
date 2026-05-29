@@ -8,7 +8,8 @@
 - 如何在 macOS 上一键部署
 - 如何安装开机启动服务
 - 如何在 Discord 里把“频道 ↔ 项目目录”绑定起来
-- 如何使用线程作为独立 Codex 会话
+- 如何使用线程作为独立 Bridge 会话
+- 如何在 Codex / Claude 双引擎之间切换
 - 如何查看实时进度、传图片和普通附件，以及把工作区文件发回 Discord
 - 如何排查常见问题
 
@@ -17,8 +18,9 @@
 部署完成后，你将获得一套本机服务：
 
 - 一个 Discord 主频道对应一个本地项目目录
-- 主频道下每个线程对应该项目里的一个独立 Codex 会话
-- 在 Discord 里发消息即可驱动本机 `codex`
+- 主频道下每个线程对应该项目里的一个独立 Bridge 会话
+- 在 Discord 里发消息即可驱动本机 `codex` 或 `claude`
+- 绑定时可以设置默认引擎，也可以用 `!claude` / `!codex` 对单次请求覆盖
 - 运行中可以实时看到 reasoning、todo/plan、时间线、当前命令和输出预览
 - Discord 上传的文件会进入项目 `inbox/`，生成后的工作区文件也可以直接发回当前频道
 - 普通文本任务默认优先走 `app-server`，必要时会显式回退到 `legacy-exec`
@@ -33,7 +35,7 @@
 
 1. 你使用的是 macOS
 2. 已安装 Node.js `>= 20.11`
-3. 已安装并登录 `codex` CLI
+3. 已安装并登录 `codex` CLI 或 `claude` CLI；如果两个引擎都要用，就两个都安装并登录
 4. 你有权限在 Discord 服务器里添加 Bot
 5. 你愿意把哪些本地目录暴露给 Discord 控制，已经想清楚
 
@@ -48,6 +50,7 @@
 | 允许绑定的项目根目录 | 你自己这台 Mac 上准备暴露给 Discord 的目录 | 项目 `.env` 里的 `ALLOWED_WORKSPACE_ROOTS=...` | 限制 Discord 可访问范围 |
 | Web 面板 token | 你自己生成一串随机字符串，或让脚本生成 | 项目 `.env` 里的 `WEB_AUTH_TOKEN=...` | 保护本机 Web 面板 |
 | 代理地址（可选） | 你本机实际可用的 HTTP 代理，例如 `http://127.0.0.1:7890` | 项目 `.env` 里的 `CODEX_DISCORD_BRIDGE_PROXY=...` | 让 bridge 能稳定连接 Discord |
+| Codex / Claude 命令（可选） | 本机 CLI 命令或绝对路径 | 项目 `.env` 里的 `CODEX_COMMAND=...` / `CLAUDE_COMMAND=...` | 指定 Bridge 调用哪个引擎 |
 | Resume ID | 在 Discord 当前频道或线程发送 `!status` | 不写入配置；直接用于 `bridgectl session resume <Resume ID>` | 把当前会话接回本机 |
 | 频道 ID / 线程 ID（可选） | Discord 打开 `Developer Mode` 后，右键频道或线程 → `Copy Channel ID` | 不写入配置；直接用于 `bridgectl ... --channel <频道ID>` | 从本机 CLI 精确指定绑定 |
 | 项目名（可选） | `!bind <project> ...` 的第一个参数，或发送 `!projects` 查看 | 不写入配置；直接用于 `bridgectl ... --project <项目名>` | 从本机 CLI 按项目定位 |
@@ -58,7 +61,7 @@
 
 1. 打开 [Discord Developer Portal](https://discord.com/developers/applications)
 2. 点击 `New Application`
-3. 为应用起名，例如 `Codex Bridge`
+3. 为应用起名，例如 `CC Bridge`
 4. 左侧进入 `Bot`
 5. 点击 `Add Bot`
 6. 在 `Token` 区域点击 `Reset Token` 或 `Copy`
@@ -185,14 +188,14 @@ CODEX_DISCORD_BRIDGE_CA_CERT=/path/to/proxy-ca.pem
 
 - `MESSAGE CONTENT INTENT`
 
-否则机器人无法读取频道中的普通消息内容，也就无法把它们转成 Codex prompt。
+否则机器人无法读取频道中的普通消息内容，也就无法把它们转成模型 prompt。
 
 ## 五、在 macOS 上一键部署
 
 进入项目目录后执行：
 
 ```bash
-cd /path/to/codex-discord-bridge
+cd /path/to/cc-bridge
 ./scripts/macos-bridge.sh deploy
 ```
 
@@ -315,7 +318,7 @@ http://127.0.0.1:7890
 
 - `git`
 - Node.js `>= 20.11`
-- 已安装并登录的 `codex` CLI
+- 已安装并登录的 `codex` CLI 或 `claude` CLI
 - 能正常访问 Discord；如果不能，请提前准备好代理 `http://127.0.0.1:7890`
 
 可以先执行：
@@ -325,6 +328,7 @@ git --version
 node -v
 npm -v
 codex --version
+claude --version
 ```
 
 ### 2. 从远程 Git 仓库拉代码
@@ -609,11 +613,11 @@ sudo ./scripts/install-service.sh --mode daemon
 
 默认情况下：
 
-- 项目配置：`/path/to/codex-discord-bridge/.env`
+- 项目配置：`/path/to/cc-bridge/.env`
 - Discord 密钥：`~/.codex-tunning/secrets.env`
-- 运行日志：`/path/to/codex-discord-bridge/logs/codex-discord-bridge.log`
-- PID 文件：`/path/to/codex-discord-bridge/.run/codex-discord-bridge.pid`
-- 运行状态：`/path/to/codex-discord-bridge/data/state.json`
+- 运行日志：`/path/to/cc-bridge/logs/cc-bridge.log`
+- PID 文件：`/path/to/cc-bridge/.run/cc-bridge.pid`
+- 运行状态：`/path/to/cc-bridge/data/state.json`
 - Web 面板：`http://127.0.0.1:3769`
 - LaunchAgent：`~/Library/LaunchAgents/<label>.plist`
 - LaunchDaemon：`/Library/LaunchDaemons/<label>.plist`
@@ -646,7 +650,7 @@ Discord bot connected as <bot-name>#<discriminator>
 在普通文本频道发送：
 
 ```text
-!bind api "/path/to/workspaces/api" --sandbox danger-full-access --approval never --search off
+!bind api "/path/to/workspaces/api" --engine claude --sandbox danger-full-access --approval never --search off
 ```
 
 说明：
@@ -654,19 +658,31 @@ Discord bot connected as <bot-name>#<discriminator>
 - `!bind` 必须在主频道执行
 - 该主频道下创建的线程会自动继承此绑定
 - 如果主绑定目录还不存在，bridge 会先自动创建这个目录
+- 不写 `--engine` 时默认使用 Codex；写 `--engine claude` 后，普通消息默认使用 Claude
 - 默认 `.env` 已把 `DEFAULT_CODEX_SANDBOX` 设为 `danger-full-access`
 - 如果工作目录本身不是 Git 仓库，建议显式补上 `--skip-git-check on`
 
-### 2. 线程会自动变成独立会话
+### 2. 单次选择 Codex 或 Claude
+
+如果只想让当前这一条换引擎，不需要重新绑定：
+
+```text
+!claude 先检查这个报错的根因
+!codex 按刚才的结论实现修复
+```
+
+Bridge 会分别保留 Codex thread 和 Claude session。跨引擎时，会把最近 transcript 摘要交给新引擎，所以不会因为切换引擎而丢掉 Discord 会话上下文。
+
+### 3. 线程会自动变成独立会话
 
 绑定完成后：
 
 - 主频道继续承担“项目入口”
-- 每个线程会成为该项目下的一条独立 Codex 会话
+- 每个线程会成为该项目下的一条独立 Bridge 会话
 
-### 3. 运行中插入新的引导
+### 4. 运行中插入新的引导
 
-如果 Codex 正在运行，而你希望临时改方向，直接发送：
+如果当前引擎正在运行，而你希望临时改方向，直接发送：
 
 ```text
 !guide 现在先创建部署文档，然后继续完成当前项目任务
@@ -674,9 +690,9 @@ Discord bot connected as <bot-name>#<discriminator>
 
 Bridge 会中断当前步骤，并在**同一会话**中先处理这条引导，再继续原任务；只有当引导明确要求停止或替换原任务时，才会改成新目标。
 
-### 4. 图片和文件怎么传
+### 5. 图片和文件怎么传
 
-- 图片附件会自动透传给 `codex -i`
+- Codex 引擎下图片附件会自动透传给 `codex -i`
 - 普通文件会下载到 bridge 本地附件目录，并同步到绑定项目目录的 `inbox/`
 - 上传和发回文件时都会尽量保留原文件名；只有目标位置已存在同名文件时，才会在扩展名前追加一段随机后缀
 - 发文件回 Discord 时，bridge 会优先在 `inbox/` 中查找，再扩展到其余工作区文件
@@ -685,11 +701,11 @@ Bridge 会中断当前步骤，并在**同一会话**中先处理这条引导，
 - 也可以用 `!sendfile report.pdf`
 - 多个匹配时，bridge 会给出候选编号；继续回复 `发第 2 个` 或 `!sendfile 2`
 - 显式绝对路径只允许管理员使用
-- 当你要求 “生成 report.pdf 后直接发给我” 时，bridge 会自动把文件回传协议注入给 Codex；模型定位到单个文件后会直接把附件发回当前频道/线程
+- 当你要求 “生成 report.pdf 后直接发给我” 时，bridge 会自动把文件回传协议注入给当前引擎；模型定位到单个文件后会直接把附件发回当前频道/线程
 
 ## 十三、权限和写文件说明
 
-为了让 Discord 中的 Codex 能像本地 CLI 一样写文件，当前默认策略是：
+为了让 Discord 中的引擎能像本地 CLI 一样写文件，当前默认策略是：
 
 - `DEFAULT_CODEX_SANDBOX=danger-full-access`
 - `DEFAULT_CODEX_APPROVAL=never`
@@ -804,7 +820,7 @@ destructive_enabled = true
 也就是说：
 
 - 主频道决定“在哪个项目目录运行”
-- 线程决定“这次任务使用哪个独立 Codex 会话上下文”
+- 线程决定“这次任务使用哪个独立 Bridge 会话上下文”
 
 ### 5. 实时反馈是什么样
 
@@ -822,7 +838,7 @@ destructive_enabled = true
 
 补充说明：
 
-- Bridge 会同时兼容传统 `app-server` 增量事件和较新的 Codex live event 形态，所以真实任务运行时，计划、分析和回复草稿会持续刷新。
+- Codex 引擎会同时兼容传统 `app-server` 增量事件和较新的 Codex live event 形态，所以真实任务运行时，计划、分析和回复草稿会持续刷新。
 - 如果进度消息很长，bridge 会优先保留最新回复草稿和最新计划，而不是让它们被前面的旧内容截断。
 
 ### 6. 图片和普通附件怎么处理
@@ -837,7 +853,7 @@ destructive_enabled = true
 
 适合：
 
-- 截图让 Codex 看 UI / 报错
+- 截图让模型看 UI / 报错
 - 发送日志、配置文件、Markdown、代码片段等
 
 ## 十六、Web 管理面板怎么用
@@ -941,7 +957,7 @@ bridgectl session resume <Resume ID>
 
 ### 3. 我只看到了最终结果，看不到过程
 
-现在机器人会实时更新一条“Codex 实时进度”消息。
+现在机器人会实时更新一条“CC Bridge 实时进度”消息。
 
 如果你能看到进度消息，但里面一直只有很旧的内容、看不到最新草稿或最新计划，也应先升级到最新构建；当前版本已经把长消息截断策略调整为“最新状态优先”。
 
