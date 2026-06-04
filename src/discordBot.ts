@@ -2023,6 +2023,12 @@ export class DiscordCodexBridge {
       return;
     }
 
+    const clearedQueueCount = runtime.queue.length;
+    if (clearedQueueCount > 0) {
+      runtime.queue = [];
+      this.pushRunTimeline(runtime, `🗑️ 已清空等待队列 ${clearedQueueCount} 条`);
+    }
+
     runtime.activeRun.status = 'cancelled';
     runtime.activeRun.latestActivity = `已由 ${message.author.username} 请求取消`;
     runtime.activeRun.cancellationReason = 'user_cancel';
@@ -2031,7 +2037,11 @@ export class DiscordCodexBridge {
 
     const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
     await this.refreshStatusPanel(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
-    await message.reply('已发送取消信号给当前 Codex 任务。');
+    await message.reply(
+      clearedQueueCount > 0
+        ? `已发送取消信号给当前 Codex 任务，并清空等待队列 ${clearedQueueCount} 条。`
+        : '已发送取消信号给当前 Codex 任务。',
+    );
   }
 
   private async handleQueueInsertCommand(

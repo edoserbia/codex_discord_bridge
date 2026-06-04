@@ -650,6 +650,38 @@ test('bridge routes !guide to app-server steer without synthetic wrapper prompts
   }
 });
 
+test('bridge cancel clears queued prompts instead of starting them after the active run stops', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-app-server-cancel-clears-queue-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeAppServerCommand,
+    driverMode: 'app-server',
+  });
+  const rootChannel = new FakeChannel('channel-app-server-cancel-clears-queue', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[app-slow] active task'));
+    await waitFor(() => (bridge as any).getDashboardData().some((entry: any) => entry.conversations.some((conversation: any) => conversation.status === 'running' || conversation.status === 'starting')), 15_000);
+
+    await dispatch(bridge, createUserMessage(rootChannel, 'queued task after cancel'));
+    await waitFor(() => findSent(rootChannel, /已加入队列/), 15_000);
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!cancel', { userId: 'admin-user' }));
+    await waitFor(() => findSent(rootChannel, /已发送取消信号/), 15_000);
+    await waitFor(() => !(bridge as any).getDashboardData().some((entry: any) => entry.conversations.some((conversation: any) => ['starting', 'running', 'cancelled'].includes(conversation.status))), 15_000);
+
+    const runtime = (bridge as any).getRuntime(rootChannel.id);
+    assert.equal(runtime.queue.length, 0);
+    assert.ok(!findSent(rootChannel, /app-server ok: queued task after cancel/));
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge keeps live reasoning, command, and subagent progress in app-server mode', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-app-server-progress-');
   const workspace = await createWorkspace(rootDir);

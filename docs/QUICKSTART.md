@@ -151,7 +151,7 @@ sudo ./scripts/install-service.sh --mode daemon
 !web
 !sendfile <文件名/相对路径/绝对路径/序号>
 !guide <追加指令>
-!cancel
+!cancel   # 取消当前运行，并清空等待队列
 !reset
 !unbind
 !projects
