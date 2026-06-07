@@ -1,0 +1,2913 @@
+{
+  "schema_version": 1,
+  "page_id": "page_005",
+  "slide": {
+    "width": 13.333,
+    "height": 7.5,
+    "background": "#FEFDFC"
+  },
+  "source": {
+    "path": "source.png",
+    "width_px": 1672,
+    "height_px": 941
+  },
+  "preview_scale": 125,
+  "preview_font_scale": 1.0,
+  "strategy": "Object-level editable reconstruction using native text boxes, cards, connectors, and simplified native vector icons; no full-slide source raster is used.",
+  "text_inventory": [
+    "结果回复与文件回传",
+    "Codex 输出",
+    "任务执行完成后，生成结果并回传。",
+    "1. 最终总结",
+    "给出结论、要点与下一步建议。",
+    "2. 长回复分段",
+    "长内容自动拆分为多条消息发送。",
+    "3. 文件附件",
+    "生成的文件自动打包并回传。",
+    "Bridge",
+    "结构化消息",
+    "BRIDGE_SEND_FILE",
+    "{\n  \"type\": \"file\",\n  \"path\": \"workspace/output/report.md\"\n}",
+    "Bridge 读取文件，并将结果发送回 Discord。",
+    "Discord 频道 #",
+    "api-项目",
+    "【总结】本次任务已完成",
+    "10:35",
+    "• 实现了登录接口",
+    "• 编写了单元测试",
+    "• 接下来建议优化错误处理",
+    "【详情（1/3）】需求分析",
+    "......",
+    "（内容较长，已自动分段）",
+    "【详情（2/3）】实现过程",
+    "【详情（3/3）】测试与结果",
+    "report.zip",
+    "10:36",
+    "（包含 5 个文件）  1.2 MB",
+    "最终总结",
+    "长回复分段",
+    "自动上传文件",
+    "需要回传文件时，让 Codex 指定文件路径， Bridge 会发回 Discord。"
+  ],
+  "visual_inventory": [
+    {
+      "id": "title_sparkles_and_underline",
+      "kind": "decorative strokes",
+      "decision": "native line shapes",
+      "reason": "simple hand-drawn strokes with no semantic bitmap identity"
+    },
+    {
+      "id": "codex_cube_icon",
+      "kind": "simple line icon",
+      "decision": "native line shapes plus native text C",
+      "reason": "small geometric icon can be editable primitives"
+    },
+    {
+      "id": "terminal_icon",
+      "kind": "simple terminal pictogram",
+      "decision": "native rounded rectangle and lines",
+      "reason": "basic primitive icon"
+    },
+    {
+      "id": "result_category_cards",
+      "kind": "cards with icons",
+      "decision": "native rounded rectangles, lines and text",
+      "reason": "all text is native; icons are simple primitives"
+    },
+    {
+      "id": "flow_arrows",
+      "kind": "orange arrows and bracket",
+      "decision": "native line shapes",
+      "reason": "simple connector strokes"
+    },
+    {
+      "id": "bridge_icon",
+      "kind": "simple bridge pictogram",
+      "decision": "native line shapes",
+      "reason": "geometric line icon with no source-identity requirement"
+    },
+    {
+      "id": "structured_message_card",
+      "kind": "green card and code box",
+      "decision": "native rounded rectangles and native text",
+      "reason": "required editable code label BRIDGE_SEND_FILE"
+    },
+    {
+      "id": "discord_channel_panel",
+      "kind": "channel mockup",
+      "decision": "native rounded rectangles, line icons and text",
+      "reason": "simplified editable Discord channel per task request"
+    },
+    {
+      "id": "legend_chips",
+      "kind": "short labels",
+      "decision": "native rounded rectangles, primitives and text",
+      "reason": "labels must remain editable"
+    },
+    {
+      "id": "takeaway_callout",
+      "kind": "dashed callout with bulb icon",
+      "decision": "native rounded rectangle, line icon and text runs",
+      "reason": "takeaway must be native text"
+    }
+  ],
+  "background_strategy": {
+    "mode": "native-or-script",
+    "source_consistency_contract": "Keep the warm off-white plain background and rebuild all visible foreground as editable native objects.",
+    "removed_foreground": "No clean-base raster removal; all readable content, cards, arrows, and mock Discord panel are redrawn natively.",
+    "comparison_note": "Source background is flat off-white with slight scan warmth; native slide background approximates it without duplicating source raster."
+  },
+  "quality_checks": {
+    "font_size_calibrated": true,
+    "visual_inventory_matched": true,
+    "background_strategy_checked": true,
+    "shape_corner_geometry_checked": true
+  },
+  "text_boxes": [
+    {
+      "id": "title",
+      "box_px": [
+        397,
+        54,
+        890,
+        96
+      ],
+      "font_size": 46,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#000A63",
+      "bold": true,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "结果回复与文件回传"
+    },
+    {
+      "id": "cube_c",
+      "box_px": [
+        119,
+        282,
+        28,
+        28
+      ],
+      "font_size": 13,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#F06B00",
+      "bold": true,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "C"
+    },
+    {
+      "id": "codex_output_label",
+      "box_px": [
+        166,
+        276,
+        180,
+        44
+      ],
+      "font_size": 20,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#F06B00",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "Codex 输出"
+    },
+    {
+      "id": "codex_card_text",
+      "box_px": [
+        97,
+        488,
+        190,
+        64
+      ],
+      "font_size": 17,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "任务执行完成后，\n生成结果并回传。"
+    },
+    {
+      "id": "summary_card_title",
+      "box_px": [
+        489,
+        245,
+        168,
+        31
+      ],
+      "font_size": 16.5,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "1. 最终总结"
+    },
+    {
+      "id": "summary_card_body",
+      "box_px": [
+        492,
+        286,
+        168,
+        60
+      ],
+      "font_size": 13.5,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "给出结论、要点\n与下一步建议。"
+    },
+    {
+      "id": "long_reply_card_title",
+      "box_px": [
+        489,
+        412,
+        168,
+        31
+      ],
+      "font_size": 16.5,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "2. 长回复分段"
+    },
+    {
+      "id": "long_reply_card_body",
+      "box_px": [
+        492,
+        452,
+        168,
+        60
+      ],
+      "font_size": 13.5,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "长内容自动拆分\n为多条消息发送。"
+    },
+    {
+      "id": "file_attach_card_title",
+      "box_px": [
+        489,
+        572,
+        168,
+        31
+      ],
+      "font_size": 16.5,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "3. 文件附件"
+    },
+    {
+      "id": "file_attach_card_body",
+      "box_px": [
+        492,
+        612,
+        168,
+        60
+      ],
+      "font_size": 13.5,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "生成的文件自动\n打包并回传。"
+    },
+    {
+      "id": "bridge_label",
+      "box_px": [
+        930,
+        300,
+        120,
+        38
+      ],
+      "font_size": 20,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#0B6B20",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "Bridge"
+    },
+    {
+      "id": "structured_msg_title",
+      "box_px": [
+        839,
+        375,
+        160,
+        32
+      ],
+      "font_size": 16.5,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": false,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "结构化消息"
+    },
+    {
+      "id": "bridge_send_file",
+      "box_px": [
+        771,
+        413,
+        210,
+        29
+      ],
+      "font_size": 14,
+      "font": "Menlo",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#0B6B20",
+      "bold": true,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "BRIDGE_SEND_FILE"
+    },
+    {
+      "id": "json_payload",
+      "box_px": [
+        771,
+        451,
+        275,
+        82
+      ],
+      "font_size": 9.5,
+      "font": "Menlo",
+      "preview_font": "/System/Library/Fonts/Supplemental/Arial.ttf",
+      "color": "#101018",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "runs": [
+        {
+          "text": "{\n",
+          "font": "Menlo",
+          "font_size": 9.5,
+          "color": "#101018"
+        },
+        {
+          "text": "  \"type\": \"file\",\n",
+          "font": "Menlo",
+          "font_size": 9.5,
+          "color": "#101018"
+        },
+        {
+          "text": "  \"path\": \"workspace/output/report.md\"\n",
+          "font": "Menlo",
+          "font_size": 8.8,
+          "color": "#101018"
+        },
+        {
+          "text": "}",
+          "font": "Menlo",
+          "font_size": 9.5,
+          "color": "#101018"
+        }
+      ],
+      "text": "{\n  \"type\": \"file\",\n  \"path\": \"workspace/output/report.md\"\n}"
+    },
+    {
+      "id": "bridge_action_text",
+      "box_px": [
+        794,
+        565,
+        250,
+        62
+      ],
+      "font_size": 15.5,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": false,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "Bridge 读取文件，\n并将结果发送回 Discord。"
+    },
+    {
+      "id": "discord_header",
+      "box_px": [
+        1255,
+        236,
+        220,
+        41
+      ],
+      "font_size": 21,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#2E76E6",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "Discord 频道 #"
+    },
+    {
+      "id": "discord_channel_name",
+      "box_px": [
+        1464,
+        246,
+        92,
+        25
+      ],
+      "font_size": 13,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "api-项目"
+    },
+    {
+      "id": "summary_msg_title",
+      "box_px": [
+        1259,
+        307,
+        235,
+        27
+      ],
+      "font_size": 12.2,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": true,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "【总结】本次任务已完成"
+    },
+    {
+      "id": "summary_time",
+      "box_px": [
+        1511,
+        311,
+        46,
+        18
+      ],
+      "font_size": 8.5,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#56606F",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "10:35"
+    },
+    {
+      "id": "summary_msg_bullets",
+      "box_px": [
+        1256,
+        330,
+        285,
+        66
+      ],
+      "font_size": 10.8,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "• 实现了登录接口\n• 编写了单元测试\n• 接下来建议优化错误处理"
+    },
+    {
+      "id": "detail_1_title",
+      "box_px": [
+        1258,
+        428,
+        247,
+        28
+      ],
+      "font_size": 11.8,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": true,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "【详情（1/3）】需求分析"
+    },
+    {
+      "id": "detail_1_time",
+      "box_px": [
+        1512,
+        432,
+        44,
+        16
+      ],
+      "font_size": 8.5,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#56606F",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "10:35"
+    },
+    {
+      "id": "detail_1_body",
+      "box_px": [
+        1257,
+        456,
+        235,
+        47
+      ],
+      "font_size": 10.2,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "......\n（内容较长，已自动分段）"
+    },
+    {
+      "id": "detail_2_title",
+      "box_px": [
+        1258,
+        528,
+        247,
+        28
+      ],
+      "font_size": 11.8,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": true,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "【详情（2/3）】实现过程"
+    },
+    {
+      "id": "detail_2_time",
+      "box_px": [
+        1512,
+        532,
+        44,
+        16
+      ],
+      "font_size": 8.5,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#56606F",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "10:35"
+    },
+    {
+      "id": "detail_3_title",
+      "box_px": [
+        1258,
+        577,
+        247,
+        28
+      ],
+      "font_size": 11.8,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": true,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "【详情（3/3）】测试与结果"
+    },
+    {
+      "id": "detail_3_time",
+      "box_px": [
+        1512,
+        581,
+        44,
+        16
+      ],
+      "font_size": 8.5,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#56606F",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "10:35"
+    },
+    {
+      "id": "attachment_filename",
+      "box_px": [
+        1251,
+        637,
+        134,
+        28
+      ],
+      "font_size": 14,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": true,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "report.zip"
+    },
+    {
+      "id": "attachment_time",
+      "box_px": [
+        1512,
+        643,
+        45,
+        16
+      ],
+      "font_size": 8.5,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#56606F",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "10:36"
+    },
+    {
+      "id": "attachment_meta",
+      "box_px": [
+        1252,
+        668,
+        214,
+        23
+      ],
+      "font_size": 10,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "（包含 5 个文件）  1.2 MB"
+    },
+    {
+      "id": "legend_summary_text",
+      "box_px": [
+        461,
+        727,
+        105,
+        31
+      ],
+      "font_size": 17,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#0B6B20",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "最终总结"
+    },
+    {
+      "id": "legend_long_text",
+      "box_px": [
+        721,
+        727,
+        145,
+        31
+      ],
+      "font_size": 17,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#2E76E6",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "长回复分段"
+    },
+    {
+      "id": "legend_file_text",
+      "box_px": [
+        982,
+        727,
+        148,
+        31
+      ],
+      "font_size": 17,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#F06B00",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "text": "自动上传文件"
+    },
+    {
+      "id": "takeaway_text",
+      "box_px": [
+        373,
+        832,
+        1045,
+        52
+      ],
+      "font_size": 19.2,
+      "font": "PingFang SC",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "color": "#101018",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "z_index": 45,
+      "runs": [
+        {
+          "text": "需要回传文件时，让 ",
+          "font": "PingFang SC",
+          "font_size": 19.2,
+          "color": "#101018"
+        },
+        {
+          "text": "Codex",
+          "font": "PingFang SC",
+          "font_size": 19.2,
+          "color": "#F06B00"
+        },
+        {
+          "text": " 指定文件路径， ",
+          "font": "PingFang SC",
+          "font_size": 19.2,
+          "color": "#101018"
+        },
+        {
+          "text": "Bridge",
+          "font": "PingFang SC",
+          "font_size": 19.2,
+          "color": "#0B6B20"
+        },
+        {
+          "text": " 会发回 ",
+          "font": "PingFang SC",
+          "font_size": 19.2,
+          "color": "#101018"
+        },
+        {
+          "text": "Discord",
+          "font": "PingFang SC",
+          "font_size": 19.2,
+          "color": "#2E76E6"
+        },
+        {
+          "text": "。",
+          "font": "PingFang SC",
+          "font_size": 19.2,
+          "color": "#101018"
+        }
+      ],
+      "text": "需要回传文件时，让 Codex 指定文件路径， Bridge 会发回 Discord。"
+    }
+  ],
+  "shapes": [
+    {
+      "id": "title_underline_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2D7BE8",
+      "stroke_width": 3,
+      "z_index": 18,
+      "points_px": [
+        410,
+        171,
+        1324,
+        165
+      ]
+    },
+    {
+      "id": "title_underline_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2D7BE8",
+      "stroke_width": 2,
+      "z_index": 18,
+      "points_px": [
+        466,
+        184,
+        1302,
+        171
+      ]
+    },
+    {
+      "id": "title_underline_3",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#5D9AF0",
+      "stroke_width": 2,
+      "z_index": 18,
+      "points_px": [
+        441,
+        178,
+        1134,
+        170
+      ]
+    },
+    {
+      "id": "sparkle_left_v1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2D7BE8",
+      "stroke_width": 3,
+      "z_index": 18,
+      "points_px": [
+        347,
+        54,
+        352,
+        82
+      ]
+    },
+    {
+      "id": "sparkle_left_v2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2D7BE8",
+      "stroke_width": 3,
+      "z_index": 18,
+      "points_px": [
+        352,
+        82,
+        373,
+        94
+      ]
+    },
+    {
+      "id": "sparkle_left_v3",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2D7BE8",
+      "stroke_width": 3,
+      "z_index": 18,
+      "points_px": [
+        352,
+        82,
+        337,
+        93
+      ]
+    },
+    {
+      "id": "sparkle_left_v4",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2D7BE8",
+      "stroke_width": 3,
+      "z_index": 18,
+      "points_px": [
+        352,
+        82,
+        360,
+        109
+      ]
+    },
+    {
+      "id": "sparkle_left_v5",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2D7BE8",
+      "stroke_width": 3,
+      "z_index": 18,
+      "points_px": [
+        352,
+        82,
+        330,
+        82
+      ]
+    },
+    {
+      "id": "sparkle_left_dash_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2D7BE8",
+      "stroke_width": 3,
+      "z_index": 18,
+      "points_px": [
+        358,
+        114,
+        376,
+        120
+      ]
+    },
+    {
+      "id": "sparkle_left_dash_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2D7BE8",
+      "stroke_width": 3,
+      "z_index": 18,
+      "points_px": [
+        347,
+        128,
+        371,
+        132
+      ]
+    },
+    {
+      "id": "sparkle_right_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 4,
+      "z_index": 18,
+      "points_px": [
+        1352,
+        74,
+        1368,
+        52
+      ]
+    },
+    {
+      "id": "sparkle_right_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 18,
+      "points_px": [
+        1377,
+        94,
+        1395,
+        86
+      ]
+    },
+    {
+      "id": "sparkle_right_3",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 18,
+      "points_px": [
+        1365,
+        106,
+        1372,
+        122
+      ]
+    },
+    {
+      "id": "cube_top_l",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3.0,
+      "z_index": 24,
+      "points_px": [
+        68,
+        264,
+        104,
+        244
+      ]
+    },
+    {
+      "id": "cube_top_r",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3.0,
+      "z_index": 24,
+      "points_px": [
+        104,
+        244,
+        140,
+        264
+      ]
+    },
+    {
+      "id": "cube_mid_l",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3.0,
+      "z_index": 24,
+      "points_px": [
+        68,
+        264,
+        104,
+        284
+      ]
+    },
+    {
+      "id": "cube_mid_r",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3.0,
+      "z_index": 24,
+      "points_px": [
+        140,
+        264,
+        104,
+        284
+      ]
+    },
+    {
+      "id": "cube_left",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3.0,
+      "z_index": 24,
+      "points_px": [
+        68,
+        264,
+        68,
+        304
+      ]
+    },
+    {
+      "id": "cube_right",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3.0,
+      "z_index": 24,
+      "points_px": [
+        140,
+        264,
+        140,
+        304
+      ]
+    },
+    {
+      "id": "cube_center",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3.0,
+      "z_index": 24,
+      "points_px": [
+        104,
+        284,
+        104,
+        324
+      ]
+    },
+    {
+      "id": "cube_bottom_l",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3.0,
+      "z_index": 24,
+      "points_px": [
+        68,
+        304,
+        104,
+        324
+      ]
+    },
+    {
+      "id": "cube_bottom_r",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3.0,
+      "z_index": 24,
+      "points_px": [
+        140,
+        304,
+        104,
+        324
+      ]
+    },
+    {
+      "id": "codex_card",
+      "type": "roundRect",
+      "fill": "#FFFDFC",
+      "stroke": "#F06B00",
+      "stroke_width": 2.2,
+      "z_index": 10,
+      "box_px": [
+        45,
+        334,
+        273,
+        266
+      ],
+      "source_corner_radius_px": 22,
+      "corner_category": "large-radius",
+      "corner_reason": "source object has visibly rounded hand-drawn card corners"
+    },
+    {
+      "id": "terminal_icon_box",
+      "type": "roundRect",
+      "fill": "#FFFDFC",
+      "stroke": "#F06B00",
+      "stroke_width": 3.0,
+      "z_index": 18,
+      "box_px": [
+        126,
+        378,
+        111,
+        74
+      ],
+      "source_corner_radius_px": 10,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visibly rounded hand-drawn card corners"
+    },
+    {
+      "id": "terminal_gt_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 4,
+      "z_index": 24,
+      "points_px": [
+        150,
+        398,
+        169,
+        417
+      ]
+    },
+    {
+      "id": "terminal_gt_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 4,
+      "z_index": 24,
+      "points_px": [
+        169,
+        417,
+        151,
+        434
+      ]
+    },
+    {
+      "id": "terminal_underscore",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        183,
+        432,
+        203,
+        432
+      ]
+    },
+    {
+      "id": "flow_horizontal_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 20,
+      "points_px": [
+        320,
+        451,
+        388,
+        451
+      ]
+    },
+    {
+      "id": "flow_vertical_main",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 20,
+      "points_px": [
+        343,
+        318,
+        343,
+        577
+      ]
+    },
+    {
+      "id": "flow_top_arrow_in",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 20,
+      "points_px": [
+        341,
+        318,
+        387,
+        281
+      ]
+    },
+    {
+      "id": "flow_mid_arrow",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 20,
+      "points_px": [
+        374,
+        437,
+        401,
+        452
+      ]
+    },
+    {
+      "id": "flow_bottom_arrow_in",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 20,
+      "points_px": [
+        343,
+        577,
+        389,
+        607
+      ]
+    },
+    {
+      "id": "flow_top_arrow_head_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 21,
+      "points_px": [
+        387,
+        281,
+        371,
+        279
+      ]
+    },
+    {
+      "id": "flow_top_arrow_head_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 21,
+      "points_px": [
+        387,
+        281,
+        379,
+        296
+      ]
+    },
+    {
+      "id": "flow_mid_arrow_head_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 21,
+      "points_px": [
+        401,
+        452,
+        386,
+        439
+      ]
+    },
+    {
+      "id": "flow_mid_arrow_head_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 21,
+      "points_px": [
+        401,
+        452,
+        386,
+        467
+      ]
+    },
+    {
+      "id": "flow_bottom_arrow_head_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 21,
+      "points_px": [
+        389,
+        607,
+        372,
+        607
+      ]
+    },
+    {
+      "id": "flow_bottom_arrow_head_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 21,
+      "points_px": [
+        389,
+        607,
+        378,
+        592
+      ]
+    },
+    {
+      "id": "summary_card",
+      "type": "roundRect",
+      "fill": "#FFFFFF",
+      "stroke": "#F06B00",
+      "stroke_width": 2.0,
+      "z_index": 12,
+      "box_px": [
+        398,
+        221,
+        267,
+        136
+      ],
+      "source_corner_radius_px": 18,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visibly rounded hand-drawn card corners"
+    },
+    {
+      "id": "summary_check_circle",
+      "type": "ellipse",
+      "fill": "#F7FEF8",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "box_px": [
+        420,
+        250,
+        51,
+        51
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "summary_check_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 26,
+      "points_px": [
+        433,
+        274,
+        448,
+        289
+      ]
+    },
+    {
+      "id": "summary_check_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 26,
+      "points_px": [
+        448,
+        289,
+        464,
+        262
+      ]
+    },
+    {
+      "id": "long_reply_card",
+      "type": "roundRect",
+      "fill": "#FFFFFF",
+      "stroke": "#F06B00",
+      "stroke_width": 2.0,
+      "z_index": 12,
+      "box_px": [
+        398,
+        388,
+        267,
+        131
+      ],
+      "source_corner_radius_px": 18,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visibly rounded hand-drawn card corners"
+    },
+    {
+      "id": "doc_icon_page",
+      "type": "rect",
+      "fill": "#F7FBFF",
+      "stroke": "#2E76E6",
+      "stroke_width": 3,
+      "z_index": 24,
+      "box_px": [
+        420,
+        413,
+        47,
+        60
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "doc_fold_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 3,
+      "z_index": 26,
+      "points_px": [
+        448,
+        413,
+        468,
+        432
+      ]
+    },
+    {
+      "id": "doc_fold_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 3,
+      "z_index": 26,
+      "points_px": [
+        448,
+        413,
+        448,
+        432
+      ]
+    },
+    {
+      "id": "doc_fold_3",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 3,
+      "z_index": 26,
+      "points_px": [
+        448,
+        432,
+        468,
+        432
+      ]
+    },
+    {
+      "id": "doc_text_line_440",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2,
+      "z_index": 26,
+      "points_px": [
+        431,
+        440,
+        459,
+        440
+      ]
+    },
+    {
+      "id": "doc_text_line_453",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2,
+      "z_index": 26,
+      "points_px": [
+        431,
+        453,
+        459,
+        453
+      ]
+    },
+    {
+      "id": "doc_text_line_466",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2,
+      "z_index": 26,
+      "points_px": [
+        431,
+        466,
+        459,
+        466
+      ]
+    },
+    {
+      "id": "file_attach_card",
+      "type": "roundRect",
+      "fill": "#FFFFFF",
+      "stroke": "#F06B00",
+      "stroke_width": 2.0,
+      "z_index": 12,
+      "box_px": [
+        398,
+        548,
+        267,
+        129
+      ],
+      "source_corner_radius_px": 18,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visibly rounded hand-drawn card corners"
+    },
+    {
+      "id": "clip_outer",
+      "type": "ellipse",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 4,
+      "z_index": 24,
+      "box_px": [
+        424,
+        581,
+        29,
+        49
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "clip_slant_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 4,
+      "z_index": 26,
+      "points_px": [
+        441,
+        612,
+        462,
+        587
+      ]
+    },
+    {
+      "id": "clip_inner",
+      "type": "ellipse",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 26,
+      "box_px": [
+        437,
+        596,
+        15,
+        28
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "result_group_bracket_top",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 20,
+      "points_px": [
+        664,
+        291,
+        695,
+        306
+      ]
+    },
+    {
+      "id": "result_group_bracket_vert",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 20,
+      "points_px": [
+        695,
+        306,
+        708,
+        430
+      ]
+    },
+    {
+      "id": "result_group_bracket_mid",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 20,
+      "points_px": [
+        708,
+        430,
+        726,
+        451
+      ]
+    },
+    {
+      "id": "result_group_arrow",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3.2,
+      "z_index": 20,
+      "points_px": [
+        668,
+        452,
+        732,
+        452
+      ]
+    },
+    {
+      "id": "result_group_arrow_head_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3.2,
+      "z_index": 21,
+      "points_px": [
+        732,
+        452,
+        712,
+        433
+      ]
+    },
+    {
+      "id": "result_group_arrow_head_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3.2,
+      "z_index": 21,
+      "points_px": [
+        732,
+        452,
+        713,
+        471
+      ]
+    },
+    {
+      "id": "result_group_bracket_low_vert",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 20,
+      "points_px": [
+        708,
+        462,
+        699,
+        592
+      ]
+    },
+    {
+      "id": "result_group_bracket_bottom",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 20,
+      "points_px": [
+        699,
+        592,
+        665,
+        607
+      ]
+    },
+    {
+      "id": "bridge_deck",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        798,
+        321,
+        912,
+        321
+      ]
+    },
+    {
+      "id": "bridge_floor",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        786,
+        334,
+        920,
+        334
+      ]
+    },
+    {
+      "id": "bridge_tower_819_l",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        819,
+        279,
+        819,
+        334
+      ]
+    },
+    {
+      "id": "bridge_tower_819_r",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        833,
+        279,
+        833,
+        334
+      ]
+    },
+    {
+      "id": "bridge_tower_819_top",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        819,
+        279,
+        833,
+        279
+      ]
+    },
+    {
+      "id": "bridge_tower_882_l",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        882,
+        279,
+        882,
+        334
+      ]
+    },
+    {
+      "id": "bridge_tower_882_r",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        896,
+        279,
+        896,
+        334
+      ]
+    },
+    {
+      "id": "bridge_tower_882_top",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        882,
+        279,
+        896,
+        279
+      ]
+    },
+    {
+      "id": "bridge_cable_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        797,
+        318,
+        819,
+        290
+      ]
+    },
+    {
+      "id": "bridge_cable_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        833,
+        290,
+        860,
+        321
+      ]
+    },
+    {
+      "id": "bridge_cable_3",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        860,
+        321,
+        882,
+        290
+      ]
+    },
+    {
+      "id": "bridge_cable_4",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        896,
+        290,
+        912,
+        319
+      ]
+    },
+    {
+      "id": "bridge_pier_819_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        823,
+        334,
+        823,
+        354
+      ]
+    },
+    {
+      "id": "bridge_pier_819_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        829,
+        334,
+        829,
+        354
+      ]
+    },
+    {
+      "id": "bridge_pier_819_base",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        815,
+        354,
+        839,
+        354
+      ]
+    },
+    {
+      "id": "bridge_pier_882_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        886,
+        334,
+        886,
+        354
+      ]
+    },
+    {
+      "id": "bridge_pier_882_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        892,
+        334,
+        892,
+        354
+      ]
+    },
+    {
+      "id": "bridge_pier_882_base",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        878,
+        354,
+        902,
+        354
+      ]
+    },
+    {
+      "id": "bridge_card",
+      "type": "roundRect",
+      "fill": "#FCFFFC",
+      "stroke": "#237239",
+      "stroke_width": 2.0,
+      "z_index": 10,
+      "box_px": [
+        740,
+        351,
+        324,
+        289
+      ],
+      "source_corner_radius_px": 25,
+      "corner_category": "large-radius",
+      "corner_reason": "source object has visibly rounded hand-drawn card corners"
+    },
+    {
+      "id": "json_box",
+      "type": "roundRect",
+      "fill": "#FFFFFF",
+      "stroke": "#8FB99B",
+      "stroke_width": 1.2,
+      "z_index": 12,
+      "box_px": [
+        755,
+        398,
+        290,
+        146
+      ],
+      "dash": "dash",
+      "source_corner_radius_px": 13,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visibly rounded hand-drawn card corners"
+    },
+    {
+      "id": "arrow_to_discord",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 4,
+      "z_index": 20,
+      "points_px": [
+        1072,
+        456,
+        1140,
+        456
+      ]
+    },
+    {
+      "id": "arrow_to_discord_head_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 4,
+      "z_index": 21,
+      "points_px": [
+        1140,
+        456,
+        1117,
+        433
+      ]
+    },
+    {
+      "id": "arrow_to_discord_head_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 4,
+      "z_index": 21,
+      "points_px": [
+        1140,
+        456,
+        1117,
+        479
+      ]
+    },
+    {
+      "id": "discord_outer",
+      "type": "roundRect",
+      "fill": "#FBFDFF",
+      "stroke": "#2E76E6",
+      "stroke_width": 3.0,
+      "z_index": 10,
+      "box_px": [
+        1155,
+        202,
+        428,
+        510
+      ],
+      "source_corner_radius_px": 36,
+      "corner_category": "large-radius",
+      "corner_reason": "source object has visibly rounded hand-drawn card corners"
+    },
+    {
+      "id": "discord_icon_circle",
+      "type": "ellipse",
+      "fill": "#617EF8",
+      "stroke": "#617EF8",
+      "stroke_width": 1,
+      "z_index": 18,
+      "box_px": [
+        1183,
+        220,
+        59,
+        59
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "discord_eye_l",
+      "type": "ellipse",
+      "fill": "#FFFFFF",
+      "stroke": "#FFFFFF",
+      "stroke_width": 1,
+      "z_index": 20,
+      "box_px": [
+        1205,
+        244,
+        8,
+        9
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "discord_eye_r",
+      "type": "ellipse",
+      "fill": "#FFFFFF",
+      "stroke": "#FFFFFF",
+      "stroke_width": 1,
+      "z_index": 20,
+      "box_px": [
+        1222,
+        244,
+        8,
+        9
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "discord_smile",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#FFFFFF",
+      "stroke_width": 3,
+      "z_index": 20,
+      "points_px": [
+        1196,
+        252,
+        1235,
+        252
+      ]
+    },
+    {
+      "id": "msg_summary",
+      "type": "roundRect",
+      "fill": "#FFFFFF",
+      "stroke": "#86B2F2",
+      "stroke_width": 1.8,
+      "z_index": 12,
+      "box_px": [
+        1176,
+        290,
+        386,
+        115
+      ],
+      "source_corner_radius_px": 16,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visibly rounded hand-drawn card corners"
+    },
+    {
+      "id": "msg_summary_check_circle",
+      "type": "ellipse",
+      "fill": "#F8FFF8",
+      "stroke": "#0B6B20",
+      "stroke_width": 2.4,
+      "z_index": 22,
+      "box_px": [
+        1197,
+        304,
+        36,
+        36
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "msg_summary_check_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 2.5,
+      "z_index": 24,
+      "points_px": [
+        1207,
+        321,
+        1217,
+        331
+      ]
+    },
+    {
+      "id": "msg_summary_check_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 2.5,
+      "z_index": 24,
+      "points_px": [
+        1217,
+        331,
+        1229,
+        312
+      ]
+    },
+    {
+      "id": "msg_details",
+      "type": "roundRect",
+      "fill": "#FFFFFF",
+      "stroke": "#86B2F2",
+      "stroke_width": 1.8,
+      "z_index": 12,
+      "box_px": [
+        1176,
+        412,
+        386,
+        197
+      ],
+      "source_corner_radius_px": 18,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visibly rounded hand-drawn card corners"
+    },
+    {
+      "id": "bubble_circle",
+      "type": "ellipse",
+      "fill": "#E8F1FF",
+      "stroke": "#2E76E6",
+      "stroke_width": 2.2,
+      "z_index": 22,
+      "box_px": [
+        1197,
+        427,
+        39,
+        37
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "bubble_tail",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2.2,
+      "z_index": 24,
+      "points_px": [
+        1206,
+        460,
+        1199,
+        470
+      ]
+    },
+    {
+      "id": "bubble_line_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2,
+      "z_index": 24,
+      "points_px": [
+        1209,
+        440,
+        1228,
+        440
+      ]
+    },
+    {
+      "id": "bubble_line_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2,
+      "z_index": 24,
+      "points_px": [
+        1209,
+        450,
+        1225,
+        450
+      ]
+    },
+    {
+      "id": "detail_sep_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#BCC7D6",
+      "stroke_width": 1,
+      "z_index": 18,
+      "points_px": [
+        1190,
+        509,
+        1548,
+        509
+      ]
+    },
+    {
+      "id": "detail_down_1a",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2,
+      "z_index": 24,
+      "points_px": [
+        1336,
+        497,
+        1336,
+        518
+      ]
+    },
+    {
+      "id": "detail_down_1b",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2,
+      "z_index": 24,
+      "points_px": [
+        1327,
+        509,
+        1336,
+        518
+      ]
+    },
+    {
+      "id": "detail_down_1c",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2,
+      "z_index": 24,
+      "points_px": [
+        1345,
+        509,
+        1336,
+        518
+      ]
+    },
+    {
+      "id": "small_doc_search",
+      "type": "rect",
+      "fill": "#F8FBFF",
+      "stroke": "#2E76E6",
+      "stroke_width": 2,
+      "z_index": 22,
+      "box_px": [
+        1198,
+        521,
+        22,
+        27
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "small_search_circle",
+      "type": "ellipse",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2,
+      "z_index": 24,
+      "box_px": [
+        1213,
+        539,
+        12,
+        12
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "small_search_handle",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2,
+      "z_index": 24,
+      "points_px": [
+        1222,
+        548,
+        1229,
+        555
+      ]
+    },
+    {
+      "id": "detail_sep_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#BCC7D6",
+      "stroke_width": 1,
+      "z_index": 18,
+      "points_px": [
+        1190,
+        557,
+        1548,
+        557
+      ]
+    },
+    {
+      "id": "detail_down_2a",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2,
+      "z_index": 24,
+      "points_px": [
+        1336,
+        547,
+        1336,
+        568
+      ]
+    },
+    {
+      "id": "detail_down_2b",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2,
+      "z_index": 24,
+      "points_px": [
+        1327,
+        559,
+        1336,
+        568
+      ]
+    },
+    {
+      "id": "detail_down_2c",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2,
+      "z_index": 24,
+      "points_px": [
+        1345,
+        559,
+        1336,
+        568
+      ]
+    },
+    {
+      "id": "small_doc",
+      "type": "rect",
+      "fill": "#F8FBFF",
+      "stroke": "#2E76E6",
+      "stroke_width": 2,
+      "z_index": 22,
+      "box_px": [
+        1198,
+        572,
+        21,
+        26
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "small_doc_line_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 1.5,
+      "z_index": 24,
+      "points_px": [
+        1204,
+        582,
+        1214,
+        582
+      ]
+    },
+    {
+      "id": "small_doc_line_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 1.5,
+      "z_index": 24,
+      "points_px": [
+        1204,
+        590,
+        1215,
+        590
+      ]
+    },
+    {
+      "id": "msg_attachment",
+      "type": "roundRect",
+      "fill": "#FFFFFF",
+      "stroke": "#86B2F2",
+      "stroke_width": 1.8,
+      "z_index": 12,
+      "box_px": [
+        1176,
+        617,
+        386,
+        73
+      ],
+      "source_corner_radius_px": 15,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visibly rounded hand-drawn card corners"
+    },
+    {
+      "id": "attachment_clip_outer",
+      "type": "ellipse",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3.4,
+      "z_index": 22,
+      "box_px": [
+        1198,
+        633,
+        23,
+        42
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "attachment_clip_slant",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3.4,
+      "z_index": 24,
+      "points_px": [
+        1210,
+        664,
+        1231,
+        637
+      ]
+    },
+    {
+      "id": "attachment_clip_inner",
+      "type": "ellipse",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 2.5,
+      "z_index": 24,
+      "box_px": [
+        1211,
+        646,
+        12,
+        23
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "legend_summary",
+      "type": "roundRect",
+      "fill": "#ECF7EC",
+      "stroke": "#237239",
+      "stroke_width": 1.8,
+      "z_index": 12,
+      "box_px": [
+        382,
+        710,
+        216,
+        53
+      ],
+      "source_corner_radius_px": 12,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visibly rounded hand-drawn card corners"
+    },
+    {
+      "id": "legend_check_circle",
+      "type": "ellipse",
+      "fill": "#F7FEF8",
+      "stroke": "#0B6B20",
+      "stroke_width": 2.4,
+      "z_index": 22,
+      "box_px": [
+        406,
+        720,
+        36,
+        36
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "legend_check_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 2.5,
+      "z_index": 24,
+      "points_px": [
+        415,
+        737,
+        426,
+        747
+      ]
+    },
+    {
+      "id": "legend_check_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#0B6B20",
+      "stroke_width": 2.5,
+      "z_index": 24,
+      "points_px": [
+        426,
+        747,
+        438,
+        726
+      ]
+    },
+    {
+      "id": "legend_long",
+      "type": "roundRect",
+      "fill": "#EDF5FF",
+      "stroke": "#2E76E6",
+      "stroke_width": 1.8,
+      "z_index": 12,
+      "box_px": [
+        634,
+        710,
+        243,
+        53
+      ],
+      "source_corner_radius_px": 12,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visibly rounded hand-drawn card corners"
+    },
+    {
+      "id": "legend_bubble",
+      "type": "ellipse",
+      "fill": "#E8F1FF",
+      "stroke": "#2E76E6",
+      "stroke_width": 2.2,
+      "z_index": 22,
+      "box_px": [
+        659,
+        720,
+        39,
+        37
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "legend_bubble_tail",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2.2,
+      "z_index": 24,
+      "points_px": [
+        668,
+        754,
+        660,
+        762
+      ]
+    },
+    {
+      "id": "legend_bubble_l1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2,
+      "z_index": 24,
+      "points_px": [
+        671,
+        734,
+        689,
+        734
+      ]
+    },
+    {
+      "id": "legend_bubble_l2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2,
+      "z_index": 24,
+      "points_px": [
+        671,
+        744,
+        686,
+        744
+      ]
+    },
+    {
+      "id": "legend_file",
+      "type": "roundRect",
+      "fill": "#FFF8F1",
+      "stroke": "#F4933C",
+      "stroke_width": 1.8,
+      "z_index": 12,
+      "box_px": [
+        908,
+        710,
+        245,
+        53
+      ],
+      "source_corner_radius_px": 12,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visibly rounded hand-drawn card corners"
+    },
+    {
+      "id": "legend_clip_outer",
+      "type": "ellipse",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 22,
+      "box_px": [
+        930,
+        721,
+        19,
+        35
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "legend_clip_slant",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 3,
+      "z_index": 24,
+      "points_px": [
+        941,
+        750,
+        960,
+        724
+      ]
+    },
+    {
+      "id": "legend_clip_inner",
+      "type": "ellipse",
+      "fill": "none",
+      "stroke": "#F06B00",
+      "stroke_width": 2.2,
+      "z_index": 24,
+      "box_px": [
+        944,
+        733,
+        10,
+        19
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "takeaway_box",
+      "type": "roundRect",
+      "fill": "#FFFFFF",
+      "stroke": "#A8CFFF",
+      "stroke_width": 1.8,
+      "z_index": 10,
+      "box_px": [
+        253,
+        795,
+        1185,
+        98
+      ],
+      "dash": "dash",
+      "source_corner_radius_px": 16,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visibly rounded hand-drawn card corners"
+    },
+    {
+      "id": "bulb_circle",
+      "type": "ellipse",
+      "fill": "#FFFDEB",
+      "stroke": "#2E76E6",
+      "stroke_width": 2.4,
+      "z_index": 22,
+      "box_px": [
+        296,
+        823,
+        37,
+        38
+      ],
+      "corner_category": "straight",
+      "corner_reason": "source primitive is straight or non-rounded"
+    },
+    {
+      "id": "bulb_base_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2.5,
+      "z_index": 24,
+      "points_px": [
+        308,
+        863,
+        326,
+        863
+      ]
+    },
+    {
+      "id": "bulb_base_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2.5,
+      "z_index": 24,
+      "points_px": [
+        311,
+        872,
+        323,
+        872
+      ]
+    },
+    {
+      "id": "bulb_stem",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2.2,
+      "z_index": 24,
+      "points_px": [
+        316,
+        861,
+        316,
+        873
+      ]
+    },
+    {
+      "id": "bulb_ray_top",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2.2,
+      "z_index": 24,
+      "points_px": [
+        316,
+        810,
+        316,
+        800
+      ]
+    },
+    {
+      "id": "bulb_ray_left",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2.2,
+      "z_index": 24,
+      "points_px": [
+        296,
+        817,
+        288,
+        809
+      ]
+    },
+    {
+      "id": "bulb_ray_right",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2.2,
+      "z_index": 24,
+      "points_px": [
+        334,
+        817,
+        342,
+        809
+      ]
+    },
+    {
+      "id": "bulb_ray_lh",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2.2,
+      "z_index": 24,
+      "points_px": [
+        286,
+        840,
+        274,
+        840
+      ]
+    },
+    {
+      "id": "bulb_ray_rh",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2.2,
+      "z_index": 24,
+      "points_px": [
+        344,
+        840,
+        356,
+        840
+      ]
+    },
+    {
+      "id": "takeaway_discord_underline",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2E76E6",
+      "stroke_width": 2.4,
+      "z_index": 46,
+      "points_px": [
+        1282,
+        872,
+        1365,
+        865
+      ]
+    }
+  ],
+  "images": [],
+  "asset_provenance": [],
+  "known_limits": [
+    "Hand-drawn marker texture is approximated with clean native strokes.",
+    "Discord logo and small icons are simplified native primitives rather than exact logo artwork.",
+    "PPT preview renderer has approximate font metrics; PowerPoint may render CJK text slightly differently."
+  ],
+  "qa_notes": "Font sizes were calibrated against source glyph heights after preview QA; all readable text remains native and visible."
+}

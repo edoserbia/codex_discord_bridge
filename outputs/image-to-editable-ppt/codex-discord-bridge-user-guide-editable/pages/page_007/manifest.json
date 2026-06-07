@@ -1,0 +1,2820 @@
+{
+  "schema_version": 1,
+  "run_id": "codex-discord-bridge-user-guide-editable",
+  "page_id": "page_007",
+  "page_index": 7,
+  "slide": {
+    "width": 13.333,
+    "height": 7.5,
+    "background": "#FDFDFC"
+  },
+  "source": {
+    "path": "source.png",
+    "width_px": 1672,
+    "height_px": 941
+  },
+  "rebuild_strategy": "Object-level editable recreation using native PowerPoint text boxes and primitive shapes; no full-page source raster and no cc-bridge text.",
+  "background_strategy": {
+    "mode": "native-or-script",
+    "source_consistency_contract": "Preserve the original off-white hand-drawn guide layout with native slide background, cards, arrows, badges, and callout shapes.",
+    "removed_foreground": "All visible foreground text, cards, icons, arrows, badges, and takeaway elements are rebuilt as editable native objects rather than baked into a background image.",
+    "comparison_note": "The background is plain off-white in the source and is recreated natively; no clean-base raster is used."
+  },
+  "text_inventory": [
+    "macOS 服务与可靠性",
+    "macOS LaunchAgent",
+    "~/Library/LaunchAgents/",
+    "com.user.codex-discord-bridge.plist",
+    "作用:",
+    "登录后自动启动",
+    "保持 service-run 常驻运行",
+    "异常退出时自动重启",
+    "启动",
+    "service-run（守护进程）",
+    "codex-discord-bridge",
+    "连接 Discord 网关",
+    "管理任务队列",
+    "调度本机 Codex 执行",
+    "回传结果与文件",
+    "异常自动重启（崩溃/退出）",
+    "写入日志",
+    "日志文件",
+    "~/Library/Logs/",
+    "codex-discord-bridge.log",
+    "记录请求、响应、错误与回传",
+    "便于排查问题",
+    "提供界面",
+    "Web 面板（本机）",
+    "http://127.0.0.1:8787",
+    "查看连接状态",
+    "任务与队列状态",
+    "最近日志与统计信息",
+    "登录后启动",
+    "异常自动重启",
+    "日志排查",
+    "Web 面板",
+    "服务层负责常驻运行与可靠性，Codex 层负责理解任务并完成执行。"
+  ],
+  "visual_inventory": [
+    {
+      "id": "background",
+      "kind": "plain background",
+      "decision": "native slide background",
+      "source_region_px": [
+        0,
+        0,
+        1672,
+        941
+      ]
+    },
+    {
+      "id": "title_underline_and_spark_marks",
+      "kind": "hand-drawn decoration",
+      "decision": "native line and text symbols",
+      "source_region_px": [
+        352,
+        48,
+        1050,
+        135
+      ]
+    },
+    {
+      "id": "launchagent_card",
+      "kind": "service chain card",
+      "decision": "native rounded rectangles, lines, text, and simple laptop/document primitives",
+      "source_region_px": [
+        82,
+        228,
+        393,
+        468
+      ]
+    },
+    {
+      "id": "service_run_card",
+      "kind": "service chain card",
+      "decision": "native rounded rectangles, bullets, text, and simplified gear/restart symbols",
+      "source_region_px": [
+        604,
+        246,
+        378,
+        443
+      ]
+    },
+    {
+      "id": "log_card",
+      "kind": "log panel card",
+      "decision": "native rounded rectangles, document icon primitives, bullets, and text",
+      "source_region_px": [
+        1155,
+        212,
+        379,
+        225
+      ]
+    },
+    {
+      "id": "web_panel_card",
+      "kind": "web panel card",
+      "decision": "native rounded rectangles, globe primitives, browser/chart primitives, bullets, and text",
+      "source_region_px": [
+        1142,
+        462,
+        454,
+        245
+      ]
+    },
+    {
+      "id": "flow_arrows",
+      "kind": "connection arrows",
+      "decision": "native line segments with open arrowheads",
+      "source_region_px": [
+        484,
+        312,
+        665,
+        258
+      ]
+    },
+    {
+      "id": "status_badges",
+      "kind": "short label badges",
+      "decision": "native rounded rectangles, simplified icons, and native text",
+      "source_region_px": [
+        342,
+        732,
+        1004,
+        59
+      ]
+    },
+    {
+      "id": "takeaway_callout",
+      "kind": "takeaway card",
+      "decision": "native rounded rectangle, bulb primitives, and colored native text runs",
+      "source_region_px": [
+        198,
+        815,
+        1275,
+        103
+      ]
+    }
+  ],
+  "quality_checks": {
+    "font_size_calibrated": true,
+    "visual_inventory_matched": true,
+    "background_strategy_checked": true,
+    "shape_corner_geometry_checked": true,
+    "no_full_slide_source_raster": true,
+    "no_cc_bridge_text": true,
+    "symbol_text_replaced_with_native_shapes": true
+  },
+  "text_boxes": [
+    {
+      "id": "title_main",
+      "box_px": [
+        462,
+        55,
+        780,
+        94
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 40,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 60,
+      "preview_font_scale": 1.0,
+      "text": "macOS 服务与可靠性"
+    },
+    {
+      "id": "left_card_title",
+      "box_px": [
+        188,
+        264,
+        250,
+        34
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 16.5,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "macOS LaunchAgent"
+    },
+    {
+      "id": "launch_path_1",
+      "box_px": [
+        113,
+        331,
+        328,
+        33
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 14.8,
+      "color": "#1152C4",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "~/Library/LaunchAgents/"
+    },
+    {
+      "id": "launch_path_2",
+      "box_px": [
+        114,
+        365,
+        330,
+        30
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 12.5,
+      "color": "#1152C4",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "com.user.codex-discord-bridge.plist"
+    },
+    {
+      "id": "left_role_label",
+      "box_px": [
+        114,
+        424,
+        82,
+        30
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 15.5,
+      "color": "#1456CA",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "作用:"
+    },
+    {
+      "id": "left_bullet_1",
+      "box_px": [
+        145,
+        456,
+        280,
+        29
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 13.2,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "登录后自动启动"
+    },
+    {
+      "id": "left_bullet_2",
+      "box_px": [
+        145,
+        493,
+        280,
+        29
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 13.2,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "保持 service-run 常驻运行"
+    },
+    {
+      "id": "left_bullet_3",
+      "box_px": [
+        145,
+        531,
+        280,
+        29
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 13.2,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "异常退出时自动重启"
+    },
+    {
+      "id": "apple_mark",
+      "box_px": [
+        261,
+        620,
+        30,
+        34
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 18.0,
+      "color": "#526EA3",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": ""
+    },
+    {
+      "id": "service_heading",
+      "box_px": [
+        696,
+        283,
+        260,
+        32
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 15.5,
+      "color": "#246B26",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "service-run（守护进程）"
+    },
+    {
+      "id": "service_name",
+      "box_px": [
+        644,
+        360,
+        310,
+        36
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 18.0,
+      "color": "#246B26",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "codex-discord-bridge"
+    },
+    {
+      "id": "service_bullet_1",
+      "box_px": [
+        661,
+        428,
+        280,
+        31
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 13.7,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "连接 Discord 网关"
+    },
+    {
+      "id": "service_bullet_2",
+      "box_px": [
+        661,
+        466,
+        280,
+        31
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 13.7,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "管理任务队列"
+    },
+    {
+      "id": "service_bullet_3",
+      "box_px": [
+        661,
+        504,
+        280,
+        31
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 13.7,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "调度本机 Codex 执行"
+    },
+    {
+      "id": "service_bullet_4",
+      "box_px": [
+        661,
+        542,
+        280,
+        31
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 13.7,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "回传结果与文件"
+    },
+    {
+      "id": "restart_inner_text",
+      "box_px": [
+        702,
+        619,
+        250,
+        28
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 13.8,
+      "color": "#246B26",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "异常自动重启（崩溃/退出）"
+    },
+    {
+      "id": "arrow_launch_label",
+      "box_px": [
+        509,
+        392,
+        65,
+        32
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 14.5,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 52,
+      "preview_font_scale": 1.0,
+      "text": "启动"
+    },
+    {
+      "id": "arrow_log_label",
+      "box_px": [
+        1028,
+        312,
+        100,
+        34
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 14.5,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 52,
+      "preview_font_scale": 1.0,
+      "text": "写入日志"
+    },
+    {
+      "id": "arrow_web_label",
+      "box_px": [
+        1015,
+        489,
+        102,
+        34
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 14.5,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 52,
+      "preview_font_scale": 1.0,
+      "text": "提供界面"
+    },
+    {
+      "id": "log_card_title",
+      "box_px": [
+        1253,
+        236,
+        120,
+        32
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 16.2,
+      "color": "#246B26",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "日志文件"
+    },
+    {
+      "id": "log_path_1",
+      "box_px": [
+        1198,
+        291,
+        238,
+        31
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 14.3,
+      "color": "#246B26",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "~/Library/Logs/"
+    },
+    {
+      "id": "log_path_2",
+      "box_px": [
+        1198,
+        323,
+        292,
+        29
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 13.2,
+      "color": "#246B26",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "codex-discord-bridge.log"
+    },
+    {
+      "id": "log_bullet_1",
+      "box_px": [
+        1210,
+        359,
+        290,
+        32
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 13.1,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "记录请求、响应、错误与回传"
+    },
+    {
+      "id": "log_bullet_2",
+      "box_px": [
+        1210,
+        397,
+        290,
+        32
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 13.1,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "便于排查问题"
+    },
+    {
+      "id": "web_card_title",
+      "box_px": [
+        1224,
+        487,
+        230,
+        32
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 17.0,
+      "color": "#F26313",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "Web 面板（本机）"
+    },
+    {
+      "id": "web_url",
+      "box_px": [
+        1180,
+        541,
+        220,
+        24
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 13.2,
+      "color": "#F26313",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "http://127.0.0.1:8787"
+    },
+    {
+      "id": "web_bullet_1",
+      "box_px": [
+        1187,
+        587,
+        230,
+        32
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 13.0,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "查看连接状态"
+    },
+    {
+      "id": "web_bullet_2",
+      "box_px": [
+        1187,
+        616,
+        230,
+        32
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 13.0,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "任务与队列状态"
+    },
+    {
+      "id": "web_bullet_3",
+      "box_px": [
+        1187,
+        654,
+        230,
+        32
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 13.0,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 50,
+      "preview_font_scale": 1.0,
+      "text": "最近日志与统计信息"
+    },
+    {
+      "id": "badge_login_text",
+      "box_px": [
+        410,
+        750,
+        132,
+        32
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 17.3,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 52,
+      "preview_font_scale": 1.0,
+      "text": "登录后启动"
+    },
+    {
+      "id": "badge_restart_text",
+      "box_px": [
+        674,
+        750,
+        170,
+        32
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 17.0,
+      "color": "#246B26",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 52,
+      "preview_font_scale": 1.0,
+      "text": "异常自动重启"
+    },
+    {
+      "id": "badge_log_text",
+      "box_px": [
+        976,
+        750,
+        100,
+        32
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 17.0,
+      "color": "#F26313",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 52,
+      "preview_font_scale": 1.0,
+      "text": "日志排查"
+    },
+    {
+      "id": "badge_web_text",
+      "box_px": [
+        1205,
+        750,
+        118,
+        32
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 17.0,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 52,
+      "preview_font_scale": 1.0,
+      "text": "Web 面板"
+    },
+    {
+      "id": "takeaway_sentence",
+      "box_px": [
+        318,
+        846,
+        1050,
+        50
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 22.0,
+      "color": "#071747",
+      "bold": false,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "autofit": "none",
+      "z_index": 60,
+      "preview_font_scale": 1.0,
+      "runs": [
+        {
+          "text": "服务层",
+          "color": "#145BE8",
+          "font_size": 22.0,
+          "font": "STHeiti"
+        },
+        {
+          "text": "负责常驻运行与可靠性，",
+          "color": "#071747",
+          "font_size": 22.0,
+          "font": "STHeiti"
+        },
+        {
+          "text": "Codex 层",
+          "color": "#F26313",
+          "font_size": 22.0,
+          "font": "STHeiti"
+        },
+        {
+          "text": "负责理解任务并",
+          "color": "#071747",
+          "font_size": 22.0,
+          "font": "STHeiti"
+        },
+        {
+          "text": "完成执行。",
+          "color": "#F26313",
+          "font_size": 22.0,
+          "font": "STHeiti"
+        }
+      ]
+    }
+  ],
+  "shapes": [
+    {
+      "id": "title_underline_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 3.0,
+      "z_index": 20,
+      "points_px": [
+        421,
+        177,
+        1337,
+        165
+      ]
+    },
+    {
+      "id": "title_underline_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.1,
+      "z_index": 20,
+      "points_px": [
+        516,
+        176,
+        1288,
+        158
+      ]
+    },
+    {
+      "id": "title_underline_3",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 1.6,
+      "z_index": 20,
+      "points_px": [
+        493,
+        181,
+        912,
+        165
+      ]
+    },
+    {
+      "id": "spark_left_tick_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.5,
+      "z_index": 20,
+      "points_px": [
+        368,
+        115,
+        381,
+        121
+      ]
+    },
+    {
+      "id": "spark_left_tick_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.5,
+      "z_index": 20,
+      "points_px": [
+        357,
+        133,
+        381,
+        137
+      ]
+    },
+    {
+      "id": "spark_right_tick_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#246B26",
+      "stroke_width": 3.0,
+      "z_index": 20,
+      "points_px": [
+        1368,
+        58,
+        1376,
+        36
+      ]
+    },
+    {
+      "id": "spark_right_tick_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#246B26",
+      "stroke_width": 3.0,
+      "z_index": 20,
+      "points_px": [
+        1380,
+        77,
+        1400,
+        62
+      ]
+    },
+    {
+      "id": "spark_right_tick_3",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#246B26",
+      "stroke_width": 3.0,
+      "z_index": 20,
+      "points_px": [
+        1369,
+        96,
+        1393,
+        104
+      ]
+    },
+    {
+      "id": "left_card",
+      "type": "roundRect",
+      "fill": "#FFFFFF",
+      "stroke": "#2F78EA",
+      "stroke_width": 3.0,
+      "z_index": 5,
+      "box_px": [
+        82,
+        228,
+        393,
+        468
+      ],
+      "source_corner_radius_px": 22,
+      "corner_category": "large-radius",
+      "corner_reason": "source card has large rounded corners"
+    },
+    {
+      "id": "launch_doc_icon",
+      "type": "roundRect",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.5,
+      "z_index": 18,
+      "box_px": [
+        117,
+        251,
+        39,
+        48
+      ],
+      "source_corner_radius_px": 2,
+      "corner_category": "small-radius",
+      "corner_reason": "small paper icon corners are slightly rounded"
+    },
+    {
+      "id": "launch_doc_fold_a",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.2,
+      "z_index": 20,
+      "points_px": [
+        141,
+        253,
+        156,
+        267
+      ]
+    },
+    {
+      "id": "launch_doc_fold_b",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.2,
+      "z_index": 20,
+      "points_px": [
+        142,
+        267,
+        156,
+        267
+      ]
+    },
+    {
+      "id": "launch_doc_line_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.0,
+      "z_index": 20,
+      "points_px": [
+        126,
+        275,
+        147,
+        275
+      ]
+    },
+    {
+      "id": "launch_doc_line_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.0,
+      "z_index": 20,
+      "points_px": [
+        126,
+        288,
+        150,
+        288
+      ]
+    },
+    {
+      "id": "launch_path_box",
+      "type": "roundRect",
+      "fill": "#F5FAFF",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.0,
+      "z_index": 7,
+      "box_px": [
+        100,
+        318,
+        358,
+        81
+      ],
+      "source_corner_radius_px": 11,
+      "corner_category": "small-radius",
+      "corner_reason": "path container has small rounded corners"
+    },
+    {
+      "id": "left_check_circle_1",
+      "type": "ellipse",
+      "fill": "none",
+      "stroke": "#1D62D6",
+      "stroke_width": 1.8,
+      "z_index": 15,
+      "box_px": [
+        113,
+        464,
+        18,
+        18
+      ]
+    },
+    {
+      "id": "left_check_circle_2",
+      "type": "ellipse",
+      "fill": "none",
+      "stroke": "#1D62D6",
+      "stroke_width": 1.8,
+      "z_index": 15,
+      "box_px": [
+        113,
+        501,
+        18,
+        18
+      ]
+    },
+    {
+      "id": "left_check_circle_3",
+      "type": "ellipse",
+      "fill": "none",
+      "stroke": "#1D62D6",
+      "stroke_width": 1.8,
+      "z_index": 15,
+      "box_px": [
+        113,
+        539,
+        18,
+        18
+      ]
+    },
+    {
+      "id": "laptop_screen",
+      "type": "roundRect",
+      "fill": "#F9FBFF",
+      "stroke": "#526EA3",
+      "stroke_width": 2.0,
+      "z_index": 14,
+      "box_px": [
+        216,
+        594,
+        108,
+        72
+      ],
+      "source_corner_radius_px": 6,
+      "corner_category": "small-radius",
+      "corner_reason": "small laptop screen has rounded corners"
+    },
+    {
+      "id": "laptop_base",
+      "type": "rect",
+      "fill": "#F4F7FF",
+      "stroke": "#526EA3",
+      "stroke_width": 2.0,
+      "z_index": 14,
+      "box_px": [
+        194,
+        666,
+        152,
+        10
+      ],
+      "corner_category": "straight"
+    },
+    {
+      "id": "laptop_base_top",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#526EA3",
+      "stroke_width": 2.0,
+      "z_index": 20,
+      "points_px": [
+        204,
+        666,
+        338,
+        666
+      ]
+    },
+    {
+      "id": "service_card",
+      "type": "roundRect",
+      "fill": "#FFFFFF",
+      "stroke": "#246B26",
+      "stroke_width": 3.0,
+      "z_index": 5,
+      "box_px": [
+        604,
+        246,
+        378,
+        443
+      ],
+      "source_corner_radius_px": 22,
+      "corner_category": "large-radius",
+      "corner_reason": "source service card has large rounded corners"
+    },
+    {
+      "id": "service_name_box",
+      "type": "roundRect",
+      "fill": "#F5FAF1",
+      "stroke": "#246B26",
+      "stroke_width": 1.6,
+      "z_index": 7,
+      "box_px": [
+        622,
+        337,
+        340,
+        66
+      ],
+      "source_corner_radius_px": 11,
+      "corner_category": "small-radius",
+      "corner_reason": "service name container has small rounded corners"
+    },
+    {
+      "id": "service_dot_1",
+      "type": "ellipse",
+      "fill": "#246B26",
+      "stroke": "#246B26",
+      "stroke_width": 1.0,
+      "z_index": 15,
+      "box_px": [
+        637,
+        438,
+        9,
+        9
+      ]
+    },
+    {
+      "id": "service_dot_2",
+      "type": "ellipse",
+      "fill": "#246B26",
+      "stroke": "#246B26",
+      "stroke_width": 1.0,
+      "z_index": 15,
+      "box_px": [
+        637,
+        476,
+        9,
+        9
+      ]
+    },
+    {
+      "id": "service_dot_3",
+      "type": "ellipse",
+      "fill": "#246B26",
+      "stroke": "#246B26",
+      "stroke_width": 1.0,
+      "z_index": 15,
+      "box_px": [
+        637,
+        514,
+        9,
+        9
+      ]
+    },
+    {
+      "id": "service_dot_4",
+      "type": "ellipse",
+      "fill": "#246B26",
+      "stroke": "#246B26",
+      "stroke_width": 1.0,
+      "z_index": 15,
+      "box_px": [
+        637,
+        552,
+        9,
+        9
+      ]
+    },
+    {
+      "id": "restart_inner_box",
+      "type": "roundRect",
+      "fill": "none",
+      "stroke": "#246B26",
+      "stroke_width": 1.9,
+      "z_index": 7,
+      "box_px": [
+        622,
+        589,
+        342,
+        74
+      ],
+      "dash": "dash",
+      "source_corner_radius_px": 13,
+      "corner_category": "small-radius",
+      "corner_reason": "restart callout has small dashed rounded corners"
+    },
+    {
+      "id": "arrow_launch_to_service_shaft",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 3.0,
+      "z_index": 24,
+      "points_px": [
+        484,
+        432,
+        591,
+        430
+      ]
+    },
+    {
+      "id": "arrow_launch_to_service_head_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 3.0,
+      "z_index": 24,
+      "points_px": [
+        591,
+        430,
+        575.6,
+        439.3
+      ]
+    },
+    {
+      "id": "arrow_launch_to_service_head_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 3.0,
+      "z_index": 24,
+      "points_px": [
+        591,
+        430,
+        575.2,
+        421.3
+      ]
+    },
+    {
+      "id": "arrow_service_to_logs_shaft",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#246B26",
+      "stroke_width": 3.0,
+      "z_index": 24,
+      "points_px": [
+        991,
+        371,
+        1148,
+        336
+      ]
+    },
+    {
+      "id": "arrow_service_to_logs_head_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#246B26",
+      "stroke_width": 3.0,
+      "z_index": 24,
+      "points_px": [
+        1148,
+        336,
+        1134.7,
+        348.2
+      ]
+    },
+    {
+      "id": "arrow_service_to_logs_head_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#246B26",
+      "stroke_width": 3.0,
+      "z_index": 24,
+      "points_px": [
+        1148,
+        336,
+        1130.8,
+        330.6
+      ]
+    },
+    {
+      "id": "arrow_service_to_web_shaft",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#246B26",
+      "stroke_width": 3.0,
+      "z_index": 24,
+      "points_px": [
+        991,
+        521,
+        1129,
+        548
+      ]
+    },
+    {
+      "id": "arrow_service_to_web_head_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#246B26",
+      "stroke_width": 3.0,
+      "z_index": 24,
+      "points_px": [
+        1129,
+        548,
+        1112.0,
+        553.8
+      ]
+    },
+    {
+      "id": "arrow_service_to_web_head_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#246B26",
+      "stroke_width": 3.0,
+      "z_index": 24,
+      "points_px": [
+        1129,
+        548,
+        1115.4,
+        536.2
+      ]
+    },
+    {
+      "id": "log_card",
+      "type": "roundRect",
+      "fill": "#FFFFFF",
+      "stroke": "#246B26",
+      "stroke_width": 2.8,
+      "z_index": 5,
+      "box_px": [
+        1155,
+        212,
+        379,
+        225
+      ],
+      "source_corner_radius_px": 21,
+      "corner_category": "large-radius",
+      "corner_reason": "source log card has large rounded corners"
+    },
+    {
+      "id": "log_doc_icon",
+      "type": "roundRect",
+      "fill": "none",
+      "stroke": "#246B26",
+      "stroke_width": 2.3,
+      "z_index": 18,
+      "box_px": [
+        1189,
+        228,
+        34,
+        45
+      ],
+      "source_corner_radius_px": 2,
+      "corner_category": "small-radius",
+      "corner_reason": "small paper icon corners are slightly rounded"
+    },
+    {
+      "id": "log_doc_fold_a",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#246B26",
+      "stroke_width": 1.9,
+      "z_index": 20,
+      "points_px": [
+        1210,
+        230,
+        1223,
+        243
+      ]
+    },
+    {
+      "id": "log_doc_fold_b",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#246B26",
+      "stroke_width": 1.9,
+      "z_index": 20,
+      "points_px": [
+        1210,
+        243,
+        1222,
+        243
+      ]
+    },
+    {
+      "id": "log_doc_line_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#246B26",
+      "stroke_width": 1.8,
+      "z_index": 20,
+      "points_px": [
+        1197,
+        253,
+        1214,
+        253
+      ]
+    },
+    {
+      "id": "log_doc_line_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#246B26",
+      "stroke_width": 1.8,
+      "z_index": 20,
+      "points_px": [
+        1197,
+        264,
+        1217,
+        264
+      ]
+    },
+    {
+      "id": "log_path_box",
+      "type": "roundRect",
+      "fill": "#F5FAF1",
+      "stroke": "#246B26",
+      "stroke_width": 1.5,
+      "z_index": 7,
+      "box_px": [
+        1183,
+        277,
+        319,
+        74
+      ],
+      "source_corner_radius_px": 10,
+      "corner_category": "small-radius",
+      "corner_reason": "log path container has small rounded corners"
+    },
+    {
+      "id": "log_dot_1",
+      "type": "ellipse",
+      "fill": "#246B26",
+      "stroke": "#246B26",
+      "stroke_width": 1,
+      "z_index": 15,
+      "box_px": [
+        1187,
+        370,
+        8,
+        8
+      ]
+    },
+    {
+      "id": "log_dot_2",
+      "type": "ellipse",
+      "fill": "#246B26",
+      "stroke": "#246B26",
+      "stroke_width": 1,
+      "z_index": 15,
+      "box_px": [
+        1187,
+        408,
+        8,
+        8
+      ]
+    },
+    {
+      "id": "web_card",
+      "type": "roundRect",
+      "fill": "#FFFFFF",
+      "stroke": "#F26313",
+      "stroke_width": 2.8,
+      "z_index": 5,
+      "box_px": [
+        1142,
+        462,
+        454,
+        245
+      ],
+      "source_corner_radius_px": 20,
+      "corner_category": "large-radius",
+      "corner_reason": "source web card has large rounded corners"
+    },
+    {
+      "id": "web_globe_outer",
+      "type": "ellipse",
+      "fill": "none",
+      "stroke": "#F26313",
+      "stroke_width": 3.0,
+      "z_index": 18,
+      "box_px": [
+        1164,
+        481,
+        42,
+        42
+      ]
+    },
+    {
+      "id": "web_globe_v",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F26313",
+      "stroke_width": 2.0,
+      "z_index": 20,
+      "points_px": [
+        1185,
+        483,
+        1185,
+        523
+      ]
+    },
+    {
+      "id": "web_globe_h1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F26313",
+      "stroke_width": 2.0,
+      "z_index": 20,
+      "points_px": [
+        1167,
+        495,
+        1203,
+        495
+      ]
+    },
+    {
+      "id": "web_globe_h2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F26313",
+      "stroke_width": 2.0,
+      "z_index": 20,
+      "points_px": [
+        1167,
+        510,
+        1203,
+        510
+      ]
+    },
+    {
+      "id": "web_globe_diag1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F26313",
+      "stroke_width": 1.6,
+      "z_index": 20,
+      "points_px": [
+        1175,
+        486,
+        1196,
+        520
+      ]
+    },
+    {
+      "id": "web_globe_diag2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F26313",
+      "stroke_width": 1.6,
+      "z_index": 20,
+      "points_px": [
+        1196,
+        486,
+        1175,
+        520
+      ]
+    },
+    {
+      "id": "web_url_box",
+      "type": "roundRect",
+      "fill": "#FFF8F3",
+      "stroke": "#F26313",
+      "stroke_width": 1.6,
+      "z_index": 7,
+      "box_px": [
+        1162,
+        526,
+        250,
+        45
+      ],
+      "source_corner_radius_px": 7,
+      "corner_category": "small-radius",
+      "corner_reason": "url pill has small rounded corners"
+    },
+    {
+      "id": "web_dot_1",
+      "type": "ellipse",
+      "fill": "#F26313",
+      "stroke": "#F26313",
+      "stroke_width": 1,
+      "z_index": 15,
+      "box_px": [
+        1165,
+        598,
+        8,
+        8
+      ]
+    },
+    {
+      "id": "web_dot_2",
+      "type": "ellipse",
+      "fill": "#F26313",
+      "stroke": "#F26313",
+      "stroke_width": 1,
+      "z_index": 15,
+      "box_px": [
+        1165,
+        627,
+        8,
+        8
+      ]
+    },
+    {
+      "id": "web_dot_3",
+      "type": "ellipse",
+      "fill": "#F26313",
+      "stroke": "#F26313",
+      "stroke_width": 1,
+      "z_index": 15,
+      "box_px": [
+        1165,
+        665,
+        8,
+        8
+      ]
+    },
+    {
+      "id": "browser_window",
+      "type": "roundRect",
+      "fill": "#F7F9FC",
+      "stroke": "#4D5667",
+      "stroke_width": 2.1,
+      "z_index": 14,
+      "box_px": [
+        1424,
+        548,
+        153,
+        137
+      ],
+      "source_corner_radius_px": 6,
+      "corner_category": "small-radius",
+      "corner_reason": "browser mockup window corners are rounded"
+    },
+    {
+      "id": "browser_header",
+      "type": "rect",
+      "fill": "#ECEFF5",
+      "stroke": "#4D5667",
+      "stroke_width": 0.8,
+      "z_index": 15,
+      "box_px": [
+        1427,
+        551,
+        147,
+        20
+      ],
+      "corner_category": "straight"
+    },
+    {
+      "id": "browser_dot_1",
+      "type": "ellipse",
+      "fill": "#5E6775",
+      "stroke": "#5E6775",
+      "stroke_width": 1,
+      "z_index": 18,
+      "box_px": [
+        1436,
+        557,
+        4,
+        4
+      ]
+    },
+    {
+      "id": "browser_dot_2",
+      "type": "ellipse",
+      "fill": "#5E6775",
+      "stroke": "#5E6775",
+      "stroke_width": 1,
+      "z_index": 18,
+      "box_px": [
+        1448,
+        557,
+        4,
+        4
+      ]
+    },
+    {
+      "id": "browser_dot_3",
+      "type": "ellipse",
+      "fill": "#5E6775",
+      "stroke": "#5E6775",
+      "stroke_width": 1,
+      "z_index": 18,
+      "box_px": [
+        1460,
+        557,
+        4,
+        4
+      ]
+    },
+    {
+      "id": "browser_left_dot_1",
+      "type": "ellipse",
+      "fill": "#B8C1D0",
+      "stroke": "#B8C1D0",
+      "stroke_width": 1,
+      "z_index": 18,
+      "box_px": [
+        1440,
+        581,
+        5,
+        5
+      ]
+    },
+    {
+      "id": "browser_left_line_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#B8C1D0",
+      "stroke_width": 1.2,
+      "z_index": 18,
+      "points_px": [
+        1450,
+        584,
+        1490,
+        584
+      ]
+    },
+    {
+      "id": "browser_left_dot_2",
+      "type": "ellipse",
+      "fill": "#B8C1D0",
+      "stroke": "#B8C1D0",
+      "stroke_width": 1,
+      "z_index": 18,
+      "box_px": [
+        1440,
+        596,
+        5,
+        5
+      ]
+    },
+    {
+      "id": "browser_left_line_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#B8C1D0",
+      "stroke_width": 1.2,
+      "z_index": 18,
+      "points_px": [
+        1450,
+        599,
+        1490,
+        599
+      ]
+    },
+    {
+      "id": "browser_left_dot_3",
+      "type": "ellipse",
+      "fill": "#B8C1D0",
+      "stroke": "#B8C1D0",
+      "stroke_width": 1,
+      "z_index": 18,
+      "box_px": [
+        1440,
+        612,
+        5,
+        5
+      ]
+    },
+    {
+      "id": "browser_left_line_3",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#B8C1D0",
+      "stroke_width": 1.2,
+      "z_index": 18,
+      "points_px": [
+        1450,
+        615,
+        1490,
+        615
+      ]
+    },
+    {
+      "id": "browser_left_dot_4",
+      "type": "ellipse",
+      "fill": "#B8C1D0",
+      "stroke": "#B8C1D0",
+      "stroke_width": 1,
+      "z_index": 18,
+      "box_px": [
+        1440,
+        635,
+        5,
+        5
+      ]
+    },
+    {
+      "id": "browser_left_line_4",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#B8C1D0",
+      "stroke_width": 1.2,
+      "z_index": 18,
+      "points_px": [
+        1450,
+        638,
+        1490,
+        638
+      ]
+    },
+    {
+      "id": "browser_left_dot_5",
+      "type": "ellipse",
+      "fill": "#B8C1D0",
+      "stroke": "#B8C1D0",
+      "stroke_width": 1,
+      "z_index": 18,
+      "box_px": [
+        1440,
+        650,
+        5,
+        5
+      ]
+    },
+    {
+      "id": "browser_left_line_5",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#B8C1D0",
+      "stroke_width": 1.2,
+      "z_index": 18,
+      "points_px": [
+        1450,
+        653,
+        1490,
+        653
+      ]
+    },
+    {
+      "id": "browser_left_dot_6",
+      "type": "ellipse",
+      "fill": "#B8C1D0",
+      "stroke": "#B8C1D0",
+      "stroke_width": 1,
+      "z_index": 18,
+      "box_px": [
+        1440,
+        667,
+        5,
+        5
+      ]
+    },
+    {
+      "id": "browser_left_line_6",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#B8C1D0",
+      "stroke_width": 1.2,
+      "z_index": 18,
+      "points_px": [
+        1450,
+        670,
+        1490,
+        670
+      ]
+    },
+    {
+      "id": "browser_chart_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.0,
+      "z_index": 18,
+      "points_px": [
+        1496,
+        614,
+        1514,
+        591
+      ]
+    },
+    {
+      "id": "browser_chart_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.0,
+      "z_index": 18,
+      "points_px": [
+        1514,
+        591,
+        1532,
+        609
+      ]
+    },
+    {
+      "id": "browser_chart_3",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.0,
+      "z_index": 18,
+      "points_px": [
+        1532,
+        609,
+        1552,
+        584
+      ]
+    },
+    {
+      "id": "browser_chart_4",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.0,
+      "z_index": 18,
+      "points_px": [
+        1552,
+        584,
+        1566,
+        596
+      ]
+    },
+    {
+      "id": "browser_pie_outer",
+      "type": "ellipse",
+      "fill": "#F3FAEF",
+      "stroke": "#246B26",
+      "stroke_width": 1.8,
+      "z_index": 18,
+      "box_px": [
+        1506,
+        627,
+        60,
+        60
+      ]
+    },
+    {
+      "id": "browser_pie_v",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#246B26",
+      "stroke_width": 1.5,
+      "z_index": 19,
+      "points_px": [
+        1536,
+        629,
+        1536,
+        682
+      ]
+    },
+    {
+      "id": "browser_pie_h",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F26313",
+      "stroke_width": 2.0,
+      "z_index": 19,
+      "points_px": [
+        1536,
+        656,
+        1565,
+        656
+      ]
+    },
+    {
+      "id": "browser_pie_slice",
+      "type": "rect",
+      "fill": "#FFD9C2",
+      "stroke": "#F26313",
+      "stroke_width": 1.0,
+      "z_index": 18,
+      "box_px": [
+        1538,
+        630,
+        26,
+        24
+      ],
+      "corner_category": "straight"
+    },
+    {
+      "id": "badge_login",
+      "type": "roundRect",
+      "fill": "#F5FAFF",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.0,
+      "z_index": 7,
+      "box_px": [
+        342,
+        732,
+        226,
+        59
+      ],
+      "source_corner_radius_px": 12,
+      "corner_category": "small-radius",
+      "corner_reason": "status badge has small rounded corners"
+    },
+    {
+      "id": "badge_login_head",
+      "type": "ellipse",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.3,
+      "z_index": 18,
+      "box_px": [
+        365,
+        746,
+        22,
+        22
+      ]
+    },
+    {
+      "id": "badge_login_body_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.3,
+      "z_index": 18,
+      "points_px": [
+        360,
+        783,
+        391,
+        783
+      ]
+    },
+    {
+      "id": "badge_login_body_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.3,
+      "z_index": 18,
+      "points_px": [
+        375,
+        768,
+        360,
+        783
+      ]
+    },
+    {
+      "id": "badge_login_body_3",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.3,
+      "z_index": 18,
+      "points_px": [
+        375,
+        768,
+        391,
+        783
+      ]
+    },
+    {
+      "id": "badge_restart",
+      "type": "roundRect",
+      "fill": "#F5FAF1",
+      "stroke": "#246B26",
+      "stroke_width": 2.0,
+      "z_index": 7,
+      "box_px": [
+        601,
+        732,
+        263,
+        59
+      ],
+      "source_corner_radius_px": 12,
+      "corner_category": "small-radius",
+      "corner_reason": "status badge has small rounded corners"
+    },
+    {
+      "id": "badge_log",
+      "type": "roundRect",
+      "fill": "#FFF8F3",
+      "stroke": "#F26313",
+      "stroke_width": 2.0,
+      "z_index": 7,
+      "box_px": [
+        898,
+        732,
+        206,
+        59
+      ],
+      "source_corner_radius_px": 12,
+      "corner_category": "small-radius",
+      "corner_reason": "status badge has small rounded corners"
+    },
+    {
+      "id": "badge_log_doc",
+      "type": "roundRect",
+      "fill": "none",
+      "stroke": "#F26313",
+      "stroke_width": 1.8,
+      "z_index": 18,
+      "box_px": [
+        918,
+        746,
+        25,
+        34
+      ],
+      "source_corner_radius_px": 2,
+      "corner_category": "small-radius",
+      "corner_reason": "small document icon corners are slightly rounded"
+    },
+    {
+      "id": "badge_log_lens",
+      "type": "ellipse",
+      "fill": "none",
+      "stroke": "#F26313",
+      "stroke_width": 1.8,
+      "z_index": 18,
+      "box_px": [
+        941,
+        762,
+        20,
+        20
+      ]
+    },
+    {
+      "id": "badge_log_handle",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#F26313",
+      "stroke_width": 1.8,
+      "z_index": 18,
+      "points_px": [
+        956,
+        777,
+        970,
+        789
+      ]
+    },
+    {
+      "id": "badge_web",
+      "type": "roundRect",
+      "fill": "#F5FAFF",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.0,
+      "z_index": 7,
+      "box_px": [
+        1130,
+        732,
+        216,
+        59
+      ],
+      "source_corner_radius_px": 12,
+      "corner_category": "small-radius",
+      "corner_reason": "status badge has small rounded corners"
+    },
+    {
+      "id": "badge_web_globe",
+      "type": "ellipse",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.4,
+      "z_index": 18,
+      "box_px": [
+        1150,
+        743,
+        39,
+        39
+      ]
+    },
+    {
+      "id": "badge_web_v",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 1.7,
+      "z_index": 18,
+      "points_px": [
+        1169,
+        745,
+        1169,
+        781
+      ]
+    },
+    {
+      "id": "badge_web_h1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 1.7,
+      "z_index": 18,
+      "points_px": [
+        1153,
+        755,
+        1186,
+        755
+      ]
+    },
+    {
+      "id": "badge_web_h2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 1.7,
+      "z_index": 18,
+      "points_px": [
+        1153,
+        770,
+        1186,
+        770
+      ]
+    },
+    {
+      "id": "takeaway_box",
+      "type": "roundRect",
+      "fill": "#FFFFFF",
+      "stroke": "#68A6FF",
+      "stroke_width": 2.0,
+      "z_index": 5,
+      "box_px": [
+        198,
+        815,
+        1275,
+        103
+      ],
+      "dash": "dash",
+      "source_corner_radius_px": 20,
+      "corner_category": "large-radius",
+      "corner_reason": "takeaway callout has large rounded dashed corners"
+    },
+    {
+      "id": "bulb_head",
+      "type": "ellipse",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.6,
+      "z_index": 18,
+      "box_px": [
+        239,
+        838,
+        46,
+        46
+      ]
+    },
+    {
+      "id": "bulb_base",
+      "type": "rect",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.2,
+      "z_index": 18,
+      "box_px": [
+        255,
+        885,
+        18,
+        16
+      ],
+      "corner_category": "straight"
+    },
+    {
+      "id": "bulb_ray_1",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.2,
+      "z_index": 18,
+      "points_px": [
+        262,
+        827,
+        262,
+        813
+      ]
+    },
+    {
+      "id": "bulb_ray_2",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.2,
+      "z_index": 18,
+      "points_px": [
+        235,
+        842,
+        223,
+        833
+      ]
+    },
+    {
+      "id": "bulb_ray_3",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.2,
+      "z_index": 18,
+      "points_px": [
+        291,
+        842,
+        303,
+        833
+      ]
+    },
+    {
+      "id": "bulb_ray_4",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.2,
+      "z_index": 18,
+      "points_px": [
+        233,
+        865,
+        218,
+        865
+      ]
+    },
+    {
+      "id": "bulb_ray_5",
+      "type": "line",
+      "fill": "none",
+      "stroke": "#2F78EA",
+      "stroke_width": 2.2,
+      "z_index": 18,
+      "points_px": [
+        290,
+        865,
+        306,
+        865
+      ]
+    },
+    {
+      "id": "spark_left_diamond_1",
+      "type": "line",
+      "points_px": [
+        375,
+        53,
+        388,
+        77
+      ],
+      "stroke": "#2F78EA",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "id": "spark_left_diamond_2",
+      "type": "line",
+      "points_px": [
+        388,
+        77,
+        375,
+        101
+      ],
+      "stroke": "#2F78EA",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "id": "spark_left_diamond_3",
+      "type": "line",
+      "points_px": [
+        375,
+        101,
+        362,
+        77
+      ],
+      "stroke": "#2F78EA",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "id": "spark_left_diamond_4",
+      "type": "line",
+      "points_px": [
+        362,
+        77,
+        375,
+        53
+      ],
+      "stroke": "#2F78EA",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "id": "gear_outer",
+      "type": "ellipse",
+      "box_px": [
+        627,
+        267,
+        45,
+        45
+      ],
+      "stroke": "#246B26",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 18
+    },
+    {
+      "id": "gear_inner",
+      "type": "ellipse",
+      "box_px": [
+        644,
+        284,
+        12,
+        12
+      ],
+      "stroke": "#246B26",
+      "fill": "none",
+      "stroke_width": 2,
+      "z_index": 19
+    },
+    {
+      "id": "gear_tooth_1",
+      "type": "line",
+      "points_px": [
+        672.5,
+        289.5,
+        680.5,
+        289.5
+      ],
+      "stroke": "#246B26",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 19
+    },
+    {
+      "id": "gear_tooth_2",
+      "type": "line",
+      "points_px": [
+        665.8,
+        305.8,
+        671.4,
+        311.4
+      ],
+      "stroke": "#246B26",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 19
+    },
+    {
+      "id": "gear_tooth_3",
+      "type": "line",
+      "points_px": [
+        649.5,
+        312.5,
+        649.5,
+        320.5
+      ],
+      "stroke": "#246B26",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 19
+    },
+    {
+      "id": "gear_tooth_4",
+      "type": "line",
+      "points_px": [
+        633.2,
+        305.8,
+        627.6,
+        311.4
+      ],
+      "stroke": "#246B26",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 19
+    },
+    {
+      "id": "gear_tooth_5",
+      "type": "line",
+      "points_px": [
+        626.5,
+        289.5,
+        618.5,
+        289.5
+      ],
+      "stroke": "#246B26",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 19
+    },
+    {
+      "id": "gear_tooth_6",
+      "type": "line",
+      "points_px": [
+        633.2,
+        273.2,
+        627.6,
+        267.6
+      ],
+      "stroke": "#246B26",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 19
+    },
+    {
+      "id": "gear_tooth_7",
+      "type": "line",
+      "points_px": [
+        649.5,
+        266.5,
+        649.5,
+        258.5
+      ],
+      "stroke": "#246B26",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 19
+    },
+    {
+      "id": "gear_tooth_8",
+      "type": "line",
+      "points_px": [
+        665.8,
+        273.2,
+        671.4,
+        267.6
+      ],
+      "stroke": "#246B26",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 19
+    },
+    {
+      "id": "left_check_mark_1_a",
+      "type": "line",
+      "points_px": [
+        117,
+        472,
+        121,
+        478
+      ],
+      "stroke": "#2F78EA",
+      "stroke_width": 2,
+      "fill": "none",
+      "z_index": 21
+    },
+    {
+      "id": "left_check_mark_1_b",
+      "type": "line",
+      "points_px": [
+        121,
+        478,
+        128,
+        467
+      ],
+      "stroke": "#2F78EA",
+      "stroke_width": 2,
+      "fill": "none",
+      "z_index": 21
+    },
+    {
+      "id": "left_check_mark_2_a",
+      "type": "line",
+      "points_px": [
+        117,
+        509,
+        121,
+        515
+      ],
+      "stroke": "#2F78EA",
+      "stroke_width": 2,
+      "fill": "none",
+      "z_index": 21
+    },
+    {
+      "id": "left_check_mark_2_b",
+      "type": "line",
+      "points_px": [
+        121,
+        515,
+        128,
+        504
+      ],
+      "stroke": "#2F78EA",
+      "stroke_width": 2,
+      "fill": "none",
+      "z_index": 21
+    },
+    {
+      "id": "left_check_mark_3_a",
+      "type": "line",
+      "points_px": [
+        117,
+        547,
+        121,
+        553
+      ],
+      "stroke": "#2F78EA",
+      "stroke_width": 2,
+      "fill": "none",
+      "z_index": 21
+    },
+    {
+      "id": "left_check_mark_3_b",
+      "type": "line",
+      "points_px": [
+        121,
+        553,
+        128,
+        542
+      ],
+      "stroke": "#2F78EA",
+      "stroke_width": 2,
+      "fill": "none",
+      "z_index": 21
+    },
+    {
+      "id": "restart_inner_circle",
+      "type": "ellipse",
+      "box_px": [
+        644,
+        607,
+        42,
+        42
+      ],
+      "stroke": "#246B26",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 18
+    },
+    {
+      "id": "restart_inner_arrow_head_a",
+      "type": "line",
+      "points_px": [
+        646,
+        613,
+        646,
+        631
+      ],
+      "stroke": "#246B26",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "id": "restart_inner_arrow_head_b",
+      "type": "line",
+      "points_px": [
+        646,
+        613,
+        663,
+        613
+      ],
+      "stroke": "#246B26",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "id": "badge_restart_circle",
+      "type": "ellipse",
+      "box_px": [
+        619,
+        742,
+        38,
+        38
+      ],
+      "stroke": "#246B26",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 18
+    },
+    {
+      "id": "badge_restart_arrow_head_a",
+      "type": "line",
+      "points_px": [
+        621,
+        749,
+        621,
+        765
+      ],
+      "stroke": "#246B26",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "id": "badge_restart_arrow_head_b",
+      "type": "line",
+      "points_px": [
+        621,
+        749,
+        637,
+        749
+      ],
+      "stroke": "#246B26",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    }
+  ],
+  "images": [],
+  "asset_provenance": [],
+  "known_limits": [
+    "Hand-drawn marker wobble, icon details, dashed preview styling, and mini browser chart are simplified with native primitives while preserving object-level editability."
+  ],
+  "qa_note": "All readable labels are native text; service cards, log/web panels, badges, takeaway, and arrows are native editable shapes without full-slide raster usage."
+}

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "codex-discord-bridge-user-guide-editable",
+  "page_id": "page_003",
+  "page_index": 3,
+  "page_dir": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_003",
+  "source_image": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_003/source.png",
+  "source_size_px": {
+    "width": 1672,
+    "height": 941
+  },
+  "slide": {
+    "width": 13.333,
+    "height": 7.5
+  },
+  "max_concurrent_pages": 4,
+  "allowed_write_scope": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_003",
+  "forbidden_paths": [
+    "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/deck_manifest.json",
+    "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/page_jobs.json",
+    "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/notes_manifest.json",
+    "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/final",
+    "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/input"
+  ],
+  "required_outputs": {
+    "manifest": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_003/manifest.json",
+    "imagegen_jobs": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_003/imagegen-jobs.json",
+    "page_pptx": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_003/page.pptx",
+    "preview": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_003/preview.png",
+    "contact_sheet": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_003/split_assets_contact.png",
+    "validation": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_003/validation.json",
+    "page_result": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_003/page_result.json"
+  }
+}

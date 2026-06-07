@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "codex-discord-bridge-user-guide-editable",
+  "page_id": "page_007",
+  "status": "completed",
+  "manifest": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_007/manifest.json",
+  "imagegen_jobs": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_007/imagegen-jobs.json",
+  "page_pptx": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_007/page.pptx",
+  "preview": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_007/preview.png",
+  "contact_sheet": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_007/split_assets_contact.png",
+  "validation": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_007/validation.json",
+  "qa_note": "Validated native editable rebuild: all readable text is editable and no full-slide source raster is used; simplified native shapes preserve the service/log/web flow.",
+  "known_limits": [
+    "Hand-drawn marker wobble, icon details, dashed preview styling, and mini browser chart are simplified with native primitives while preserving object-level editability."
+  ],
+  "validation_passed": true,
+  "output_hashes": {
+    "manifest.json": "1f370e7a0974cec44cbaf00548fb59849a74c175f1823497e2f8c663ee412bfb",
+    "imagegen-jobs.json": "3a1464ee706ec2e0e0e40c50ca476c7da3fbe6cabdb2ce251c6a33d225b86c9b",
+    "page.pptx": "497d48b75b79d26d3fc286b88107bf6216e04140a037c01605e3fe0b77657664",
+    "preview.png": "bd79d238051904c4b617b4201783412bbe49e567e570c8d5d588913eeb1b939a",
+    "split_assets_contact.png": "0a7dde3831d2be25f1f852f48926fff29c85c83dbbf2a7eb90de9a72a57246cd",
+    "validation.json": "fd98a224f1efb80fb6dd1650b769eb51e5e58c35c503a0776ea2954d8f38de38"
+  }
+}

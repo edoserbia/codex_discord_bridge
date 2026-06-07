@@ -1,0 +1,2342 @@
+{
+  "schema_version": 1,
+  "run_id": "codex-discord-bridge-user-guide-editable",
+  "page_id": "page_004",
+  "slide": {
+    "width": 13.333,
+    "height": 7.5,
+    "background": "#ffffff"
+  },
+  "source": {
+    "path": "source.png",
+    "width_px": 1672,
+    "height_px": 941
+  },
+  "preview_scale": 120,
+  "text_inventory": [
+    "文件输入与附件",
+    "Discord 附件",
+    "截图.png",
+    "1.2 MB",
+    "需求说明.pdf",
+    "245 KB",
+    "utils.py",
+    "3.1 KB",
+    "......",
+    "workspace inbox",
+    "（自动同步）",
+    "workspace/.bridge-inbox",
+    "Codex 输入区",
+    "可读取 inbox 中的文件作为输入",
+    "示例引用：",
+    "请根据 需求说明.pdf 生成接口文档，",
+    "并参考 截图.png 中的界面。",
+    "工具函数可查看 utils.py。",
+    "附件自动同步",
+    "图片可作为输入",
+    "任务里引用文件名",
+    "把截图、文档、代码发到 Discord， Codex 就能在项目里处理。"
+  ],
+  "visual_inventory": [
+    {
+      "id": "discord-logo",
+      "description": "Discord attachment icon simplified with native circle/body/eyes",
+      "decision": "native-shape-simplified"
+    },
+    {
+      "id": "attachment-file-icons",
+      "description": "image, PDF, and code attachment icons repeated in list and folder",
+      "decision": "native-shape-simplified"
+    },
+    {
+      "id": "workspace-folder",
+      "description": "small inbox folder and large inbox folder",
+      "decision": "native-shape"
+    },
+    {
+      "id": "direction-arrows",
+      "description": "blue and green transfer arrows",
+      "decision": "native-shape"
+    },
+    {
+      "id": "codex-cube",
+      "description": "orange Codex cube logo-like icon",
+      "decision": "native-shape-simplified"
+    },
+    {
+      "id": "legend-icons",
+      "description": "sync, picture, document legend pictograms",
+      "decision": "native-shape-simplified"
+    },
+    {
+      "id": "takeaway-lightbulb",
+      "description": "bottom lightbulb icon and dashed note border",
+      "decision": "native-shape-simplified"
+    },
+    {
+      "id": "decorative-hand-lines",
+      "description": "sparkle, title underline, green emphasis rays",
+      "decision": "native-freeform-lines"
+    }
+  ],
+  "background_strategy": {
+    "mode": "native-or-script",
+    "source_consistency_contract": "Source background is plain white with hand-drawn colored elements; rebuilt with white slide background and native shapes only.",
+    "removed_foreground": "No clean-base raster removal; all visible text, cards, icons, arrows, labels and takeaway are reconstructed as editable text or native shapes.",
+    "comparison_note": "Preview preserves the three-column attachment-to-inbox-to-Codex flow, major colors, labels, and bottom takeaway without using full-page source raster."
+  },
+  "quality_checks": {
+    "font_size_calibrated": true,
+    "visual_inventory_matched": true,
+    "background_strategy_checked": true,
+    "shape_corner_geometry_checked": true
+  },
+  "text_boxes": [
+    {
+      "name": "title",
+      "text": "文件输入与附件",
+      "box_px": [
+        528,
+        60,
+        692,
+        86
+      ],
+      "font_size": 41,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.05,
+      "color": "#061d58",
+      "bold": true,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "discord attachment label",
+      "text": "Discord 附件",
+      "box_px": [
+        207,
+        250,
+        181,
+        39
+      ],
+      "font_size": 20,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.95,
+      "color": "#286fd3",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "left image file",
+      "text": "截图.png",
+      "box_px": [
+        247,
+        336,
+        123,
+        30
+      ],
+      "font_size": 17,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.94,
+      "color": "#07102f",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "left image size",
+      "text": "1.2 MB",
+      "box_px": [
+        249,
+        371,
+        81,
+        25
+      ],
+      "font_size": 13,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.95,
+      "color": "#657085",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "left pdf file",
+      "text": "需求说明.pdf",
+      "box_px": [
+        248,
+        434,
+        151,
+        31
+      ],
+      "font_size": 17,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.94,
+      "color": "#07102f",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "left pdf size",
+      "text": "245 KB",
+      "box_px": [
+        249,
+        468,
+        82,
+        25
+      ],
+      "font_size": 13,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.95,
+      "color": "#657085",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "left code file",
+      "text": "utils.py",
+      "box_px": [
+        249,
+        532,
+        110,
+        29
+      ],
+      "font_size": 17,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.94,
+      "color": "#07102f",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "left code size",
+      "text": "3.1 KB",
+      "box_px": [
+        250,
+        566,
+        77,
+        25
+      ],
+      "font_size": 13,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.95,
+      "color": "#657085",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "left ellipsis",
+      "text": "......",
+      "box_px": [
+        251,
+        615,
+        85,
+        24
+      ],
+      "font_size": 16,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.98,
+      "color": "#07102f",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "workspace inbox label",
+      "text": "workspace inbox\n（自动同步）",
+      "box_px": [
+        720,
+        232,
+        210,
+        66
+      ],
+      "font_size": 19,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.88,
+      "color": "#2f6b34",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "folder image file",
+      "text": "截图.png",
+      "box_px": [
+        701,
+        385,
+        126,
+        30
+      ],
+      "font_size": 17,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.94,
+      "color": "#07102f",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "folder pdf file",
+      "text": "需求说明.pdf",
+      "box_px": [
+        701,
+        452,
+        158,
+        30
+      ],
+      "font_size": 17,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.94,
+      "color": "#07102f",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "folder code file",
+      "text": "utils.py",
+      "box_px": [
+        701,
+        520,
+        110,
+        30
+      ],
+      "font_size": 17,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.94,
+      "color": "#07102f",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "folder ellipsis",
+      "text": "......",
+      "box_px": [
+        702,
+        555,
+        93,
+        26
+      ],
+      "font_size": 15,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.98,
+      "color": "#07102f",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "workspace path",
+      "text": "workspace/.bridge-inbox",
+      "box_px": [
+        614,
+        625,
+        342,
+        32
+      ],
+      "font_size": 20,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.94,
+      "color": "#2f6b34",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "codex input label",
+      "text": "Codex 输入区",
+      "box_px": [
+        1260,
+        251,
+        199,
+        36
+      ],
+      "font_size": 20,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.95,
+      "color": "#ee6a00",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "codex card text",
+      "text": "可读取 inbox 中的文件作为输入",
+      "box_px": [
+        1140,
+        354,
+        326,
+        34
+      ],
+      "font_size": 18,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.93,
+      "color": "#07102f",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "sample citation label",
+      "text": "示例引用：",
+      "box_px": [
+        1140,
+        411,
+        123,
+        32
+      ],
+      "font_size": 17,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.95,
+      "color": "#ee6a00",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "sample prompt text",
+      "text": "请根据 需求说明.pdf 生成接口文档，\n并参考 截图.png 中的界面。\n工具函数可查看 utils.py。",
+      "box_px": [
+        1146,
+        459,
+        363,
+        84
+      ],
+      "font_size": 16,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.89,
+      "color": "#07102f",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "sync legend text",
+      "text": "附件自动同步",
+      "box_px": [
+        413,
+        719,
+        170,
+        29
+      ],
+      "font_size": 18,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.95,
+      "color": "#286fd3",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "image input legend text",
+      "text": "图片可作为输入",
+      "box_px": [
+        743,
+        720,
+        179,
+        29
+      ],
+      "font_size": 18,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.95,
+      "color": "#2f6b34",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "file reference legend text",
+      "text": "任务里引用文件名",
+      "box_px": [
+        1075,
+        719,
+        210,
+        30
+      ],
+      "font_size": 18,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.95,
+      "color": "#ee6a00",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400
+    },
+    {
+      "name": "takeaway mixed text",
+      "box_px": [
+        347,
+        822,
+        935,
+        48
+      ],
+      "font_size": 22,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 0.95,
+      "color": "#07102f",
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 400,
+      "runs": [
+        {
+          "text": "把截图、文档、代码发到 ",
+          "font_size": 22,
+          "color": "#07102f"
+        },
+        {
+          "text": "Discord",
+          "font_size": 22,
+          "color": "#286fd3"
+        },
+        {
+          "text": "， ",
+          "font_size": 22,
+          "color": "#07102f"
+        },
+        {
+          "text": "Codex",
+          "font_size": 22,
+          "color": "#ee6a00"
+        },
+        {
+          "text": " 就能在项目里处理。",
+          "font_size": 22,
+          "color": "#07102f"
+        }
+      ]
+    }
+  ],
+  "shapes": [
+    {
+      "name": "blue sparkle outline",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          457,
+          77
+        ],
+        [
+          468,
+          58
+        ],
+        [
+          476,
+          77
+        ],
+        [
+          491,
+          84
+        ],
+        [
+          475,
+          92
+        ],
+        [
+          468,
+          109
+        ],
+        [
+          459,
+          93
+        ],
+        [
+          446,
+          86
+        ]
+      ],
+      "box_px": [
+        446,
+        58,
+        45,
+        51
+      ],
+      "stroke": "#286fd3",
+      "stroke_width": 3,
+      "fill": "none",
+      "closed": true,
+      "z_index": 120
+    },
+    {
+      "name": "small sparkle dash 1",
+      "type": "line",
+      "points_px": [
+        461,
+        121,
+        477,
+        118
+      ],
+      "stroke": "#286fd3",
+      "stroke_width": 3,
+      "preset": "line",
+      "dash": null,
+      "z_index": 120
+    },
+    {
+      "name": "small sparkle dash 2",
+      "type": "line",
+      "points_px": [
+        460,
+        137,
+        476,
+        137
+      ],
+      "stroke": "#286fd3",
+      "stroke_width": 3,
+      "preset": "line",
+      "dash": null,
+      "z_index": 120
+    },
+    {
+      "name": "green accent 1",
+      "type": "line",
+      "points_px": [
+        1262,
+        75,
+        1281,
+        52
+      ],
+      "stroke": "#2f6b34",
+      "stroke_width": 5,
+      "preset": "line",
+      "dash": null,
+      "z_index": 120
+    },
+    {
+      "name": "green accent 2",
+      "type": "line",
+      "points_px": [
+        1281,
+        86,
+        1307,
+        72
+      ],
+      "stroke": "#2f6b34",
+      "stroke_width": 4,
+      "preset": "line",
+      "dash": null,
+      "z_index": 120
+    },
+    {
+      "name": "green accent 3",
+      "type": "line",
+      "points_px": [
+        1288,
+        101,
+        1314,
+        111
+      ],
+      "stroke": "#2f6b34",
+      "stroke_width": 4,
+      "preset": "line",
+      "dash": null,
+      "z_index": 120
+    },
+    {
+      "name": "blue title underline",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          497,
+          189
+        ],
+        [
+          690,
+          179
+        ],
+        [
+          945,
+          176
+        ],
+        [
+          1267,
+          179
+        ]
+      ],
+      "box_px": [
+        497,
+        176,
+        770,
+        13
+      ],
+      "stroke": "#286fd3",
+      "stroke_width": 3,
+      "fill": "none",
+      "closed": false,
+      "z_index": 120
+    },
+    {
+      "name": "blue title underline second",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          552,
+          195
+        ],
+        [
+          743,
+          181
+        ],
+        [
+          1007,
+          178
+        ],
+        [
+          1259,
+          179
+        ]
+      ],
+      "box_px": [
+        552,
+        178,
+        707,
+        17
+      ],
+      "stroke": "#286fd3",
+      "stroke_width": 2,
+      "fill": "none",
+      "closed": false,
+      "z_index": 120
+    },
+    {
+      "name": "discord attachment panel",
+      "type": "roundRect",
+      "box_px": [
+        100,
+        216,
+        356,
+        433
+      ],
+      "fill": "#ffffff",
+      "stroke": "#286fd3",
+      "stroke_width": 4,
+      "source_corner_radius_px": 47,
+      "corner_category": "large-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 70
+    },
+    {
+      "name": "discord blue circle",
+      "type": "ellipse",
+      "box_px": [
+        126,
+        235,
+        70,
+        70
+      ],
+      "fill": "#5667e9",
+      "stroke": "none",
+      "stroke_width": 0,
+      "z_index": 160
+    },
+    {
+      "name": "discord white body",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          141,
+          272
+        ],
+        [
+          146,
+          261
+        ],
+        [
+          157,
+          258
+        ],
+        [
+          165,
+          260
+        ],
+        [
+          176,
+          258
+        ],
+        [
+          186,
+          264
+        ],
+        [
+          184,
+          283
+        ],
+        [
+          174,
+          288
+        ],
+        [
+          165,
+          283
+        ],
+        [
+          157,
+          288
+        ],
+        [
+          146,
+          284
+        ]
+      ],
+      "box_px": [
+        141,
+        258,
+        45,
+        30
+      ],
+      "stroke": "#ffffff",
+      "stroke_width": 1,
+      "fill": "#ffffff",
+      "closed": true,
+      "z_index": 161
+    },
+    {
+      "name": "discord eye left",
+      "type": "ellipse",
+      "box_px": [
+        151,
+        269,
+        7,
+        8
+      ],
+      "fill": "#5667e9",
+      "stroke": "none",
+      "stroke_width": 0,
+      "z_index": 162
+    },
+    {
+      "name": "discord eye right",
+      "type": "ellipse",
+      "box_px": [
+        171,
+        269,
+        7,
+        8
+      ],
+      "fill": "#5667e9",
+      "stroke": "none",
+      "stroke_width": 0,
+      "z_index": 162
+    },
+    {
+      "name": "discord file row",
+      "type": "roundRect",
+      "box_px": [
+        128,
+        315,
+        293,
+        89
+      ],
+      "fill": "#ffffff",
+      "stroke": "#a1a8b8",
+      "stroke_width": 2,
+      "source_corner_radius_px": 14,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 80
+    },
+    {
+      "name": "discord file row",
+      "type": "roundRect",
+      "box_px": [
+        128,
+        412,
+        293,
+        89
+      ],
+      "fill": "#ffffff",
+      "stroke": "#a1a8b8",
+      "stroke_width": 2,
+      "source_corner_radius_px": 14,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 80
+    },
+    {
+      "name": "discord file row",
+      "type": "roundRect",
+      "box_px": [
+        128,
+        510,
+        293,
+        89
+      ],
+      "fill": "#ffffff",
+      "stroke": "#a1a8b8",
+      "stroke_width": 2,
+      "source_corner_radius_px": 14,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 80
+    },
+    {
+      "name": "image icon frame",
+      "type": "roundRect",
+      "box_px": [
+        153,
+        330,
+        68,
+        53.04
+      ],
+      "fill": "#ffffff",
+      "stroke": "#2f6b34",
+      "stroke_width": 3,
+      "source_corner_radius_px": 4,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 160
+    },
+    {
+      "name": "image icon sun",
+      "type": "ellipse",
+      "box_px": [
+        197.88,
+        338.84,
+        8.16,
+        8.16
+      ],
+      "fill": "#c7b97a",
+      "stroke": "none",
+      "stroke_width": 0,
+      "z_index": 161
+    },
+    {
+      "name": "image icon mountains",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          159.8,
+          375.56
+        ],
+        [
+          176.8,
+          354.48
+        ],
+        [
+          188.36,
+          369.44
+        ],
+        [
+          197.88,
+          359.24
+        ],
+        [
+          214.2,
+          376.24
+        ]
+      ],
+      "box_px": [
+        159.8,
+        354.48,
+        54.39999999999998,
+        21.75999999999999
+      ],
+      "stroke": "#2f6b34",
+      "stroke_width": 2,
+      "fill": "#7ea874",
+      "closed": true,
+      "z_index": 162
+    },
+    {
+      "name": "pdf page body",
+      "type": "roundRect",
+      "box_px": [
+        157,
+        423,
+        58,
+        67
+      ],
+      "fill": "#ffffff",
+      "stroke": "#cf250f",
+      "stroke_width": 3,
+      "source_corner_radius_px": 3,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 160
+    },
+    {
+      "name": "pdf folded corner",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          195.86,
+          423
+        ],
+        [
+          215,
+          443.1
+        ],
+        [
+          195.86,
+          443.1
+        ]
+      ],
+      "box_px": [
+        195.86,
+        423,
+        19.139999999999986,
+        20.100000000000023
+      ],
+      "stroke": "#cf250f",
+      "stroke_width": 2,
+      "fill": "#fff4ef",
+      "closed": true,
+      "z_index": 161
+    },
+    {
+      "name": "PDF label",
+      "text": "PDF",
+      "box_px": [
+        162,
+        448,
+        50,
+        21
+      ],
+      "font_size": 10.8,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0,
+      "color": "#cf250f",
+      "bold": true,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 164
+    },
+    {
+      "name": "code page body",
+      "type": "roundRect",
+      "box_px": [
+        157,
+        520,
+        58,
+        66
+      ],
+      "fill": "#ffffff",
+      "stroke": "#42628c",
+      "stroke_width": 3,
+      "source_corner_radius_px": 3,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 160
+    },
+    {
+      "name": "code folded corner",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          195.86,
+          520
+        ],
+        [
+          215,
+          539.8
+        ],
+        [
+          195.86,
+          539.8
+        ]
+      ],
+      "box_px": [
+        195.86,
+        520,
+        19.139999999999986,
+        19.799999999999955
+      ],
+      "stroke": "#42628c",
+      "stroke_width": 2,
+      "fill": "#eef4ff",
+      "closed": true,
+      "z_index": 161
+    },
+    {
+      "name": "code slash left",
+      "type": "line",
+      "points_px": [
+        179,
+        542,
+        172,
+        558
+      ],
+      "stroke": "#245a9b",
+      "stroke_width": 3,
+      "preset": "line",
+      "dash": null,
+      "z_index": 163
+    },
+    {
+      "name": "code slash mid",
+      "type": "line",
+      "points_px": [
+        187,
+        540,
+        182,
+        562
+      ],
+      "stroke": "#245a9b",
+      "stroke_width": 3,
+      "preset": "line",
+      "dash": null,
+      "z_index": 163
+    },
+    {
+      "name": "code slash right",
+      "type": "line",
+      "points_px": [
+        193,
+        542,
+        200,
+        553
+      ],
+      "stroke": "#245a9b",
+      "stroke_width": 3,
+      "preset": "line",
+      "dash": null,
+      "z_index": 163
+    },
+    {
+      "name": "code slash right2",
+      "type": "line",
+      "points_px": [
+        200,
+        553,
+        192,
+        563
+      ],
+      "stroke": "#245a9b",
+      "stroke_width": 3,
+      "preset": "line",
+      "dash": null,
+      "z_index": 163
+    },
+    {
+      "name": "small folder tab",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          621,
+          247
+        ],
+        [
+          621,
+          235
+        ],
+        [
+          649,
+          235
+        ],
+        [
+          658,
+          245
+        ],
+        [
+          693,
+          245
+        ],
+        [
+          693,
+          255
+        ],
+        [
+          621,
+          255
+        ]
+      ],
+      "box_px": [
+        621,
+        235,
+        72,
+        20
+      ],
+      "stroke": "#2f6b34",
+      "stroke_width": 4,
+      "fill": "#eef7ee",
+      "closed": true,
+      "z_index": 150
+    },
+    {
+      "name": "small folder body",
+      "type": "roundRect",
+      "box_px": [
+        619,
+        250,
+        77,
+        40
+      ],
+      "fill": "#ffffff",
+      "stroke": "#2f6b34",
+      "stroke_width": 4,
+      "source_corner_radius_px": 4,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 151
+    },
+    {
+      "name": "inbox folder tab",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          590,
+          355
+        ],
+        [
+          590,
+          318
+        ],
+        [
+          716,
+          318
+        ],
+        [
+          733,
+          338
+        ],
+        [
+          965,
+          338
+        ],
+        [
+          982,
+          360
+        ],
+        [
+          982,
+          385
+        ],
+        [
+          590,
+          385
+        ]
+      ],
+      "box_px": [
+        590,
+        318,
+        392,
+        67
+      ],
+      "stroke": "#2f6b34",
+      "stroke_width": 4,
+      "fill": "#eef7ee",
+      "closed": true,
+      "z_index": 90
+    },
+    {
+      "name": "inbox folder body",
+      "type": "roundRect",
+      "box_px": [
+        590,
+        356,
+        389,
+        241
+      ],
+      "fill": "#ffffff",
+      "stroke": "#2f6b34",
+      "stroke_width": 4,
+      "source_corner_radius_px": 24,
+      "corner_category": "large-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 91
+    },
+    {
+      "name": "folder top seam",
+      "type": "line",
+      "points_px": [
+        592,
+        356,
+        978,
+        356
+      ],
+      "stroke": "#2f6b34",
+      "stroke_width": 3,
+      "preset": "line",
+      "dash": null,
+      "z_index": 92
+    },
+    {
+      "name": "image icon frame",
+      "type": "roundRect",
+      "box_px": [
+        627,
+        377,
+        51,
+        39.78
+      ],
+      "fill": "#ffffff",
+      "stroke": "#2f6b34",
+      "stroke_width": 3,
+      "source_corner_radius_px": 4,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 160
+    },
+    {
+      "name": "image icon sun",
+      "type": "ellipse",
+      "box_px": [
+        660.66,
+        383.63,
+        6.12,
+        6.12
+      ],
+      "fill": "#c7b97a",
+      "stroke": "none",
+      "stroke_width": 0,
+      "z_index": 161
+    },
+    {
+      "name": "image icon mountains",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          632.1,
+          411.17
+        ],
+        [
+          644.85,
+          395.36
+        ],
+        [
+          653.52,
+          406.58
+        ],
+        [
+          660.66,
+          398.93
+        ],
+        [
+          672.9,
+          411.68
+        ]
+      ],
+      "box_px": [
+        632.1,
+        395.36,
+        40.799999999999955,
+        16.319999999999993
+      ],
+      "stroke": "#2f6b34",
+      "stroke_width": 2,
+      "fill": "#7ea874",
+      "closed": true,
+      "z_index": 162
+    },
+    {
+      "name": "pdf page body",
+      "type": "roundRect",
+      "box_px": [
+        630,
+        440,
+        48,
+        57
+      ],
+      "fill": "#ffffff",
+      "stroke": "#cf250f",
+      "stroke_width": 3,
+      "source_corner_radius_px": 3,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 160
+    },
+    {
+      "name": "pdf folded corner",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          662.16,
+          440
+        ],
+        [
+          678,
+          457.1
+        ],
+        [
+          662.16,
+          457.1
+        ]
+      ],
+      "box_px": [
+        662.16,
+        440,
+        15.840000000000032,
+        17.100000000000023
+      ],
+      "stroke": "#cf250f",
+      "stroke_width": 2,
+      "fill": "#fff4ef",
+      "closed": true,
+      "z_index": 161
+    },
+    {
+      "name": "PDF label",
+      "text": "PDF",
+      "box_px": [
+        635,
+        465,
+        40,
+        21
+      ],
+      "font_size": 10.8,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0,
+      "color": "#cf250f",
+      "bold": true,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 164
+    },
+    {
+      "name": "code page body",
+      "type": "roundRect",
+      "box_px": [
+        630,
+        506,
+        49,
+        56
+      ],
+      "fill": "#ffffff",
+      "stroke": "#42628c",
+      "stroke_width": 3,
+      "source_corner_radius_px": 3,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 160
+    },
+    {
+      "name": "code folded corner",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          662.83,
+          506
+        ],
+        [
+          679,
+          522.8
+        ],
+        [
+          662.83,
+          522.8
+        ]
+      ],
+      "box_px": [
+        662.83,
+        506,
+        16.16999999999996,
+        16.799999999999955
+      ],
+      "stroke": "#42628c",
+      "stroke_width": 2,
+      "fill": "#eef4ff",
+      "closed": true,
+      "z_index": 161
+    },
+    {
+      "name": "code slash left",
+      "type": "line",
+      "points_px": [
+        652,
+        528,
+        645,
+        544
+      ],
+      "stroke": "#245a9b",
+      "stroke_width": 3,
+      "preset": "line",
+      "dash": null,
+      "z_index": 163
+    },
+    {
+      "name": "code slash mid",
+      "type": "line",
+      "points_px": [
+        660,
+        526,
+        655,
+        548
+      ],
+      "stroke": "#245a9b",
+      "stroke_width": 3,
+      "preset": "line",
+      "dash": null,
+      "z_index": 163
+    },
+    {
+      "name": "code slash right",
+      "type": "line",
+      "points_px": [
+        666,
+        528,
+        673,
+        539
+      ],
+      "stroke": "#245a9b",
+      "stroke_width": 3,
+      "preset": "line",
+      "dash": null,
+      "z_index": 163
+    },
+    {
+      "name": "code slash right2",
+      "type": "line",
+      "points_px": [
+        673,
+        539,
+        665,
+        549
+      ],
+      "stroke": "#245a9b",
+      "stroke_width": 3,
+      "preset": "line",
+      "dash": null,
+      "z_index": 163
+    },
+    {
+      "name": "workspace path pill",
+      "type": "roundRect",
+      "box_px": [
+        565,
+        613,
+        431,
+        51
+      ],
+      "fill": "#f6fbf4",
+      "stroke": "#2f6b34",
+      "stroke_width": 2,
+      "source_corner_radius_px": 13,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 80
+    },
+    {
+      "name": "blue sync arrow",
+      "type": "line",
+      "points_px": [
+        481,
+        437,
+        566,
+        437
+      ],
+      "stroke": "#286fd3",
+      "stroke_width": 7,
+      "preset": "lineWithArrow",
+      "dash": null,
+      "z_index": 130
+    },
+    {
+      "name": "green input arrow",
+      "type": "line",
+      "points_px": [
+        998,
+        437,
+        1080,
+        437
+      ],
+      "stroke": "#2f6b34",
+      "stroke_width": 7,
+      "preset": "lineWithArrow",
+      "dash": null,
+      "z_index": 130
+    },
+    {
+      "name": "codex cube top",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          1191.0,
+          219
+        ],
+        [
+          1229,
+          238.0
+        ],
+        [
+          1191.0,
+          257.0
+        ],
+        [
+          1153,
+          238.0
+        ]
+      ],
+      "box_px": [
+        1153,
+        219,
+        76,
+        38.0
+      ],
+      "stroke": "#ee6a00",
+      "stroke_width": 3,
+      "fill": "#ffffff",
+      "closed": true,
+      "z_index": 150
+    },
+    {
+      "name": "codex cube left",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          1153,
+          238.0
+        ],
+        [
+          1191.0,
+          257.0
+        ],
+        [
+          1191.0,
+          295
+        ],
+        [
+          1153,
+          275.24
+        ]
+      ],
+      "box_px": [
+        1153,
+        238.0,
+        38.0,
+        57.0
+      ],
+      "stroke": "#ee6a00",
+      "stroke_width": 3,
+      "fill": "#fff8f0",
+      "closed": true,
+      "z_index": 151
+    },
+    {
+      "name": "codex cube right",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          1229,
+          238.0
+        ],
+        [
+          1191.0,
+          257.0
+        ],
+        [
+          1191.0,
+          295
+        ],
+        [
+          1229,
+          275.24
+        ]
+      ],
+      "box_px": [
+        1191.0,
+        238.0,
+        38.0,
+        57.0
+      ],
+      "stroke": "#ee6a00",
+      "stroke_width": 3,
+      "fill": "#ffffff",
+      "closed": true,
+      "z_index": 152
+    },
+    {
+      "name": "cube C",
+      "text": "C",
+      "box_px": [
+        1204,
+        261,
+        22,
+        24
+      ],
+      "font_size": 12,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0,
+      "color": "#ee6a00",
+      "bold": true,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 154
+    },
+    {
+      "name": "codex input card",
+      "type": "roundRect",
+      "box_px": [
+        1105,
+        314,
+        464,
+        344
+      ],
+      "fill": "#fffaf5",
+      "stroke": "#ee6a00",
+      "stroke_width": 3,
+      "source_corner_radius_px": 48,
+      "corner_category": "large-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 75
+    },
+    {
+      "name": "sample prompt dashed box",
+      "type": "roundRect",
+      "box_px": [
+        1130,
+        443,
+        415,
+        113
+      ],
+      "fill": "#fffefd",
+      "stroke": "#a58b76",
+      "stroke_width": 2,
+      "source_corner_radius_px": 8,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": "dash",
+      "z_index": 85
+    },
+    {
+      "name": "codex gray line 1",
+      "type": "line",
+      "points_px": [
+        1142,
+        584,
+        1488,
+        584
+      ],
+      "stroke": "#d7d2cc",
+      "stroke_width": 5,
+      "preset": "line",
+      "dash": null,
+      "z_index": 120
+    },
+    {
+      "name": "codex gray line 2",
+      "type": "line",
+      "points_px": [
+        1140,
+        605,
+        1532,
+        605
+      ],
+      "stroke": "#d7d2cc",
+      "stroke_width": 5,
+      "preset": "line",
+      "dash": null,
+      "z_index": 120
+    },
+    {
+      "name": "sync legend pill",
+      "type": "roundRect",
+      "box_px": [
+        328,
+        698,
+        287,
+        60
+      ],
+      "fill": "#f4f9ff",
+      "stroke": "#286fd3",
+      "stroke_width": 2,
+      "source_corner_radius_px": 16,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 80
+    },
+    {
+      "name": "sync arrow upper arc",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          365.94744111674237,
+          729.5
+        ],
+        [
+          363.4807527838563,
+          735.0496778744625
+        ],
+        [
+          363.12051830189796,
+          740.9860408020854
+        ],
+        [
+          364.9019999318628,
+          746.7279962184402
+        ],
+        [
+          368.65081383949735,
+          751.7134815208183
+        ],
+        [
+          374.0,
+          755.4544826719043
+        ],
+        [
+          380.4259428020093,
+          757.5848044139423
+        ],
+        [
+          387.29962619188836,
+          757.8959160119972
+        ],
+        [
+          393.94820614766763,
+          756.3573636952094
+        ],
+        [
+          399.72087333989487,
+          753.1197516840705
+        ],
+        [
+          404.05255888325763,
+          748.5
+        ]
+      ],
+      "box_px": [
+        363.12051830189796,
+        729.5,
+        40.93204058135967,
+        28.3959160119972
+      ],
+      "stroke": "#286fd3",
+      "stroke_width": 4,
+      "fill": "none",
+      "closed": false,
+      "z_index": 160
+    },
+    {
+      "name": "sync arrow upper head",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          400,
+          724
+        ],
+        [
+          411,
+          723
+        ],
+        [
+          406,
+          735
+        ]
+      ],
+      "box_px": [
+        400,
+        723,
+        11,
+        12
+      ],
+      "stroke": "#286fd3",
+      "stroke_width": 2,
+      "fill": "#286fd3",
+      "closed": true,
+      "z_index": 161
+    },
+    {
+      "name": "sync arrow lower arc",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          404.05255888325763,
+          748.5
+        ],
+        [
+          399.72087333989487,
+          753.1197516840705
+        ],
+        [
+          393.94820614766763,
+          756.3573636952094
+        ],
+        [
+          387.29962619188836,
+          757.8959160119972
+        ],
+        [
+          380.4259428020093,
+          757.5848044139423
+        ],
+        [
+          374.0,
+          755.4544826719043
+        ],
+        [
+          368.65081383949735,
+          751.7134815208183
+        ],
+        [
+          364.9019999318628,
+          746.7279962184402
+        ],
+        [
+          363.12051830189796,
+          740.9860408020854
+        ],
+        [
+          363.4807527838563,
+          735.0496778744625
+        ],
+        [
+          365.94744111674237,
+          729.5
+        ]
+      ],
+      "box_px": [
+        363.12051830189796,
+        729.5,
+        40.93204058135967,
+        28.3959160119972
+      ],
+      "stroke": "#286fd3",
+      "stroke_width": 4,
+      "fill": "none",
+      "closed": false,
+      "z_index": 160
+    },
+    {
+      "name": "sync arrow lower head",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          369,
+          753
+        ],
+        [
+          359,
+          754
+        ],
+        [
+          364,
+          742
+        ]
+      ],
+      "box_px": [
+        359,
+        742,
+        10,
+        12
+      ],
+      "stroke": "#286fd3",
+      "stroke_width": 2,
+      "fill": "#286fd3",
+      "closed": true,
+      "z_index": 161
+    },
+    {
+      "name": "image input legend pill",
+      "type": "roundRect",
+      "box_px": [
+        663,
+        698,
+        293,
+        60
+      ],
+      "fill": "#f8fbf4",
+      "stroke": "#2f6b34",
+      "stroke_width": 2,
+      "source_corner_radius_px": 16,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 80
+    },
+    {
+      "name": "image icon frame",
+      "type": "roundRect",
+      "box_px": [
+        687,
+        714,
+        39,
+        30.42
+      ],
+      "fill": "#ffffff",
+      "stroke": "#2f6b34",
+      "stroke_width": 3,
+      "source_corner_radius_px": 4,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 160
+    },
+    {
+      "name": "image icon sun",
+      "type": "ellipse",
+      "box_px": [
+        712.74,
+        719.07,
+        4.68,
+        4.68
+      ],
+      "fill": "#c7b97a",
+      "stroke": "none",
+      "stroke_width": 0,
+      "z_index": 161
+    },
+    {
+      "name": "image icon mountains",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          690.9,
+          740.13
+        ],
+        [
+          700.65,
+          728.04
+        ],
+        [
+          707.28,
+          736.62
+        ],
+        [
+          712.74,
+          730.77
+        ],
+        [
+          722.1,
+          740.52
+        ]
+      ],
+      "box_px": [
+        690.9,
+        728.04,
+        31.200000000000045,
+        12.480000000000018
+      ],
+      "stroke": "#2f6b34",
+      "stroke_width": 2,
+      "fill": "#7ea874",
+      "closed": true,
+      "z_index": 162
+    },
+    {
+      "name": "file reference legend pill",
+      "type": "roundRect",
+      "box_px": [
+        1000,
+        698,
+        329,
+        60
+      ],
+      "fill": "#fffaf5",
+      "stroke": "#ee6a00",
+      "stroke_width": 2,
+      "source_corner_radius_px": 16,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 80
+    },
+    {
+      "name": "pdf page body",
+      "type": "roundRect",
+      "box_px": [
+        1024,
+        712,
+        31,
+        37
+      ],
+      "fill": "#ffffff",
+      "stroke": "#cf250f",
+      "stroke_width": 3,
+      "source_corner_radius_px": 3,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 160
+    },
+    {
+      "name": "pdf folded corner",
+      "type": "freeform",
+      "freeform_points_px": [
+        [
+          1044.77,
+          712
+        ],
+        [
+          1055,
+          723.1
+        ],
+        [
+          1044.77,
+          723.1
+        ]
+      ],
+      "box_px": [
+        1044.77,
+        712,
+        10.230000000000018,
+        11.100000000000023
+      ],
+      "stroke": "#cf250f",
+      "stroke_width": 2,
+      "fill": "#fff4ef",
+      "closed": true,
+      "z_index": 161
+    },
+    {
+      "name": "PDF label",
+      "text": "PDF",
+      "box_px": [
+        1029,
+        737,
+        23,
+        21
+      ],
+      "font_size": 10.8,
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0,
+      "color": "#cf250f",
+      "bold": true,
+      "align": "left",
+      "wrap": "none",
+      "z_index": 164
+    },
+    {
+      "name": "takeaway dashed border",
+      "type": "roundRect",
+      "box_px": [
+        218,
+        792,
+        1220,
+        102
+      ],
+      "fill": "none",
+      "stroke": "#6ba7ef",
+      "stroke_width": 3,
+      "source_corner_radius_px": 12,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": "dash",
+      "z_index": 70
+    },
+    {
+      "name": "bulb head",
+      "type": "ellipse",
+      "box_px": [
+        271,
+        818,
+        40,
+        47
+      ],
+      "fill": "#fffef3",
+      "stroke": "#286fd3",
+      "stroke_width": 4,
+      "z_index": 150
+    },
+    {
+      "name": "bulb neck",
+      "type": "roundRect",
+      "box_px": [
+        281,
+        862,
+        22,
+        15
+      ],
+      "fill": "#fffef3",
+      "stroke": "#286fd3",
+      "stroke_width": 3,
+      "source_corner_radius_px": 3,
+      "corner_category": "small-radius",
+      "corner_reason": "source has rounded marker/card corners",
+      "dash": null,
+      "z_index": 151
+    },
+    {
+      "name": "bulb base 1",
+      "type": "line",
+      "points_px": [
+        281,
+        880,
+        303,
+        880
+      ],
+      "stroke": "#286fd3",
+      "stroke_width": 3,
+      "preset": "line",
+      "dash": null,
+      "z_index": 151
+    },
+    {
+      "name": "bulb base 2",
+      "type": "line",
+      "points_px": [
+        285,
+        887,
+        299,
+        887
+      ],
+      "stroke": "#286fd3",
+      "stroke_width": 3,
+      "preset": "line",
+      "dash": null,
+      "z_index": 151
+    },
+    {
+      "name": "bulb ray top",
+      "type": "line",
+      "points_px": [
+        291,
+        808,
+        291,
+        815
+      ],
+      "stroke": "#286fd3",
+      "stroke_width": 3,
+      "preset": "line",
+      "dash": null,
+      "z_index": 150
+    },
+    {
+      "name": "bulb ray left",
+      "type": "line",
+      "points_px": [
+        257,
+        828,
+        267,
+        833
+      ],
+      "stroke": "#286fd3",
+      "stroke_width": 3,
+      "preset": "line",
+      "dash": null,
+      "z_index": 150
+    },
+    {
+      "name": "bulb ray right",
+      "type": "line",
+      "points_px": [
+        315,
+        831,
+        326,
+        825
+      ],
+      "stroke": "#286fd3",
+      "stroke_width": 3,
+      "preset": "line",
+      "dash": null,
+      "z_index": 150
+    },
+    {
+      "name": "bulb ray upper left",
+      "type": "line",
+      "points_px": [
+        270,
+        813,
+        276,
+        824
+      ],
+      "stroke": "#286fd3",
+      "stroke_width": 3,
+      "preset": "line",
+      "dash": null,
+      "z_index": 150
+    },
+    {
+      "name": "bulb ray upper right",
+      "type": "line",
+      "points_px": [
+        308,
+        816,
+        302,
+        826
+      ],
+      "stroke": "#286fd3",
+      "stroke_width": 3,
+      "preset": "line",
+      "dash": null,
+      "z_index": 150
+    }
+  ],
+  "images": [],
+  "asset_provenance": [],
+  "page_strategy": "Object-level editable reconstruction using native PowerPoint text boxes, primitive shapes, and freeform vector approximations; no full-slide raster image is used.",
+  "known_limits": [
+    "Hand-drawn source styling, Discord mark, Codex cube, sync arrows, lightbulb, and attachment icons are simplified native-vector approximations rather than exact brand/icon artwork.",
+    "Preview renderer uses available system CJK font, so handwritten brush texture and exact glyph metrics differ from the source."
+  ],
+  "required_text": [
+    "文件输入与附件",
+    "Discord 附件",
+    "截图.png",
+    "1.2 MB",
+    "需求说明.pdf",
+    "245 KB",
+    "utils.py",
+    "3.1 KB",
+    "......",
+    "workspace inbox",
+    "（自动同步）",
+    "workspace/.bridge-inbox",
+    "Codex 输入区",
+    "可读取 inbox 中的文件作为输入",
+    "示例引用：",
+    "请根据 需求说明.pdf 生成接口文档，",
+    "并参考 截图.png 中的界面。",
+    "工具函数可查看 utils.py。",
+    "附件自动同步",
+    "图片可作为输入",
+    "任务里引用文件名",
+    "把截图、文档、代码发到 Discord， Codex 就能在项目里处理。"
+  ]
+}

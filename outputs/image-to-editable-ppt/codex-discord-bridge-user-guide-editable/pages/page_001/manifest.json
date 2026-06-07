@@ -1,0 +1,2223 @@
+{
+  "schema_version": 1,
+  "page_id": "page_001",
+  "slide": {
+    "width": 13.333,
+    "height": 7.5,
+    "background": "#FEFDF9"
+  },
+  "source": {
+    "path": "source.png",
+    "width_px": 1672,
+    "height_px": 941
+  },
+  "preview_scale": 126,
+  "preview_font_scale": 0.98,
+  "page_strategy": "Object-level editable reconstruction using native text and shape primitives; non-text hand-drawn icons are separate source-derived raster assets, not a full-page background.",
+  "text_inventory": [
+    "Codex Discord Bridge 使用指南",
+    "Discord",
+    "发任务，",
+    "本机 Codex",
+    "执行，",
+    "结果自动回传。",
+    "任务内容",
+    "转发任务",
+    "执行命令",
+    "返回结果",
+    "...",
+    "发送任务",
+    "Bridge",
+    "中转与路由",
+    "Codex",
+    "本机执行任务",
+    "macOS 本机",
+    "运行 Codex",
+    "C",
+    "默认 Codex",
+    "•",
+    "macOS 服务",
+    "图片/文件回传"
+  ],
+  "visual_inventory": [
+    {
+      "id": "background",
+      "type": "native",
+      "description": "Warm off-white plain background rebuilt as slide fill."
+    },
+    {
+      "id": "title_decorations",
+      "type": "native-shapes",
+      "description": "Title underline and small spark/ray doodles simplified into editable lines."
+    },
+    {
+      "id": "main_nodes",
+      "type": "native-shapes",
+      "description": "Four circular nodes, hatch accents, and label cards rebuilt as native ellipses/roundRects."
+    },
+    {
+      "id": "flow_arrows",
+      "type": "native-shapes",
+      "description": "Blue, green, and orange directional arrows rebuilt as line segments with native arrowheads."
+    },
+    {
+      "id": "discord_logo",
+      "type": "source-derived-rasterization",
+      "description": "Non-text Discord logo kept as independent movable asset."
+    },
+    {
+      "id": "bridge_icon",
+      "type": "source-derived-rasterization",
+      "description": "Non-text bridge pictogram kept as independent movable asset."
+    },
+    {
+      "id": "codex_cube",
+      "type": "native-shapes",
+      "description": "Codex cube approximated with editable lines plus native C text."
+    },
+    {
+      "id": "laptop_icon",
+      "type": "source-derived-rasterization",
+      "description": "Non-text laptop pictogram kept as independent movable asset."
+    },
+    {
+      "id": "legend_icons",
+      "type": "source-derived-rasterization",
+      "description": "Small non-text status icons kept as independent movable assets."
+    },
+    {
+      "id": "legend_pills",
+      "type": "native-shapes",
+      "description": "Bottom dashed container and three rounded pills rebuilt as native shapes."
+    }
+  ],
+  "background_strategy": {
+    "mode": "native-or-script",
+    "source_consistency_contract": "Preserve the plain warm paper color and airy whiteboard layout without using source.png as a full-slide background.",
+    "removed_foreground": "All text, arrows, nodes, and icons are reconstructed as independent objects.",
+    "comparison_note": "Background is a uniform native fill sampled from source; no clean-base image or inpainting is required."
+  },
+  "quality_checks": {
+    "font_size_calibrated": true,
+    "visual_inventory_matched": true,
+    "background_strategy_checked": true,
+    "shape_corner_geometry_checked": true,
+    "font_size_calibration_note": "Preview pass reduced subtitle, card, caption, and legend typography to avoid overflow and better match source density."
+  },
+  "text_boxes": [
+    {
+      "text": "Codex Discord Bridge 使用指南",
+      "box_px": [
+        207,
+        104,
+        1345,
+        120
+      ],
+      "font_size": 54,
+      "font": "PingFang SC",
+      "color": "#0B3E6B",
+      "bold": true,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none",
+      "name": "title"
+    },
+    {
+      "text": "Discord",
+      "box_px": [
+        333,
+        276,
+        165,
+        52
+      ],
+      "font_size": 29,
+      "font": "PingFang SC",
+      "color": "#428DDE",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none",
+      "name": "subtitle_discord"
+    },
+    {
+      "text": "发任务，",
+      "box_px": [
+        522,
+        281,
+        160,
+        48
+      ],
+      "font_size": 25,
+      "font": "PingFang SC",
+      "color": "#242424",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none",
+      "name": "subtitle_task"
+    },
+    {
+      "text": "本机 Codex",
+      "box_px": [
+        713,
+        281,
+        232,
+        48
+      ],
+      "font_size": 25,
+      "font": "PingFang SC",
+      "color": "#242424",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none",
+      "name": "subtitle_local_codex"
+    },
+    {
+      "text": "执行，",
+      "box_px": [
+        970,
+        281,
+        116,
+        48
+      ],
+      "font_size": 25,
+      "font": "PingFang SC",
+      "color": "#242424",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none",
+      "name": "subtitle_execute"
+    },
+    {
+      "text": "结果自动回传。",
+      "box_px": [
+        1118,
+        281,
+        252,
+        48
+      ],
+      "font_size": 25,
+      "font": "PingFang SC",
+      "color": "#242424",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none",
+      "name": "subtitle_return"
+    },
+    {
+      "text": "任务内容",
+      "box_px": [
+        399,
+        439,
+        110,
+        38
+      ],
+      "font_size": 18,
+      "font": "PingFang SC",
+      "color": "#2F83D8",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none"
+    },
+    {
+      "text": "转发任务",
+      "box_px": [
+        782,
+        439,
+        110,
+        38
+      ],
+      "font_size": 18,
+      "font": "PingFang SC",
+      "color": "#4F7B42",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none"
+    },
+    {
+      "text": "执行命令",
+      "box_px": [
+        1150,
+        415,
+        115,
+        38
+      ],
+      "font_size": 19,
+      "font": "PingFang SC",
+      "color": "#C96A25",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none"
+    },
+    {
+      "text": "返回结果",
+      "box_px": [
+        1154,
+        581,
+        120,
+        38
+      ],
+      "font_size": 18,
+      "font": "PingFang SC",
+      "color": "#4F7B42",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none"
+    },
+    {
+      "text": "...",
+      "box_px": [
+        800,
+        539,
+        64,
+        32
+      ],
+      "font_size": 21,
+      "font": "PingFang SC",
+      "color": "#4F7B42",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none"
+    },
+    {
+      "text": "Discord",
+      "box_px": [
+        191,
+        647,
+        108,
+        32
+      ],
+      "font_size": 20,
+      "font": "PingFang SC",
+      "color": "#0B3E6B",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none"
+    },
+    {
+      "text": "发送任务",
+      "box_px": [
+        190,
+        697,
+        112,
+        30
+      ],
+      "font_size": 18,
+      "font": "PingFang SC",
+      "color": "#242424",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none"
+    },
+    {
+      "text": "Bridge",
+      "box_px": [
+        599,
+        647,
+        100,
+        32
+      ],
+      "font_size": 20,
+      "font": "PingFang SC",
+      "color": "#4F7B42",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none"
+    },
+    {
+      "text": "中转与路由",
+      "box_px": [
+        588,
+        697,
+        140,
+        30
+      ],
+      "font_size": 18,
+      "font": "PingFang SC",
+      "color": "#242424",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none"
+    },
+    {
+      "text": "Codex",
+      "box_px": [
+        968,
+        647,
+        96,
+        32
+      ],
+      "font_size": 20,
+      "font": "PingFang SC",
+      "color": "#A24F18",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none"
+    },
+    {
+      "text": "本机执行任务",
+      "box_px": [
+        938,
+        697,
+        155,
+        30
+      ],
+      "font_size": 18,
+      "font": "PingFang SC",
+      "color": "#242424",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none"
+    },
+    {
+      "text": "macOS 本机",
+      "box_px": [
+        1348,
+        649,
+        142,
+        30
+      ],
+      "font_size": 17,
+      "font": "PingFang SC",
+      "color": "#0B3E6B",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none"
+    },
+    {
+      "text": "运行 Codex",
+      "box_px": [
+        1351,
+        697,
+        132,
+        30
+      ],
+      "font_size": 18,
+      "font": "PingFang SC",
+      "color": "#242424",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none"
+    },
+    {
+      "text": "C",
+      "box_px": [
+        1040,
+        509,
+        38,
+        46
+      ],
+      "font_size": 30,
+      "font": "PingFang SC",
+      "color": "#242424",
+      "bold": false,
+      "italic": false,
+      "z_index": 51,
+      "wrap": "none",
+      "autofit": "none",
+      "name": "codex_cube_c"
+    },
+    {
+      "text": "默认 Codex",
+      "box_px": [
+        480,
+        825,
+        120,
+        28
+      ],
+      "font_size": 17,
+      "font": "PingFang SC",
+      "color": "#236FB7",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none"
+    },
+    {
+      "text": "•",
+      "box_px": [
+        664,
+        819,
+        20,
+        35
+      ],
+      "font_size": 17,
+      "font": "PingFang SC",
+      "color": "#6F5D46",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none"
+    },
+    {
+      "text": "macOS 服务",
+      "box_px": [
+        787,
+        825,
+        128,
+        28
+      ],
+      "font_size": 17,
+      "font": "PingFang SC",
+      "color": "#4F7B42",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none"
+    },
+    {
+      "text": "•",
+      "box_px": [
+        976,
+        819,
+        20,
+        35
+      ],
+      "font_size": 17,
+      "font": "PingFang SC",
+      "color": "#6F5D46",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none"
+    },
+    {
+      "text": "图片/文件回传",
+      "box_px": [
+        1091,
+        825,
+        154,
+        28
+      ],
+      "font_size": 17,
+      "font": "PingFang SC",
+      "color": "#B9541E",
+      "bold": false,
+      "italic": false,
+      "z_index": 50,
+      "wrap": "none",
+      "autofit": "none"
+    }
+  ],
+  "shapes": [
+    {
+      "type": "line",
+      "points_px": [
+        203,
+        239,
+        1100,
+        235
+      ],
+      "stroke": "#8CBCEB",
+      "stroke_width": 4,
+      "fill": "none",
+      "z_index": 6
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1102,
+        236,
+        1207,
+        238
+      ],
+      "stroke": "#A2C8EF",
+      "stroke_width": 2,
+      "fill": "none",
+      "z_index": 6
+    },
+    {
+      "type": "line",
+      "points_px": [
+        103,
+        150,
+        116,
+        130
+      ],
+      "stroke": "#2F83D8",
+      "stroke_width": 2,
+      "fill": "none",
+      "z_index": 6
+    },
+    {
+      "type": "line",
+      "points_px": [
+        116,
+        130,
+        129,
+        151
+      ],
+      "stroke": "#2F83D8",
+      "stroke_width": 2,
+      "fill": "none",
+      "z_index": 6
+    },
+    {
+      "type": "line",
+      "points_px": [
+        129,
+        151,
+        107,
+        160
+      ],
+      "stroke": "#2F83D8",
+      "stroke_width": 2,
+      "fill": "none",
+      "z_index": 6
+    },
+    {
+      "type": "line",
+      "points_px": [
+        107,
+        160,
+        103,
+        150
+      ],
+      "stroke": "#2F83D8",
+      "stroke_width": 2,
+      "fill": "none",
+      "z_index": 6
+    },
+    {
+      "type": "line",
+      "points_px": [
+        150,
+        149,
+        187,
+        176
+      ],
+      "stroke": "#71A8E1",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 6
+    },
+    {
+      "type": "line",
+      "points_px": [
+        140,
+        170,
+        169,
+        177
+      ],
+      "stroke": "#71A8E1",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 6
+    },
+    {
+      "type": "line",
+      "points_px": [
+        136,
+        191,
+        168,
+        194
+      ],
+      "stroke": "#71A8E1",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 6
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1540,
+        91,
+        1524,
+        119
+      ],
+      "stroke": "#4F7B42",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 6
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1573,
+        111,
+        1545,
+        135
+      ],
+      "stroke": "#4F7B42",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 6
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1591,
+        137,
+        1555,
+        136
+      ],
+      "stroke": "#4F7B42",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 6
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1592,
+        154,
+        1560,
+        153
+      ],
+      "stroke": "#4F7B42",
+      "stroke_width": 2,
+      "fill": "none",
+      "z_index": 6
+    },
+    {
+      "type": "line",
+      "points_px": [
+        330,
+        331,
+        503,
+        328
+      ],
+      "stroke": "#4D91DD",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 6
+    },
+    {
+      "type": "line",
+      "points_px": [
+        712,
+        329,
+        950,
+        326
+      ],
+      "stroke": "#6E9B63",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 6
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1187,
+        330,
+        1345,
+        326
+      ],
+      "stroke": "#E58A38",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 6
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        108,
+        387,
+        262,
+        236
+      ],
+      "fill": "#EFF7FF",
+      "stroke": "#4C8FD8",
+      "stroke_width": 3,
+      "z_index": 10,
+      "name": "discord_circle"
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        112,
+        389,
+        254,
+        233
+      ],
+      "fill": "none",
+      "stroke": "#4C8FD8",
+      "stroke_width": 1,
+      "z_index": 11,
+      "name": "discord_sketch_circle"
+    },
+    {
+      "type": "line",
+      "points_px": [
+        132.91,
+        548.91,
+        177.82,
+        593.82
+      ],
+      "stroke": "#D8E8FA",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        128.02,
+        521.02,
+        208.35,
+        601.35
+      ],
+      "stroke": "#D8E8FA",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        130.63,
+        500.63,
+        231.39,
+        601.39
+      ],
+      "stroke": "#D8E8FA",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        136.58,
+        483.58,
+        251.09,
+        598.09
+      ],
+      "stroke": "#D8E8FA",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        144.73,
+        468.73,
+        268.59,
+        592.59
+      ],
+      "stroke": "#D8E8FA",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        154.62,
+        455.62,
+        284.35,
+        585.35
+      ],
+      "stroke": "#D8E8FA",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        166.01,
+        444.01,
+        298.61,
+        576.61
+      ],
+      "stroke": "#D8E8FA",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        178.8,
+        433.8,
+        311.46,
+        566.46
+      ],
+      "stroke": "#D8E8FA",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        193.0,
+        425.0,
+        322.91,
+        554.91
+      ],
+      "stroke": "#D8E8FA",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        208.69,
+        417.69,
+        332.87,
+        541.87
+      ],
+      "stroke": "#D8E8FA",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        226.1,
+        412.1,
+        341.11,
+        527.11
+      ],
+      "stroke": "#D8E8FA",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        245.7,
+        408.7,
+        347.17,
+        510.17
+      ],
+      "stroke": "#D8E8FA",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        268.55,
+        408.55,
+        349.96,
+        489.96
+      ],
+      "stroke": "#D8E8FA",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        298.49,
+        415.49,
+        345.67,
+        462.67
+      ],
+      "stroke": "#D8E8FA",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        529,
+        387,
+        232,
+        236
+      ],
+      "fill": "#F3F8EE",
+      "stroke": "#5E7E50",
+      "stroke_width": 3,
+      "z_index": 10,
+      "name": "bridge_circle"
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        533,
+        389,
+        224,
+        233
+      ],
+      "fill": "none",
+      "stroke": "#5E7E50",
+      "stroke_width": 1,
+      "z_index": 11,
+      "name": "bridge_sketch_circle"
+    },
+    {
+      "type": "line",
+      "points_px": [
+        550.39,
+        537.39,
+        615.03,
+        602.03
+      ],
+      "stroke": "#E1ECD8",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        549.48,
+        513.48,
+        638.5,
+        602.5
+      ],
+      "stroke": "#E1ECD8",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        553.01,
+        494.01,
+        657.54,
+        598.54
+      ],
+      "stroke": "#E1ECD8",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        559.15,
+        477.15,
+        673.96,
+        591.96
+      ],
+      "stroke": "#E1ECD8",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        567.23,
+        462.23,
+        688.43,
+        583.43
+      ],
+      "stroke": "#E1ECD8",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        576.96,
+        448.96,
+        701.27,
+        573.27
+      ],
+      "stroke": "#E1ECD8",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        588.21,
+        437.21,
+        712.58,
+        561.58
+      ],
+      "stroke": "#E1ECD8",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        600.97,
+        426.97,
+        722.38,
+        548.38
+      ],
+      "stroke": "#E1ECD8",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        615.38,
+        418.38,
+        730.54,
+        533.54
+      ],
+      "stroke": "#E1ECD8",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        631.7,
+        411.7,
+        736.77,
+        516.77
+      ],
+      "stroke": "#E1ECD8",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        650.6,
+        407.6,
+        740.44,
+        497.44
+      ],
+      "stroke": "#E1ECD8",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        673.8,
+        407.8,
+        739.8,
+        473.8
+      ],
+      "stroke": "#E1ECD8",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        914,
+        386,
+        232,
+        236
+      ],
+      "fill": "#FFF4E8",
+      "stroke": "#D88B40",
+      "stroke_width": 3,
+      "z_index": 10,
+      "name": "codex_circle"
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        918,
+        388,
+        224,
+        233
+      ],
+      "fill": "none",
+      "stroke": "#D88B40",
+      "stroke_width": 1,
+      "z_index": 11,
+      "name": "codex_sketch_circle"
+    },
+    {
+      "type": "line",
+      "points_px": [
+        935.39,
+        536.39,
+        1000.03,
+        601.03
+      ],
+      "stroke": "#F5DFBF",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        934.48,
+        512.48,
+        1023.5,
+        601.5
+      ],
+      "stroke": "#F5DFBF",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        938.01,
+        493.01,
+        1042.54,
+        597.54
+      ],
+      "stroke": "#F5DFBF",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        944.15,
+        476.15,
+        1058.96,
+        590.96
+      ],
+      "stroke": "#F5DFBF",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        952.23,
+        461.23,
+        1073.43,
+        582.43
+      ],
+      "stroke": "#F5DFBF",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        961.96,
+        447.96,
+        1086.27,
+        572.27
+      ],
+      "stroke": "#F5DFBF",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        973.21,
+        436.21,
+        1097.58,
+        560.58
+      ],
+      "stroke": "#F5DFBF",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        985.97,
+        425.97,
+        1107.38,
+        547.38
+      ],
+      "stroke": "#F5DFBF",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1000.38,
+        417.38,
+        1115.54,
+        532.54
+      ],
+      "stroke": "#F5DFBF",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1016.7,
+        410.7,
+        1121.77,
+        515.77
+      ],
+      "stroke": "#F5DFBF",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1035.6,
+        406.6,
+        1125.44,
+        496.44
+      ],
+      "stroke": "#F5DFBF",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1058.8,
+        406.8,
+        1124.8,
+        472.8
+      ],
+      "stroke": "#F5DFBF",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1282,
+        389,
+        232,
+        233
+      ],
+      "fill": "#F4FAFF",
+      "stroke": "#5E88B2",
+      "stroke_width": 3,
+      "z_index": 10,
+      "name": "mac_circle"
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1286,
+        391,
+        224,
+        230
+      ],
+      "fill": "none",
+      "stroke": "#5E88B2",
+      "stroke_width": 1,
+      "z_index": 11,
+      "name": "mac_sketch_circle"
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1303.35,
+        537.85,
+        1366.25,
+        600.75
+      ],
+      "stroke": "#D9E9F7",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1302.36,
+        513.86,
+        1390.14,
+        601.64
+      ],
+      "stroke": "#D9E9F7",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1305.96,
+        494.46,
+        1409.43,
+        597.93
+      ],
+      "stroke": "#D9E9F7",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1312.21,
+        477.71,
+        1426.07,
+        591.57
+      ],
+      "stroke": "#D9E9F7",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1320.43,
+        462.93,
+        1440.73,
+        583.23
+      ],
+      "stroke": "#D9E9F7",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1330.31,
+        449.81,
+        1453.74,
+        573.24
+      ],
+      "stroke": "#D9E9F7",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1341.73,
+        438.23,
+        1465.22,
+        561.72
+      ],
+      "stroke": "#D9E9F7",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1354.67,
+        428.17,
+        1475.17,
+        548.67
+      ],
+      "stroke": "#D9E9F7",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1369.26,
+        419.76,
+        1483.47,
+        533.97
+      ],
+      "stroke": "#D9E9F7",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1385.8,
+        413.3,
+        1489.82,
+        517.32
+      ],
+      "stroke": "#D9E9F7",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1404.95,
+        409.45,
+        1493.56,
+        498.06
+      ],
+      "stroke": "#D9E9F7",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1428.55,
+        410.05,
+        1492.85,
+        474.35
+      ],
+      "stroke": "#D9E9F7",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 11
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        163,
+        630,
+        162,
+        53
+      ],
+      "source_corner_radius_px": 12,
+      "corner_category": "small-radius",
+      "corner_reason": "source shape has visibly rounded hand-drawn corners",
+      "fill": "#F6FBFF",
+      "stroke": "#2F83D8",
+      "stroke_width": 2,
+      "z_index": 12,
+      "name": "discord_label_card"
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        568,
+        630,
+        163,
+        53
+      ],
+      "source_corner_radius_px": 12,
+      "corner_category": "small-radius",
+      "corner_reason": "source shape has visibly rounded hand-drawn corners",
+      "fill": "#F7FBF4",
+      "stroke": "#4F7B42",
+      "stroke_width": 2,
+      "z_index": 12,
+      "name": "bridge_label_card"
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        935,
+        630,
+        163,
+        53
+      ],
+      "source_corner_radius_px": 12,
+      "corner_category": "small-radius",
+      "corner_reason": "source shape has visibly rounded hand-drawn corners",
+      "fill": "#FFF7EE",
+      "stroke": "#C96A25",
+      "stroke_width": 2,
+      "z_index": 12,
+      "name": "codex_label_card"
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        1318,
+        631,
+        201,
+        52
+      ],
+      "source_corner_radius_px": 12,
+      "corner_category": "small-radius",
+      "corner_reason": "source shape has visibly rounded hand-drawn corners",
+      "fill": "#F6FBFF",
+      "stroke": "#4E82B6",
+      "stroke_width": 2,
+      "z_index": 12,
+      "name": "mac_label_card"
+    },
+    {
+      "type": "line",
+      "points_px": [
+        388,
+        504,
+        514,
+        504
+      ],
+      "stroke": "#2F83D8",
+      "stroke_width": 5,
+      "fill": "none",
+      "z_index": 18,
+      "name": "discord_to_bridge_arrow"
+    },
+    {
+      "type": "line",
+      "points_px": [
+        493,
+        486,
+        516,
+        504
+      ],
+      "stroke": "#2F83D8",
+      "stroke_width": 5,
+      "fill": "none",
+      "z_index": 18
+    },
+    {
+      "type": "line",
+      "points_px": [
+        493,
+        522,
+        516,
+        504
+      ],
+      "stroke": "#2F83D8",
+      "stroke_width": 5,
+      "fill": "none",
+      "z_index": 18
+    },
+    {
+      "type": "line",
+      "points_px": [
+        778,
+        504,
+        886,
+        504
+      ],
+      "stroke": "#4F7B42",
+      "stroke_width": 5,
+      "fill": "none",
+      "z_index": 18,
+      "name": "bridge_to_codex_arrow"
+    },
+    {
+      "type": "line",
+      "points_px": [
+        865,
+        486,
+        888,
+        504
+      ],
+      "stroke": "#4F7B42",
+      "stroke_width": 5,
+      "fill": "none",
+      "z_index": 18
+    },
+    {
+      "type": "line",
+      "points_px": [
+        865,
+        522,
+        888,
+        504
+      ],
+      "stroke": "#4F7B42",
+      "stroke_width": 5,
+      "fill": "none",
+      "z_index": 18
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1146,
+        467,
+        1280,
+        467
+      ],
+      "stroke": "#C96A25",
+      "stroke_width": 4,
+      "fill": "none",
+      "z_index": 18,
+      "name": "codex_to_macos_command_arrow"
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1259,
+        449,
+        1283,
+        467
+      ],
+      "stroke": "#C96A25",
+      "stroke_width": 4,
+      "fill": "none",
+      "z_index": 18
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1259,
+        485,
+        1283,
+        467
+      ],
+      "stroke": "#C96A25",
+      "stroke_width": 4,
+      "fill": "none",
+      "z_index": 18
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1277,
+        519,
+        1143,
+        519
+      ],
+      "stroke": "#4F7B42",
+      "stroke_width": 4,
+      "fill": "none",
+      "z_index": 18,
+      "name": "macos_to_codex_result_arrow"
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1165,
+        501,
+        1141,
+        519
+      ],
+      "stroke": "#4F7B42",
+      "stroke_width": 4,
+      "fill": "none",
+      "z_index": 18
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1165,
+        537,
+        1141,
+        519
+      ],
+      "stroke": "#4F7B42",
+      "stroke_width": 4,
+      "fill": "none",
+      "z_index": 18
+    },
+    {
+      "type": "line",
+      "points_px": [
+        947,
+        474,
+        1012,
+        438
+      ],
+      "stroke": "#C96A25",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 25,
+      "name": "codex_cube_edge"
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1012,
+        438,
+        1078,
+        474
+      ],
+      "stroke": "#1F1F1F",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1078,
+        474,
+        1077,
+        544
+      ],
+      "stroke": "#C96A25",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1077,
+        544,
+        1014,
+        582
+      ],
+      "stroke": "#1F1F1F",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1014,
+        582,
+        947,
+        546
+      ],
+      "stroke": "#1F1F1F",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        947,
+        546,
+        947,
+        474
+      ],
+      "stroke": "#1F1F1F",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        947,
+        474,
+        1014,
+        509
+      ],
+      "stroke": "#C96A25",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1014,
+        509,
+        1078,
+        474
+      ],
+      "stroke": "#1F1F1F",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1014,
+        509,
+        1014,
+        582
+      ],
+      "stroke": "#1F1F1F",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        948,
+        548,
+        1014,
+        584
+      ],
+      "stroke": "#1F1F1F",
+      "stroke_width": 1,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        105,
+        388,
+        115,
+        407
+      ],
+      "stroke": "#2F83D8",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 8
+    },
+    {
+      "type": "line",
+      "points_px": [
+        123,
+        383,
+        127,
+        406
+      ],
+      "stroke": "#2F83D8",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 8
+    },
+    {
+      "type": "line",
+      "points_px": [
+        142,
+        384,
+        137,
+        407
+      ],
+      "stroke": "#2F83D8",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 8
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1519,
+        386,
+        1510,
+        405
+      ],
+      "stroke": "#2F83D8",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 8
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1533,
+        384,
+        1527,
+        402
+      ],
+      "stroke": "#2F83D8",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 8
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        376,
+        789,
+        924,
+        92
+      ],
+      "source_corner_radius_px": 14,
+      "corner_category": "small-radius",
+      "corner_reason": "source shape has visibly rounded hand-drawn corners",
+      "fill": "none",
+      "stroke": "#A9CBE8",
+      "stroke_width": 2,
+      "z_index": 10,
+      "dash": "dash",
+      "name": "legend_dashed_container"
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        404,
+        809,
+        239,
+        51
+      ],
+      "source_corner_radius_px": 14,
+      "corner_category": "small-radius",
+      "corner_reason": "source shape has visibly rounded hand-drawn corners",
+      "fill": "#F3F9FF",
+      "stroke": "#BBD8F4",
+      "stroke_width": 1.5,
+      "z_index": 12,
+      "name": "legend_codex_pill"
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        699,
+        809,
+        252,
+        51
+      ],
+      "source_corner_radius_px": 14,
+      "corner_category": "small-radius",
+      "corner_reason": "source shape has visibly rounded hand-drawn corners",
+      "fill": "#F3FAEF",
+      "stroke": "#C2DDB8",
+      "stroke_width": 1.5,
+      "z_index": 12,
+      "name": "legend_macos_pill"
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        1006,
+        809,
+        267,
+        51
+      ],
+      "source_corner_radius_px": 14,
+      "corner_category": "small-radius",
+      "corner_reason": "source shape has visibly rounded hand-drawn corners",
+      "fill": "#FFF5EB",
+      "stroke": "#F0C59F",
+      "stroke_width": 1.5,
+      "z_index": 12,
+      "name": "legend_file_pill"
+    }
+  ],
+  "images": [
+    {
+      "path": "assets/discord_logo.png",
+      "box_px": [
+        147,
+        424,
+        180,
+        154
+      ],
+      "z_index": 30,
+      "alt": "Discord logo drawing"
+    },
+    {
+      "path": "assets/bridge_icon.png",
+      "box_px": [
+        548,
+        408,
+        188,
+        172
+      ],
+      "z_index": 30,
+      "alt": "Bridge icon drawing"
+    },
+    {
+      "path": "assets/laptop_icon.png",
+      "box_px": [
+        1312,
+        443,
+        180,
+        143
+      ],
+      "z_index": 30,
+      "alt": "Laptop icon drawing"
+    },
+    {
+      "path": "assets/envelope_icon.png",
+      "box_px": [
+        421,
+        534,
+        51,
+        35
+      ],
+      "z_index": 31,
+      "alt": "Envelope icon drawing"
+    },
+    {
+      "path": "assets/result_image_icon.png",
+      "box_px": [
+        1162,
+        540,
+        43,
+        37
+      ],
+      "z_index": 31,
+      "alt": "Result image icon"
+    },
+    {
+      "path": "assets/result_file_icon.png",
+      "box_px": [
+        1223,
+        538,
+        39,
+        39
+      ],
+      "z_index": 31,
+      "alt": "Result file icon"
+    },
+    {
+      "path": "assets/legend_gear_icon.png",
+      "box_px": [
+        421,
+        813,
+        43,
+        43
+      ],
+      "z_index": 31,
+      "alt": "Gear icon"
+    },
+    {
+      "path": "assets/legend_monitor_icon.png",
+      "box_px": [
+        719,
+        818,
+        44,
+        32
+      ],
+      "z_index": 31,
+      "alt": "Monitor icon"
+    },
+    {
+      "path": "assets/legend_image_icon.png",
+      "box_px": [
+        1028,
+        818,
+        42,
+        34
+      ],
+      "z_index": 31,
+      "alt": "Image icon"
+    }
+  ],
+  "asset_provenance": [
+    {
+      "path": "assets/discord_logo.png",
+      "source": "source.png",
+      "source_type": "source-derived-rasterization",
+      "provenance_note": "Source-cropped non-text Discord logo preserved as an independent movable asset.",
+      "source_region_px": [
+        147,
+        424,
+        180,
+        154
+      ]
+    },
+    {
+      "path": "assets/bridge_icon.png",
+      "source": "source.png",
+      "source_type": "source-derived-rasterization",
+      "provenance_note": "Source-cropped non-text bridge pictogram preserved as an independent movable asset.",
+      "source_region_px": [
+        548,
+        408,
+        188,
+        172
+      ]
+    },
+    {
+      "path": "assets/laptop_icon.png",
+      "source": "source.png",
+      "source_type": "source-derived-rasterization",
+      "provenance_note": "Source-cropped non-text laptop pictogram preserved as an independent movable asset.",
+      "source_region_px": [
+        1312,
+        443,
+        180,
+        143
+      ]
+    },
+    {
+      "path": "assets/envelope_icon.png",
+      "source": "source.png",
+      "source_type": "source-derived-rasterization",
+      "provenance_note": "Source-cropped non-text envelope icon preserved as an independent movable asset.",
+      "source_region_px": [
+        421,
+        534,
+        51,
+        35
+      ]
+    },
+    {
+      "path": "assets/result_image_icon.png",
+      "source": "source.png",
+      "source_type": "source-derived-rasterization",
+      "provenance_note": "Source-cropped non-text returned-image icon preserved as an independent movable asset.",
+      "source_region_px": [
+        1162,
+        540,
+        43,
+        37
+      ]
+    },
+    {
+      "path": "assets/result_file_icon.png",
+      "source": "source.png",
+      "source_type": "source-derived-rasterization",
+      "provenance_note": "Source-cropped non-text returned-file icon preserved as an independent movable asset.",
+      "source_region_px": [
+        1223,
+        538,
+        39,
+        39
+      ]
+    },
+    {
+      "path": "assets/legend_gear_icon.png",
+      "source": "source.png",
+      "source_type": "source-derived-rasterization",
+      "provenance_note": "Source-cropped non-text gear icon preserved as an independent movable asset.",
+      "source_region_px": [
+        421,
+        813,
+        43,
+        43
+      ]
+    },
+    {
+      "path": "assets/legend_monitor_icon.png",
+      "source": "source.png",
+      "source_type": "source-derived-rasterization",
+      "provenance_note": "Source-cropped non-text monitor icon preserved as an independent movable asset.",
+      "source_region_px": [
+        719,
+        818,
+        44,
+        32
+      ]
+    },
+    {
+      "path": "assets/legend_image_icon.png",
+      "source": "source.png",
+      "source_type": "source-derived-rasterization",
+      "provenance_note": "Source-cropped non-text image icon preserved as an independent movable asset.",
+      "source_region_px": [
+        1028,
+        818,
+        42,
+        34
+      ]
+    }
+  ],
+  "known_limits": [
+    "Hand-drawn sketch texture, circle hatching, and doodle imperfections are simplified with native editable strokes.",
+    "The Codex cube is approximated by editable linework rather than exact filled polygon faces because the manifest renderer supports primitive shapes.",
+    "Small icon crops preserve the original hand-drawn identity; each remains independently movable, while surrounding labels are native editable text.",
+    "Handwritten marker-style typography is approximated with native editable fonts for editability and stable CJK rendering."
+  ]
+}

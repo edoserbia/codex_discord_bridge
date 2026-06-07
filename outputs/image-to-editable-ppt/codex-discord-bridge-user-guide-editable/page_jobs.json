@@ -1,0 +1,418 @@
+{
+  "schema_version": 1,
+  "run_id": "codex-discord-bridge-user-guide-editable",
+  "run_status": "complete",
+  "max_concurrent_pages": 4,
+  "created_at": "2026-06-07T11:58:52Z",
+  "updated_at": "2026-06-07T12:49:14Z",
+  "pages": [
+    {
+      "page_id": "page_001",
+      "page_index": 1,
+      "status": "accepted",
+      "page_dir": "pages/page_001",
+      "source": "pages/page_001/source.png",
+      "page_request": "pages/page_001/page_request.json",
+      "manifest": "pages/page_001/manifest.json",
+      "validation": "pages/page_001/validation.json",
+      "dispatch": {
+        "agent_id": "019ea1f6-a2f6-7a10-aaa5-a758a38fccc4",
+        "agent_nickname": "Lorentz",
+        "prompt": "pages/page_001/page_request.json",
+        "prompt_sha256": "7be21a13111dbd7cec15b28bd89de85a857b57feb914631a672d0f58f16e9208",
+        "page_request_sha256": "7be21a13111dbd7cec15b28bd89de85a857b57feb914631a672d0f58f16e9208",
+        "repair_item_id": null,
+        "dispatched_at": "2026-06-07T12:09:11Z"
+      },
+      "result": {
+        "agent_id": "019ea1f6-a2f6-7a10-aaa5-a758a38fccc4",
+        "recorded_at": "2026-06-07T12:19:22Z",
+        "outputs": {
+          "page_manifest": "pages/page_001/manifest.json",
+          "imagegen_jobs": "pages/page_001/imagegen-jobs.json",
+          "page_pptx": "pages/page_001/page.pptx",
+          "preview": "pages/page_001/preview.png",
+          "contact_sheet": "pages/page_001/split_assets_contact.png",
+          "validation": "pages/page_001/validation.json",
+          "page_result": "pages/page_001/page_result.json"
+        },
+        "hashes": {
+          "page_manifest": "1ea05522bdf829d470e93c014358303a6c82cb225284534fe0463996a5ea5cb9",
+          "imagegen_jobs": "8a699487e965005aba741fb5989958775cf6904c201a733fc8d16c4e42546ade",
+          "page_pptx": "9fbbeefaa7d26a2dd92e60fd5602f441b41b0f1193784a643b080dd0d2c4fe6e",
+          "preview": "98955aba3c0647c9118fb002bbfc90b14fdc1b1f3c4a728e12016058c9fe4bf7",
+          "contact_sheet": "1c451abed615eb02d2f170ef6285195a31cbc681598411cb91ff9726dbae83e0",
+          "validation": "4560df9c4817f90e1b0938aff696db779ec3fc733149fc342d3e1fe3e8657115",
+          "page_result": "c36e05ef16bebb76272079eefb212b0e9f735a351031a4e954b40f99bf3df86e"
+        },
+        "validation_passed": true,
+        "qa_note": "Validated successfully; preview/contact sheet preserve the page layout with editable text, native diagram structure, and independent icon assets.",
+        "known_limits": [
+          "Hand-drawn sketch texture, circle hatching, and doodle imperfections are simplified with native editable strokes.",
+          "The Codex cube is approximated by editable linework rather than exact filled polygon faces because the manifest renderer supports primitive shapes.",
+          "Small icon crops preserve the original hand-drawn identity; each remains independently movable, while surrounding labels are native editable text.",
+          "Handwritten marker-style typography is approximated with native editable fonts for editability and stable CJK rendering."
+        ]
+      },
+      "repair": [],
+      "blocker": null,
+      "accepted": true,
+      "accepted_at": "2026-06-07T12:49:14Z"
+    },
+    {
+      "page_id": "page_002",
+      "page_index": 2,
+      "status": "accepted",
+      "page_dir": "pages/page_002",
+      "source": "pages/page_002/source.png",
+      "page_request": "pages/page_002/page_request.json",
+      "manifest": "pages/page_002/manifest.json",
+      "validation": "pages/page_002/validation.json",
+      "dispatch": {
+        "agent_id": "019ea1f7-e8cd-7473-88a3-3130b5d96268",
+        "agent_nickname": "Bacon",
+        "prompt": "pages/page_002/page_request.json",
+        "prompt_sha256": "7a9e1144d9b53d90d9cc093931b70fa88c3b9238d0c888dfa0f7a337564c3998",
+        "page_request_sha256": "7a9e1144d9b53d90d9cc093931b70fa88c3b9238d0c888dfa0f7a337564c3998",
+        "repair_item_id": null,
+        "dispatched_at": "2026-06-07T12:09:12Z"
+      },
+      "result": {
+        "agent_id": "019ea1f7-e8cd-7473-88a3-3130b5d96268",
+        "recorded_at": "2026-06-07T12:14:28Z",
+        "outputs": {
+          "page_manifest": "pages/page_002/manifest.json",
+          "imagegen_jobs": "pages/page_002/imagegen-jobs.json",
+          "page_pptx": "pages/page_002/page.pptx",
+          "preview": "pages/page_002/preview.png",
+          "contact_sheet": "pages/page_002/split_assets_contact.png",
+          "validation": "pages/page_002/validation.json",
+          "page_result": "pages/page_002/page_result.json"
+        },
+        "hashes": {
+          "page_manifest": "73969edf642c595bab0f0866a9580b7907824b8e41aea57039eba2fe2a5587d1",
+          "imagegen_jobs": "4d1cd55702fb381cb83d64c03835a01473a417b5080415a8fd9e3efe98188a22",
+          "page_pptx": "dd988d3833feaac685d64c1c56c25b9c0708e16f464f66297897f6999812135e",
+          "preview": "91211fb6b0aca93f9cc581a0256096a939932ba2d03f335da7be40a0299186fa",
+          "contact_sheet": "a4f17ac2227780df7b8923389466f7bfef5e88de6d692b73d09ab49498fcd5c5",
+          "validation": "377febe7b2f7bb56f947547252856ef9f8274e6c53ce8081af7687485586b218",
+          "page_result": "e3e25ac540870f35092060b1c63bfac3a1f8ab7895bccf236cc930eebb465bb5"
+        },
+        "validation_passed": true,
+        "qa_note": "Validation passed; source/preview contact sheet inspected, with all readable Chinese labels and command snippets rebuilt as native editable text and workflow objects as native shapes.",
+        "known_limits": [
+          "Hand-drawn wobble, hatching and logo/avatar details are approximated with native PowerPoint primitives rather than exact bitmap artwork.",
+          "The folder tab silhouette is simplified into editable rounded rectangles and straight icon primitives."
+        ]
+      },
+      "repair": [],
+      "blocker": null,
+      "accepted": true,
+      "accepted_at": "2026-06-07T12:49:14Z"
+    },
+    {
+      "page_id": "page_003",
+      "page_index": 3,
+      "status": "accepted",
+      "page_dir": "pages/page_003",
+      "source": "pages/page_003/source.png",
+      "page_request": "pages/page_003/page_request.json",
+      "manifest": "pages/page_003/manifest.json",
+      "validation": "pages/page_003/validation.json",
+      "dispatch": {
+        "agent_id": "019ea1f9-4228-7a93-b055-a5c139588452",
+        "agent_nickname": "Dewey",
+        "prompt": "pages/page_003/page_request.json",
+        "prompt_sha256": "c85c166be83623d3a467a0c1f5566bd5c4c3a3c048107909705c83e835924314",
+        "page_request_sha256": "c85c166be83623d3a467a0c1f5566bd5c4c3a3c048107909705c83e835924314",
+        "repair_item_id": null,
+        "dispatched_at": "2026-06-07T12:09:12Z"
+      },
+      "result": {
+        "agent_id": "019ea1f9-4228-7a93-b055-a5c139588452",
+        "recorded_at": "2026-06-07T12:24:29Z",
+        "outputs": {
+          "page_manifest": "pages/page_003/manifest.json",
+          "imagegen_jobs": "pages/page_003/imagegen-jobs.json",
+          "page_pptx": "pages/page_003/page.pptx",
+          "preview": "pages/page_003/preview.png",
+          "contact_sheet": "pages/page_003/split_assets_contact.png",
+          "validation": "pages/page_003/validation.json",
+          "page_result": "pages/page_003/page_result.json"
+        },
+        "hashes": {
+          "page_manifest": "1516d72436b41dd5c4cc39312ecbfd1205e1e431efe96a2333fa21a329220be6",
+          "imagegen_jobs": "5e13581f795d17bf9a31ea0d8b7a5b3f08637dbfd9197e720a72d97bd641de06",
+          "page_pptx": "caf2120395479ae72a5c7f6864c2484b22650617b1c9113e0773821152e8ab5c",
+          "preview": "4f5bbce9d09e23457969efd7f3816292682919be619f8d4bed507ff0bbff065a",
+          "contact_sheet": "16478f43e9897bfe14aaf5c0062a78b3fc8a191dd30b662eebf6257d0eb3096c",
+          "validation": "1a40ee42296801dd1c7baafef70f63866e739dc0b7938921ca2bef9db8d8988c",
+          "page_result": "d7dfb769d5956fff3aa94b39a5c6746e7d0a59fcb9cd3a72d8186b478fdc89f4"
+        },
+        "validation_passed": true,
+        "qa_note": "Object-level editable rebuild uses native text, cards, queue/thread panels, connectors, icons, labels, and bottom callout; validation passed.",
+        "known_limits": [
+          "Hand-drawn texture, exact Discord/Codex icon artwork, and notebook coil irregularities are simplified as editable native shapes."
+        ]
+      },
+      "repair": [],
+      "blocker": null,
+      "accepted": true,
+      "accepted_at": "2026-06-07T12:49:14Z"
+    },
+    {
+      "page_id": "page_004",
+      "page_index": 4,
+      "status": "accepted",
+      "page_dir": "pages/page_004",
+      "source": "pages/page_004/source.png",
+      "page_request": "pages/page_004/page_request.json",
+      "manifest": "pages/page_004/manifest.json",
+      "validation": "pages/page_004/validation.json",
+      "dispatch": {
+        "agent_id": "019ea1fa-6f01-7a63-9aa8-a0bcb0d639c1",
+        "agent_nickname": "Ramanujan",
+        "prompt": "pages/page_004/page_request.json",
+        "prompt_sha256": "eb93fd6e215963af42419e506c0c9cff69977aaa923c3b762d7d8fd91aa38a2d",
+        "page_request_sha256": "eb93fd6e215963af42419e506c0c9cff69977aaa923c3b762d7d8fd91aa38a2d",
+        "repair_item_id": null,
+        "dispatched_at": "2026-06-07T12:09:12Z"
+      },
+      "result": {
+        "agent_id": "019ea1fa-6f01-7a63-9aa8-a0bcb0d639c1",
+        "recorded_at": "2026-06-07T12:26:59Z",
+        "outputs": {
+          "page_manifest": "pages/page_004/manifest.json",
+          "imagegen_jobs": "pages/page_004/imagegen-jobs.json",
+          "page_pptx": "pages/page_004/page.pptx",
+          "preview": "pages/page_004/preview.png",
+          "contact_sheet": "pages/page_004/split_assets_contact.png",
+          "validation": "pages/page_004/validation.json",
+          "page_result": "pages/page_004/page_result.json"
+        },
+        "hashes": {
+          "page_manifest": "8c761d2e10f59efed98b1b3a61abfe96d294d13bb2eb85609b6896288d8005bb",
+          "imagegen_jobs": "4b1c9be2e6c6eec88e4542b3668dfe63f618fde371dc606469e0fc1e2f4b0129",
+          "page_pptx": "1c58a0f4e582abb459ec11c88aa086ba012d9968f856eb4fac1239a982e501b6",
+          "preview": "0254aac55345bfb498fbfbd00fecaae64a8bffcdb652502ec3a5ad880bd75fc0",
+          "contact_sheet": "978343f60fff9f3f410a4defadf2d28372634780d61c1773fe768ed26495f093",
+          "validation": "d83c554fe382795bdc26d09b25ef114410405c2d73f228c755e8c0084198c9a7",
+          "page_result": "a808c85e9204184990c50b0fee5a59cc593aaad7ac44a303af13a913ebfb1f6a"
+        },
+        "validation_passed": true,
+        "qa_note": "对象级重建完成：关键文字、workspace/.bridge-inbox 路径、三段流程、附件/文件夹/箭头/Codex 输入区和 takeaway 均为可编辑文本或 native shapes。",
+        "known_limits": [
+          "Hand-drawn source styling, Discord mark, Codex cube, sync arrows, lightbulb, and attachment icons are simplified native-vector approximations rather than exact brand/icon artwork.",
+          "Preview renderer uses available system CJK font, so handwritten brush texture and exact glyph metrics differ from the source."
+        ]
+      },
+      "repair": [],
+      "blocker": null,
+      "accepted": true,
+      "accepted_at": "2026-06-07T12:49:14Z"
+    },
+    {
+      "page_id": "page_005",
+      "page_index": 5,
+      "status": "accepted",
+      "page_dir": "pages/page_005",
+      "source": "pages/page_005/source.png",
+      "page_request": "pages/page_005/page_request.json",
+      "manifest": "pages/page_005/manifest.json",
+      "validation": "pages/page_005/validation.json",
+      "dispatch": {
+        "agent_id": "019ea202-b082-7871-aa65-e5e850da2f1e",
+        "agent_nickname": "Avicenna",
+        "prompt": "pages/page_005/page_request.json",
+        "prompt_sha256": "5364b3da74949f207fa3688b5f2229e0df35e82b084fc985879a71d0a334ecbd",
+        "page_request_sha256": "5364b3da74949f207fa3688b5f2229e0df35e82b084fc985879a71d0a334ecbd",
+        "repair_item_id": null,
+        "dispatched_at": "2026-06-07T12:16:59Z"
+      },
+      "result": {
+        "agent_id": "019ea202-b082-7871-aa65-e5e850da2f1e",
+        "recorded_at": "2026-06-07T12:36:44Z",
+        "outputs": {
+          "page_manifest": "pages/page_005/manifest.json",
+          "imagegen_jobs": "pages/page_005/imagegen-jobs.json",
+          "page_pptx": "pages/page_005/page.pptx",
+          "preview": "pages/page_005/preview.png",
+          "contact_sheet": "pages/page_005/split_assets_contact.png",
+          "validation": "pages/page_005/validation.json",
+          "page_result": "pages/page_005/page_result.json"
+        },
+        "hashes": {
+          "page_manifest": "207cc0daac844d0054b1bf1d74d714d286657a92ee446ffc721e85cdde80def8",
+          "imagegen_jobs": "28f14c37ea24049ef68549b5b7260e2cc309234c080821262481df2a67e1d205",
+          "page_pptx": "30ff60d7eff60b2ad905c1d58d475f33a397a38579681eaeda18b8f22cfd1837",
+          "preview": "26f1596d6e220c0f52adddcccf95e9af39b9b68db2d70af417f381d0305c035f",
+          "contact_sheet": "da7a133ae4b34fccc864bdc12b0d307708af8ddda13333a0e58ae9504e8cc3d3",
+          "validation": "f047e7407cd22e1ffdcd90ec952ef721f063b5e361465aa78f1f41b38f72d92f",
+          "page_result": "5e972b1b3d90d477372c41b7ee9ba61a6d995fe7010baabad2842fa40a22af1a"
+        },
+        "validation_passed": true,
+        "qa_note": "Page 5 rebuilt with native editable text, cards, connectors, simplified Discord channel shapes, and no full-slide raster overlay.",
+        "known_limits": [
+          "Hand-drawn marker texture is approximated with clean native strokes.",
+          "Discord logo and small pictograms are simplified native primitives rather than exact artwork.",
+          "Preview font metrics may differ slightly from PowerPoint CJK rendering."
+        ]
+      },
+      "repair": [],
+      "blocker": null,
+      "accepted": true,
+      "accepted_at": "2026-06-07T12:49:14Z"
+    },
+    {
+      "page_id": "page_006",
+      "page_index": 6,
+      "status": "accepted",
+      "page_dir": "pages/page_006",
+      "source": "pages/page_006/source.png",
+      "page_request": "pages/page_006/page_request.json",
+      "manifest": "pages/page_006/manifest.json",
+      "validation": "pages/page_006/validation.json",
+      "dispatch": {
+        "agent_id": "019ea207-3ab1-7b40-b2fb-467f4915627d",
+        "agent_nickname": "Beauvoir",
+        "prompt": "pages/page_006/page_request.json",
+        "prompt_sha256": "abaa36affd4576953c835ffe160987c053a556b88c3b915ccb827da7e2b6e1cf",
+        "page_request_sha256": "abaa36affd4576953c835ffe160987c053a556b88c3b915ccb827da7e2b6e1cf",
+        "repair_item_id": null,
+        "dispatched_at": "2026-06-07T12:21:59Z"
+      },
+      "result": {
+        "agent_id": "019ea207-3ab1-7b40-b2fb-467f4915627d",
+        "recorded_at": "2026-06-07T12:36:44Z",
+        "outputs": {
+          "page_manifest": "pages/page_006/manifest.json",
+          "imagegen_jobs": "pages/page_006/imagegen-jobs.json",
+          "page_pptx": "pages/page_006/page.pptx",
+          "preview": "pages/page_006/preview.png",
+          "contact_sheet": "pages/page_006/split_assets_contact.png",
+          "validation": "pages/page_006/validation.json",
+          "page_result": "pages/page_006/page_result.json"
+        },
+        "hashes": {
+          "page_manifest": "28baaec705c4fe7fc4eaada64ad98b3f8ea4e1dec6fab9df704211b6438a0f08",
+          "imagegen_jobs": "b07d972aa20a18fea04f38cd5e2d928ef9004f18345a78c63f2985d0d9ad9b68",
+          "page_pptx": "a82485794c633f0490babbedd63752d2d71ea27afa088c628ee56a2833cb0f0b",
+          "preview": "c84d73e3c0baf1652dfb5a424357894892ded89744a48ae1339cfc6dab683e50",
+          "contact_sheet": "d745f91b0122e261a9ef1a3e3abaad2d8a9d3b98e0e0d85efc83e911a51a3f00",
+          "validation": "6deb582fa39e1294fd8d1255202047f86a547d495f1fd723ca5cd50b4f576891",
+          "page_result": "d2be7ec8847277a5ead4f6ef97f38d17a2eacdc5c668067b3e663b2a8b5162e0"
+        },
+        "validation_passed": true,
+        "qa_note": "Object-level editable rebuild: all readable text is native, core structure uses native shapes, and validation passed with no full-slide source raster.",
+        "known_limits": [
+          "Hand-drawn line wobble and Discord/architecture micro-icon detail are approximated with editable native primitives rather than exact bitmap-style strokes.",
+          "The Discord logo, cube, paperclip, and PNG architecture preview are simplified native shapes to keep the page object-level editable."
+        ]
+      },
+      "repair": [],
+      "blocker": null,
+      "accepted": true,
+      "accepted_at": "2026-06-07T12:49:14Z"
+    },
+    {
+      "page_id": "page_007",
+      "page_index": 7,
+      "status": "accepted",
+      "page_dir": "pages/page_007",
+      "source": "pages/page_007/source.png",
+      "page_request": "pages/page_007/page_request.json",
+      "manifest": "pages/page_007/manifest.json",
+      "validation": "pages/page_007/validation.json",
+      "dispatch": {
+        "agent_id": "019ea210-c853-7ce3-90a7-4d546d2d41a5",
+        "agent_nickname": "Heisenberg",
+        "prompt": "pages/page_007/page_request.json",
+        "prompt_sha256": "6da8fb5f292c6fa20c293854db2812bfa346c758f9fe9b79549d97737ca2804f",
+        "page_request_sha256": "6da8fb5f292c6fa20c293854db2812bfa346c758f9fe9b79549d97737ca2804f",
+        "repair_item_id": null,
+        "dispatched_at": "2026-06-07T12:34:10Z"
+      },
+      "result": {
+        "agent_id": "019ea210-c853-7ce3-90a7-4d546d2d41a5",
+        "recorded_at": "2026-06-07T12:49:14Z",
+        "outputs": {
+          "page_manifest": "pages/page_007/manifest.json",
+          "imagegen_jobs": "pages/page_007/imagegen-jobs.json",
+          "page_pptx": "pages/page_007/page.pptx",
+          "preview": "pages/page_007/preview.png",
+          "contact_sheet": "pages/page_007/split_assets_contact.png",
+          "validation": "pages/page_007/validation.json",
+          "page_result": "pages/page_007/page_result.json"
+        },
+        "hashes": {
+          "page_manifest": "1f370e7a0974cec44cbaf00548fb59849a74c175f1823497e2f8c663ee412bfb",
+          "imagegen_jobs": "3a1464ee706ec2e0e0e40c50ca476c7da3fbe6cabdb2ce251c6a33d225b86c9b",
+          "page_pptx": "497d48b75b79d26d3fc286b88107bf6216e04140a037c01605e3fe0b77657664",
+          "preview": "bd79d238051904c4b617b4201783412bbe49e567e570c8d5d588913eeb1b939a",
+          "contact_sheet": "0a7dde3831d2be25f1f852f48926fff29c85c83dbbf2a7eb90de9a72a57246cd",
+          "validation": "fd98a224f1efb80fb6dd1650b769eb51e5e58c35c503a0776ea2954d8f38de38",
+          "page_result": "2245c12dd6ba516d9515e33257db30498c5ce705ffa547674534f229bf41878c"
+        },
+        "validation_passed": true,
+        "qa_note": "Validated native editable rebuild: all readable text is editable and no full-slide source raster is used; simplified native shapes preserve the service/log/web flow.",
+        "known_limits": [
+          "Hand-drawn marker wobble, icon details, dashed preview styling, and mini browser chart are simplified with native primitives while preserving object-level editability."
+        ]
+      },
+      "repair": [],
+      "blocker": null,
+      "accepted": true,
+      "accepted_at": "2026-06-07T12:49:14Z"
+    },
+    {
+      "page_id": "page_008",
+      "page_index": 8,
+      "status": "accepted",
+      "page_dir": "pages/page_008",
+      "source": "pages/page_008/source.png",
+      "page_request": "pages/page_008/page_request.json",
+      "manifest": "pages/page_008/manifest.json",
+      "validation": "pages/page_008/validation.json",
+      "dispatch": {
+        "agent_id": "019ea212-2d36-7980-b2ac-2192437e7c29",
+        "agent_nickname": "Ptolemy",
+        "prompt": "pages/page_008/page_request.json",
+        "prompt_sha256": "9aefb52f0e3a8077d6accab62119f7e1ce52c8efb20275a698c868760c0b4870",
+        "page_request_sha256": "9aefb52f0e3a8077d6accab62119f7e1ce52c8efb20275a698c868760c0b4870",
+        "repair_item_id": null,
+        "dispatched_at": "2026-06-07T12:34:10Z"
+      },
+      "result": {
+        "agent_id": "019ea212-2d36-7980-b2ac-2192437e7c29",
+        "recorded_at": "2026-06-07T12:43:58Z",
+        "outputs": {
+          "page_manifest": "pages/page_008/manifest.json",
+          "imagegen_jobs": "pages/page_008/imagegen-jobs.json",
+          "page_pptx": "pages/page_008/page.pptx",
+          "preview": "pages/page_008/preview.png",
+          "contact_sheet": "pages/page_008/split_assets_contact.png",
+          "validation": "pages/page_008/validation.json",
+          "page_result": "pages/page_008/page_result.json"
+        },
+        "hashes": {
+          "page_manifest": "6f7b1ce8cef2dcdb307c6d108d635880852b2ac76eb2f13e22e414412ece67af",
+          "imagegen_jobs": "2ab81152e8ae0325d8dc358e41002fca7d70dfb2a01b244c4592988b5a695167",
+          "page_pptx": "903cb7a9c6811e059e627e677427fa0164d9bd1d485f605267aac54a7073c43b",
+          "preview": "1b63f39c9c529acad45d4bfafddf9ba362efed88eac878a31ef51b0c511133e7",
+          "contact_sheet": "64234a4e6bc845f5311c68307db9da1387d0c8bfb82a0568e93492244e8fdd47",
+          "validation": "f4fb7390bd7f28cb762824aa06da637a5850e79a52305762f62de3e833add518",
+          "page_result": "dbc24715731ff6ca3e0fb9fe40a178aac5c33fd789977c5777825206f9d095a1"
+        },
+        "validation_passed": true,
+        "qa_note": "Deterministic validation passes; native text and primitive shapes recreate the four-step workflow, best-practice list, and summary card without full-slide raster.",
+        "known_limits": [
+          "Hand-drawn jitter and detailed pictograms are simplified as native editable shapes."
+        ]
+      },
+      "repair": [],
+      "blocker": null,
+      "accepted": true,
+      "accepted_at": "2026-06-07T12:49:14Z"
+    }
+  ]
+}

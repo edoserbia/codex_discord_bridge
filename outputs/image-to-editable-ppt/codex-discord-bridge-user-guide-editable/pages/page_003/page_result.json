@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "codex-discord-bridge-user-guide-editable",
+  "page_id": "page_003",
+  "page_manifest": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_003/manifest.json",
+  "imagegen_jobs": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_003/imagegen-jobs.json",
+  "page_pptx": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_003/page.pptx",
+  "preview": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_003/preview.png",
+  "contact_sheet": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_003/split_assets_contact.png",
+  "validation": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_003/validation.json",
+  "validation_passed": true,
+  "qa_note": "Object-level editable rebuild uses native text, cards, queue/thread panels, connectors, icons, labels, and bottom callout; validation passed.",
+  "known_limits": [
+    "Hand-drawn texture, exact Discord/Codex icon artwork, and notebook coil irregularities are simplified as editable native shapes."
+  ],
+  "output_hashes": {
+    "page_manifest": "1516d72436b41dd5c4cc39312ecbfd1205e1e431efe96a2333fa21a329220be6",
+    "imagegen_jobs": "5e13581f795d17bf9a31ea0d8b7a5b3f08637dbfd9197e720a72d97bd641de06",
+    "page_pptx": "caf2120395479ae72a5c7f6864c2484b22650617b1c9113e0773821152e8ab5c",
+    "preview": "4f5bbce9d09e23457969efd7f3816292682919be619f8d4bed507ff0bbff065a",
+    "contact_sheet": "16478f43e9897bfe14aaf5c0062a78b3fc8a191dd30b662eebf6257d0eb3096c",
+    "validation": "1a40ee42296801dd1c7baafef70f63866e739dc0b7938921ca2bef9db8d8988c"
+  }
+}

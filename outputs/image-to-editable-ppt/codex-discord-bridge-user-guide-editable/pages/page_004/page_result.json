@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "codex-discord-bridge-user-guide-editable",
+  "page_id": "page_004",
+  "status": "completed",
+  "manifest": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_004/manifest.json",
+  "page_pptx": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_004/page.pptx",
+  "preview": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_004/preview.png",
+  "contact_sheet": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_004/split_assets_contact.png",
+  "validation": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_004/validation.json",
+  "imagegen_jobs": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_004/imagegen-jobs.json",
+  "qa_note": "对象级重建完成：关键文字、workspace/.bridge-inbox 路径、三段流程、附件/文件夹/箭头/Codex 输入区和 takeaway 均为可编辑文本或 native shapes。",
+  "known_limits": [
+    "Hand-drawn source styling, Discord mark, Codex cube, sync arrows, lightbulb, and attachment icons are simplified native-vector approximations rather than exact brand/icon artwork.",
+    "Preview renderer uses available system CJK font, so handwritten brush texture and exact glyph metrics differ from the source."
+  ],
+  "output_hashes": {
+    "manifest": "8c761d2e10f59efed98b1b3a61abfe96d294d13bb2eb85609b6896288d8005bb",
+    "page_pptx": "1c58a0f4e582abb459ec11c88aa086ba012d9968f856eb4fac1239a982e501b6",
+    "preview": "0254aac55345bfb498fbfbd00fecaae64a8bffcdb652502ec3a5ad880bd75fc0",
+    "contact_sheet": "978343f60fff9f3f410a4defadf2d28372634780d61c1773fe768ed26495f093",
+    "validation": "d83c554fe382795bdc26d09b25ef114410405c2d73f228c755e8c0084198c9a7",
+    "imagegen_jobs": "4b1c9be2e6c6eec88e4542b3668dfe63f618fde371dc606469e0fc1e2f4b0129"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "codex-discord-bridge-user-guide-editable",
+  "page_id": "page_001",
+  "status": "completed",
+  "created_at": "2026-06-07T12:17:05.102879+00:00",
+  "manifest": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_001/manifest.json",
+  "imagegen_jobs": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_001/imagegen-jobs.json",
+  "page_pptx": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_001/page.pptx",
+  "preview": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_001/preview.png",
+  "contact_sheet": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_001/split_assets_contact.png",
+  "validation": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_001/validation.json",
+  "validation_passed": true,
+  "qa_note": "Validated successfully; preview/contact sheet preserve the page layout with editable text, native diagram structure, and independent icon assets.",
+  "known_limits": [
+    "Hand-drawn sketch texture, circle hatching, and doodle imperfections are simplified with native editable strokes.",
+    "The Codex cube is approximated by editable linework rather than exact filled polygon faces because the manifest renderer supports primitive shapes.",
+    "Small icon crops preserve the original hand-drawn identity; each remains independently movable, while surrounding labels are native editable text.",
+    "Handwritten marker-style typography is approximated with native editable fonts for editability and stable CJK rendering."
+  ],
+  "output_hashes": {
+    "manifest": "1ea05522bdf829d470e93c014358303a6c82cb225284534fe0463996a5ea5cb9",
+    "imagegen_jobs": "8a699487e965005aba741fb5989958775cf6904c201a733fc8d16c4e42546ade",
+    "page_pptx": "9fbbeefaa7d26a2dd92e60fd5602f441b41b0f1193784a643b080dd0d2c4fe6e",
+    "preview": "98955aba3c0647c9118fb002bbfc90b14fdc1b1f3c4a728e12016058c9fe4bf7",
+    "contact_sheet": "1c451abed615eb02d2f170ef6285195a31cbc681598411cb91ff9726dbae83e0",
+    "validation": "4560df9c4817f90e1b0938aff696db779ec3fc733149fc342d3e1fe3e8657115"
+  },
+  "object_summary": {
+    "editable_text_shapes": 25,
+    "native_shapes": 109,
+    "raster_assets": 9,
+    "asset_provenance_checked": 9
+  }
+}

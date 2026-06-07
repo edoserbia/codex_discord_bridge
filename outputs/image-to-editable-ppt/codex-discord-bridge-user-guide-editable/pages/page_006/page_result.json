@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "run_id": "codex-discord-bridge-user-guide-editable",
+  "page_id": "page_006",
+  "status": "completed",
+  "manifest": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_006/manifest.json",
+  "imagegen_jobs": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_006/imagegen-jobs.json",
+  "page_pptx": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_006/page.pptx",
+  "preview": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_006/preview.png",
+  "contact_sheet": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_006/split_assets_contact.png",
+  "validation": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_006/validation.json",
+  "qa_note": "Object-level editable rebuild: all readable text is native, core structure uses native shapes, and validation passed with no full-slide source raster.",
+  "known_limits": [
+    "Hand-drawn line wobble and Discord/architecture micro-icon detail are approximated with editable native primitives rather than exact bitmap-style strokes.",
+    "The Discord logo, cube, paperclip, and PNG architecture preview are simplified native shapes to keep the page object-level editable."
+  ],
+  "validation_passed": true,
+  "output_hashes": {
+    "manifest": "28baaec705c4fe7fc4eaada64ad98b3f8ea4e1dec6fab9df704211b6438a0f08",
+    "imagegen_jobs": "b07d972aa20a18fea04f38cd5e2d928ef9004f18345a78c63f2985d0d9ad9b68",
+    "page_pptx": "a82485794c633f0490babbedd63752d2d71ea27afa088c628ee56a2833cb0f0b",
+    "preview": "c84d73e3c0baf1652dfb5a424357894892ded89744a48ae1339cfc6dab683e50",
+    "contact_sheet": "d745f91b0122e261a9ef1a3e3abaad2d8a9d3b98e0e0d85efc83e911a51a3f00",
+    "validation": "6deb582fa39e1294fd8d1255202047f86a547d495f1fd723ca5cd50b4f576891"
+  }
+}

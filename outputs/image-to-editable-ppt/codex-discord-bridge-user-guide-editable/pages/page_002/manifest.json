@@ -1,0 +1,2020 @@
+{
+  "schema_version": 1,
+  "run_id": "codex-discord-bridge-user-guide-editable",
+  "page_id": "page_002",
+  "page_index": 2,
+  "slide": {
+    "width": 13.333,
+    "height": 7.5,
+    "background": "#ffffff"
+  },
+  "source": {
+    "path": "source.png",
+    "width_px": 1672,
+    "height_px": 941
+  },
+  "preview_scale": 126,
+  "preview_font_scale": 0.95,
+  "page_strategy": "Native editable reconstruction of a hand-drawn workflow page. Text, command snippets, labels, cards, arrows, folder/channel pictograms, decorative marks and dashed note box are built from PowerPoint text and primitive shapes. No full-page source raster is used.",
+  "text_inventory": [
+    "先绑定项目",
+    "Discord 频道",
+    "Discord",
+    "api-项目",
+    "用户A",
+    "用户B",
+    "···",
+    "绑定命令",
+    "!bind api \"/path/to/workspaces/api\"",
+    "--engine codex",
+    "频道绑定",
+    "默认 Codex",
+    "工作目录",
+    "本机项目目录",
+    "api",
+    "/path/to/workspaces/api",
+    "src/",
+    "tests/",
+    "README.md",
+    "pyproject.toml",
+    "…",
+    "本机项目（工作目录）",
+    "绑定后，频道就成为这个项目的远程入口。"
+  ],
+  "visual_inventory": [
+    {
+      "id": "title_sparkle",
+      "kind": "decorative sparkle",
+      "representation": "native line shapes",
+      "source_bbox_px": [
+        506,
+        69,
+        548,
+        116
+      ]
+    },
+    {
+      "id": "title_green_marks",
+      "kind": "decorative marks",
+      "representation": "native line shapes",
+      "source_bbox_px": [
+        1140,
+        61,
+        1195,
+        129
+      ]
+    },
+    {
+      "id": "title_underline",
+      "kind": "hand-drawn underline",
+      "representation": "native lines",
+      "source_bbox_px": [
+        535,
+        189,
+        1168,
+        204
+      ]
+    },
+    {
+      "id": "discord_panel",
+      "kind": "speech/card container",
+      "representation": "native roundRect plus callout tail",
+      "source_bbox_px": [
+        82,
+        255,
+        416,
+        652
+      ]
+    },
+    {
+      "id": "discord_logo",
+      "kind": "logo-like channel icon",
+      "representation": "native simplified icon",
+      "source_bbox_px": [
+        109,
+        276,
+        186,
+        353
+      ]
+    },
+    {
+      "id": "user_icons",
+      "kind": "avatar icons",
+      "representation": "native circles and arcs",
+      "source_bbox_px": [
+        110,
+        433,
+        155,
+        560
+      ]
+    },
+    {
+      "id": "flow_arrow_left",
+      "kind": "arrow",
+      "representation": "native line arrow",
+      "source_bbox_px": [
+        435,
+        430,
+        536,
+        464
+      ]
+    },
+    {
+      "id": "command_card",
+      "kind": "command card",
+      "representation": "native roundRect with hatch lines",
+      "source_bbox_px": [
+        563,
+        320,
+        1130,
+        564
+      ]
+    },
+    {
+      "id": "terminal_prompt",
+      "kind": "terminal prompt icon",
+      "representation": "native line glyph",
+      "source_bbox_px": [
+        597,
+        354,
+        644,
+        387
+      ]
+    },
+    {
+      "id": "flow_arrow_right",
+      "kind": "arrow",
+      "representation": "native line arrow",
+      "source_bbox_px": [
+        1147,
+        431,
+        1220,
+        463
+      ]
+    },
+    {
+      "id": "folder_panel",
+      "kind": "folder/file card",
+      "representation": "native roundRect and primitive folder/file icons",
+      "source_bbox_px": [
+        1238,
+        249,
+        1584,
+        648
+      ]
+    },
+    {
+      "id": "legend_badges",
+      "kind": "three rounded badges",
+      "representation": "native roundRect plus icons",
+      "source_bbox_px": [
+        469,
+        632,
+        1168,
+        702
+      ]
+    },
+    {
+      "id": "note_box",
+      "kind": "dashed callout",
+      "representation": "native rounded dashed rect plus bulb icon",
+      "source_bbox_px": [
+        309,
+        767,
+        1337,
+        887
+      ]
+    }
+  ],
+  "background_strategy": {
+    "mode": "native-or-script",
+    "source_consistency_contract": "White page background is represented as native white slide background. All foreground workflow objects are reconstructed independently with native PowerPoint shapes and text.",
+    "removed_foreground": [],
+    "comparison_note": "Source background is plain white with no texture requiring clean-base restoration; no full-slide raster background is used."
+  },
+  "quality_checks": {
+    "font_size_calibrated": true,
+    "visual_inventory_matched": true,
+    "background_strategy_checked": true,
+    "shape_corner_geometry_checked": true
+  },
+  "asset_provenance": [],
+  "images": [],
+  "shapes": [
+    {
+      "id": "title_sparkle_l1",
+      "type": "line",
+      "points_px": [
+        522,
+        72,
+        526,
+        112
+      ],
+      "stroke": "#2b7fd8",
+      "stroke_width": 3,
+      "z_index": 10
+    },
+    {
+      "id": "title_sparkle_l2",
+      "type": "line",
+      "points_px": [
+        506,
+        94,
+        543,
+        94
+      ],
+      "stroke": "#2b7fd8",
+      "stroke_width": 3,
+      "z_index": 10
+    },
+    {
+      "id": "title_sparkle_l3",
+      "type": "line",
+      "points_px": [
+        514,
+        81,
+        535,
+        105
+      ],
+      "stroke": "#2b7fd8",
+      "stroke_width": 2,
+      "z_index": 10
+    },
+    {
+      "id": "title_sparkle_l4",
+      "type": "line",
+      "points_px": [
+        535,
+        81,
+        514,
+        105
+      ],
+      "stroke": "#2b7fd8",
+      "stroke_width": 2,
+      "z_index": 10
+    },
+    {
+      "id": "title_left_dash1",
+      "type": "line",
+      "points_px": [
+        516,
+        136,
+        542,
+        141
+      ],
+      "stroke": "#2b7fd8",
+      "stroke_width": 3,
+      "z_index": 10
+    },
+    {
+      "id": "title_left_dash2",
+      "type": "line",
+      "points_px": [
+        521,
+        154,
+        542,
+        154
+      ],
+      "stroke": "#2b7fd8",
+      "stroke_width": 3,
+      "z_index": 10
+    },
+    {
+      "id": "title_green_mark1",
+      "type": "line",
+      "points_px": [
+        1162,
+        61,
+        1144,
+        96
+      ],
+      "stroke": "#2e7d38",
+      "stroke_width": 4,
+      "z_index": 10
+    },
+    {
+      "id": "title_green_mark2",
+      "type": "line",
+      "points_px": [
+        1187,
+        88,
+        1158,
+        107
+      ],
+      "stroke": "#2e7d38",
+      "stroke_width": 3,
+      "z_index": 10
+    },
+    {
+      "id": "title_green_mark3",
+      "type": "line",
+      "points_px": [
+        1166,
+        120,
+        1197,
+        127
+      ],
+      "stroke": "#2e7d38",
+      "stroke_width": 3,
+      "z_index": 10
+    },
+    {
+      "id": "title_underline_1",
+      "type": "line",
+      "points_px": [
+        535,
+        198,
+        1139,
+        188
+      ],
+      "stroke": "#5b8fd3",
+      "stroke_width": 3,
+      "z_index": 10
+    },
+    {
+      "id": "title_underline_2",
+      "type": "line",
+      "points_px": [
+        595,
+        202,
+        1168,
+        196
+      ],
+      "stroke": "#5b8fd3",
+      "stroke_width": 2,
+      "z_index": 10
+    },
+    {
+      "id": "discord_panel",
+      "type": "roundRect",
+      "box_px": [
+        82,
+        256,
+        334,
+        374
+      ],
+      "fill": "#ffffff",
+      "stroke": "#2b72c9",
+      "stroke_width": 3,
+      "source_corner_radius_px": 30,
+      "corner_category": "large-radius",
+      "corner_reason": "source speech card has clearly rounded outer corners",
+      "z_index": 10
+    },
+    {
+      "id": "speech_tail",
+      "type": "line",
+      "points_px": [
+        222,
+        630,
+        222,
+        652
+      ],
+      "stroke": "#2b72c9",
+      "stroke_width": 3,
+      "z_index": 11
+    },
+    {
+      "id": "speech_tail_a",
+      "type": "line",
+      "points_px": [
+        222,
+        652,
+        255,
+        629
+      ],
+      "stroke": "#2b72c9",
+      "stroke_width": 3,
+      "z_index": 11
+    },
+    {
+      "id": "discord_icon_circle",
+      "type": "ellipse",
+      "box_px": [
+        109,
+        276,
+        77,
+        77
+      ],
+      "fill": "#5865F2",
+      "stroke": "none",
+      "stroke_width": 0,
+      "z_index": 15
+    },
+    {
+      "id": "discord_icon_head",
+      "type": "roundRect",
+      "box_px": [
+        126,
+        300,
+        44,
+        25
+      ],
+      "fill": "#ffffff",
+      "stroke": "none",
+      "stroke_width": 0,
+      "source_corner_radius_px": 8,
+      "corner_category": "small-radius",
+      "corner_reason": "simplified white Discord controller silhouette",
+      "z_index": 16
+    },
+    {
+      "id": "discord_eye_l",
+      "type": "ellipse",
+      "box_px": [
+        134,
+        309,
+        8,
+        8
+      ],
+      "fill": "#5865F2",
+      "stroke": "none",
+      "stroke_width": 0,
+      "z_index": 17
+    },
+    {
+      "id": "discord_eye_r",
+      "type": "ellipse",
+      "box_px": [
+        156,
+        309,
+        8,
+        8
+      ],
+      "fill": "#5865F2",
+      "stroke": "none",
+      "stroke_width": 0,
+      "z_index": 17
+    },
+    {
+      "id": "hash_vertical",
+      "type": "line",
+      "points_px": [
+        129,
+        372,
+        122,
+        405
+      ],
+      "stroke": "#111111",
+      "stroke_width": 3,
+      "z_index": 15
+    },
+    {
+      "id": "hash_vertical_2",
+      "type": "line",
+      "points_px": [
+        145,
+        372,
+        138,
+        405
+      ],
+      "stroke": "#111111",
+      "stroke_width": 3,
+      "z_index": 15
+    },
+    {
+      "id": "hash_horizontal",
+      "type": "line",
+      "points_px": [
+        114,
+        383,
+        153,
+        383
+      ],
+      "stroke": "#111111",
+      "stroke_width": 3,
+      "z_index": 15
+    },
+    {
+      "id": "hash_horizontal_2",
+      "type": "line",
+      "points_px": [
+        112,
+        395,
+        151,
+        395
+      ],
+      "stroke": "#111111",
+      "stroke_width": 3,
+      "z_index": 15
+    },
+    {
+      "id": "avatar_a_circle",
+      "type": "ellipse",
+      "box_px": [
+        111,
+        433,
+        44,
+        44
+      ],
+      "fill": "#e8f1ff",
+      "stroke": "#2b72c9",
+      "stroke_width": 2,
+      "z_index": 15
+    },
+    {
+      "id": "avatar_a_head",
+      "type": "ellipse",
+      "box_px": [
+        125,
+        442,
+        16,
+        16
+      ],
+      "fill": "#ffffff",
+      "stroke": "#2b72c9",
+      "stroke_width": 2,
+      "z_index": 16
+    },
+    {
+      "id": "avatar_a_body",
+      "type": "ellipse",
+      "box_px": [
+        119,
+        456,
+        28,
+        18
+      ],
+      "fill": "#ffffff",
+      "stroke": "#2b72c9",
+      "stroke_width": 2,
+      "z_index": 16
+    },
+    {
+      "id": "avatar_b_circle",
+      "type": "ellipse",
+      "box_px": [
+        111,
+        517,
+        44,
+        44
+      ],
+      "fill": "#fff1df",
+      "stroke": "#f28a22",
+      "stroke_width": 2,
+      "z_index": 15
+    },
+    {
+      "id": "avatar_b_head",
+      "type": "ellipse",
+      "box_px": [
+        125,
+        526,
+        16,
+        16
+      ],
+      "fill": "#ffffff",
+      "stroke": "#f28a22",
+      "stroke_width": 2,
+      "z_index": 16
+    },
+    {
+      "id": "avatar_b_body",
+      "type": "ellipse",
+      "box_px": [
+        119,
+        540,
+        28,
+        18
+      ],
+      "fill": "#ffffff",
+      "stroke": "#f28a22",
+      "stroke_width": 2,
+      "z_index": 16
+    },
+    {
+      "id": "user_a_line_1",
+      "type": "line",
+      "points_px": [
+        172,
+        464,
+        376,
+        464
+      ],
+      "stroke": "#bfbfbf",
+      "stroke_width": 2,
+      "z_index": 12
+    },
+    {
+      "id": "user_a_line_2",
+      "type": "line",
+      "points_px": [
+        172,
+        484,
+        334,
+        484
+      ],
+      "stroke": "#c8c8c8",
+      "stroke_width": 2,
+      "z_index": 12
+    },
+    {
+      "id": "user_b_line_1",
+      "type": "line",
+      "points_px": [
+        172,
+        544,
+        376,
+        544
+      ],
+      "stroke": "#bfbfbf",
+      "stroke_width": 2,
+      "z_index": 12
+    },
+    {
+      "id": "user_b_line_2",
+      "type": "line",
+      "points_px": [
+        172,
+        563,
+        334,
+        563
+      ],
+      "stroke": "#c8c8c8",
+      "stroke_width": 2,
+      "z_index": 12
+    },
+    {
+      "id": "left_arrow_main",
+      "type": "line",
+      "points_px": [
+        436,
+        431,
+        533,
+        432
+      ],
+      "stroke": "#2b72c9",
+      "stroke_width": 4,
+      "z_index": 10
+    },
+    {
+      "id": "left_arrow_head_1",
+      "type": "line",
+      "points_px": [
+        533,
+        432,
+        510,
+        410
+      ],
+      "stroke": "#2b72c9",
+      "stroke_width": 4,
+      "z_index": 10
+    },
+    {
+      "id": "left_arrow_head_2",
+      "type": "line",
+      "points_px": [
+        533,
+        432,
+        510,
+        454
+      ],
+      "stroke": "#2b72c9",
+      "stroke_width": 4,
+      "z_index": 10
+    },
+    {
+      "id": "command_card",
+      "type": "roundRect",
+      "box_px": [
+        563,
+        321,
+        567,
+        244
+      ],
+      "fill": "#fbfff8",
+      "stroke": "#2e6b35",
+      "stroke_width": 3,
+      "source_corner_radius_px": 20,
+      "corner_category": "large-radius",
+      "corner_reason": "source command card has visible rounded corners",
+      "z_index": 10
+    },
+    {
+      "id": "command_hatch_1",
+      "type": "line",
+      "points_px": [
+        583,
+        543,
+        850,
+        342
+      ],
+      "stroke": "#e7f0e3",
+      "stroke_width": 1,
+      "z_index": 11
+    },
+    {
+      "id": "command_hatch_2",
+      "type": "line",
+      "points_px": [
+        648,
+        549,
+        944,
+        335
+      ],
+      "stroke": "#e7f0e3",
+      "stroke_width": 1,
+      "z_index": 11
+    },
+    {
+      "id": "command_hatch_3",
+      "type": "line",
+      "points_px": [
+        748,
+        548,
+        1044,
+        337
+      ],
+      "stroke": "#e7f0e3",
+      "stroke_width": 1,
+      "z_index": 11
+    },
+    {
+      "id": "terminal_gt_1",
+      "type": "line",
+      "points_px": [
+        599,
+        354,
+        618,
+        372
+      ],
+      "stroke": "#2e6b35",
+      "stroke_width": 5,
+      "z_index": 16
+    },
+    {
+      "id": "terminal_gt_2",
+      "type": "line",
+      "points_px": [
+        618,
+        372,
+        600,
+        389
+      ],
+      "stroke": "#2e6b35",
+      "stroke_width": 5,
+      "z_index": 16
+    },
+    {
+      "id": "terminal_underscore",
+      "type": "line",
+      "points_px": [
+        624,
+        386,
+        645,
+        386
+      ],
+      "stroke": "#2e6b35",
+      "stroke_width": 4,
+      "z_index": 16
+    },
+    {
+      "id": "command_mark_1",
+      "type": "line",
+      "points_px": [
+        1070,
+        352,
+        1074,
+        365
+      ],
+      "stroke": "#2e6b35",
+      "stroke_width": 3,
+      "z_index": 16
+    },
+    {
+      "id": "command_mark_2",
+      "type": "line",
+      "points_px": [
+        1084,
+        350,
+        1086,
+        367
+      ],
+      "stroke": "#2e6b35",
+      "stroke_width": 3,
+      "z_index": 16
+    },
+    {
+      "id": "command_mark_3",
+      "type": "line",
+      "points_px": [
+        1097,
+        355,
+        1090,
+        372
+      ],
+      "stroke": "#2e6b35",
+      "stroke_width": 3,
+      "z_index": 16
+    },
+    {
+      "id": "right_arrow_main",
+      "type": "line",
+      "points_px": [
+        1148,
+        432,
+        1218,
+        432
+      ],
+      "stroke": "#2f7f39",
+      "stroke_width": 4,
+      "z_index": 10
+    },
+    {
+      "id": "right_arrow_head_1",
+      "type": "line",
+      "points_px": [
+        1218,
+        432,
+        1194,
+        414
+      ],
+      "stroke": "#2f7f39",
+      "stroke_width": 4,
+      "z_index": 10
+    },
+    {
+      "id": "right_arrow_head_2",
+      "type": "line",
+      "points_px": [
+        1218,
+        432,
+        1194,
+        455
+      ],
+      "stroke": "#2f7f39",
+      "stroke_width": 4,
+      "z_index": 10
+    },
+    {
+      "id": "folder_tab",
+      "type": "roundRect",
+      "box_px": [
+        1238,
+        250,
+        345,
+        94
+      ],
+      "fill": "#fff7eb",
+      "stroke": "#ee8a25",
+      "stroke_width": 3,
+      "source_corner_radius_px": 20,
+      "corner_category": "large-radius",
+      "corner_reason": "outer folder shape has rounded corners",
+      "z_index": 9
+    },
+    {
+      "id": "folder_panel",
+      "type": "roundRect",
+      "box_px": [
+        1238,
+        303,
+        345,
+        344
+      ],
+      "fill": "#fffdf9",
+      "stroke": "#ee8a25",
+      "stroke_width": 3,
+      "source_corner_radius_px": 18,
+      "corner_category": "large-radius",
+      "corner_reason": "folder content panel corners are rounded",
+      "z_index": 10
+    },
+    {
+      "id": "folder_hatch_1",
+      "type": "line",
+      "points_px": [
+        1252,
+        624,
+        1475,
+        313
+      ],
+      "stroke": "#f5eadb",
+      "stroke_width": 1,
+      "z_index": 11
+    },
+    {
+      "id": "folder_hatch_2",
+      "type": "line",
+      "points_px": [
+        1320,
+        632,
+        1548,
+        318
+      ],
+      "stroke": "#f5eadb",
+      "stroke_width": 1,
+      "z_index": 11
+    },
+    {
+      "id": "folder_hatch_3",
+      "type": "line",
+      "points_px": [
+        1250,
+        505,
+        1410,
+        312
+      ],
+      "stroke": "#f5eadb",
+      "stroke_width": 1,
+      "z_index": 11
+    },
+    {
+      "id": "api_folder_body",
+      "type": "rect",
+      "box_px": [
+        1267,
+        387,
+        48,
+        33
+      ],
+      "fill": "#fff3dc",
+      "stroke": "#ee8a25",
+      "stroke_width": 3,
+      "corner_category": "straight",
+      "z_index": 16
+    },
+    {
+      "id": "api_folder_tab",
+      "type": "rect",
+      "box_px": [
+        1269,
+        378,
+        27,
+        14
+      ],
+      "fill": "#fff3dc",
+      "stroke": "#ee8a25",
+      "stroke_width": 3,
+      "corner_category": "straight",
+      "z_index": 16
+    },
+    {
+      "id": "src_icon",
+      "type": "rect",
+      "box_px": [
+        1280,
+        462,
+        21,
+        22
+      ],
+      "fill": "#ffffff",
+      "stroke": "#3e4a59",
+      "stroke_width": 2,
+      "corner_category": "straight",
+      "z_index": 16
+    },
+    {
+      "id": "tests_icon",
+      "type": "rect",
+      "box_px": [
+        1280,
+        500,
+        21,
+        22
+      ],
+      "fill": "#ffffff",
+      "stroke": "#3e4a59",
+      "stroke_width": 2,
+      "corner_category": "straight",
+      "z_index": 16
+    },
+    {
+      "id": "readme_icon",
+      "type": "rect",
+      "box_px": [
+        1280,
+        536,
+        20,
+        24
+      ],
+      "fill": "#ffffff",
+      "stroke": "#3e4a59",
+      "stroke_width": 2,
+      "corner_category": "straight",
+      "z_index": 16
+    },
+    {
+      "id": "readme_line1",
+      "type": "line",
+      "points_px": [
+        1285,
+        544,
+        1295,
+        544
+      ],
+      "stroke": "#3e4a59",
+      "stroke_width": 1,
+      "z_index": 17
+    },
+    {
+      "id": "readme_line2",
+      "type": "line",
+      "points_px": [
+        1285,
+        550,
+        1295,
+        550
+      ],
+      "stroke": "#3e4a59",
+      "stroke_width": 1,
+      "z_index": 17
+    },
+    {
+      "id": "pyproject_icon",
+      "type": "rect",
+      "box_px": [
+        1280,
+        574,
+        20,
+        24
+      ],
+      "fill": "#ffffff",
+      "stroke": "#3e4a59",
+      "stroke_width": 2,
+      "corner_category": "straight",
+      "z_index": 16
+    },
+    {
+      "id": "pyproject_line1",
+      "type": "line",
+      "points_px": [
+        1285,
+        582,
+        1295,
+        582
+      ],
+      "stroke": "#3e4a59",
+      "stroke_width": 1,
+      "z_index": 17
+    },
+    {
+      "id": "pyproject_line2",
+      "type": "line",
+      "points_px": [
+        1285,
+        588,
+        1295,
+        588
+      ],
+      "stroke": "#3e4a59",
+      "stroke_width": 1,
+      "z_index": 17
+    },
+    {
+      "id": "badge_channel",
+      "type": "roundRect",
+      "box_px": [
+        469,
+        632,
+        208,
+        69
+      ],
+      "fill": "#f3f8ff",
+      "stroke": "#2b72c9",
+      "stroke_width": 2,
+      "source_corner_radius_px": 17,
+      "corner_category": "large-radius",
+      "corner_reason": "legend badges are rounded pills",
+      "z_index": 10
+    },
+    {
+      "id": "badge_link_l1",
+      "type": "line",
+      "points_px": [
+        498,
+        670,
+        517,
+        651
+      ],
+      "stroke": "#2b72c9",
+      "stroke_width": 4,
+      "z_index": 15
+    },
+    {
+      "id": "badge_link_l2",
+      "type": "line",
+      "points_px": [
+        511,
+        680,
+        530,
+        661
+      ],
+      "stroke": "#2b72c9",
+      "stroke_width": 4,
+      "z_index": 15
+    },
+    {
+      "id": "badge_codex",
+      "type": "roundRect",
+      "box_px": [
+        702,
+        632,
+        238,
+        69
+      ],
+      "fill": "#f6fbf2",
+      "stroke": "#55925d",
+      "stroke_width": 2,
+      "source_corner_radius_px": 17,
+      "corner_category": "large-radius",
+      "corner_reason": "legend badges are rounded pills",
+      "z_index": 10
+    },
+    {
+      "id": "codex_box",
+      "type": "rect",
+      "box_px": [
+        724,
+        650,
+        38,
+        38
+      ],
+      "fill": "#edf7e9",
+      "stroke": "#55925d",
+      "stroke_width": 2,
+      "corner_category": "straight",
+      "z_index": 15
+    },
+    {
+      "id": "codex_diag_1",
+      "type": "line",
+      "points_px": [
+        724,
+        650,
+        744,
+        641
+      ],
+      "stroke": "#55925d",
+      "stroke_width": 2,
+      "z_index": 16
+    },
+    {
+      "id": "codex_diag_2",
+      "type": "line",
+      "points_px": [
+        762,
+        650,
+        744,
+        641
+      ],
+      "stroke": "#55925d",
+      "stroke_width": 2,
+      "z_index": 16
+    },
+    {
+      "id": "codex_v",
+      "type": "line",
+      "points_px": [
+        744,
+        641,
+        744,
+        680
+      ],
+      "stroke": "#55925d",
+      "stroke_width": 2,
+      "z_index": 16
+    },
+    {
+      "id": "badge_workdir",
+      "type": "roundRect",
+      "box_px": [
+        964,
+        632,
+        205,
+        69
+      ],
+      "fill": "#fff8ef",
+      "stroke": "#ee8a25",
+      "stroke_width": 2,
+      "source_corner_radius_px": 17,
+      "corner_category": "large-radius",
+      "corner_reason": "legend badges are rounded pills",
+      "z_index": 10
+    },
+    {
+      "id": "badge_folder_body",
+      "type": "rect",
+      "box_px": [
+        990,
+        661,
+        44,
+        25
+      ],
+      "fill": "#fff3dc",
+      "stroke": "#ee8a25",
+      "stroke_width": 3,
+      "corner_category": "straight",
+      "z_index": 15
+    },
+    {
+      "id": "badge_folder_tab",
+      "type": "rect",
+      "box_px": [
+        992,
+        651,
+        26,
+        13
+      ],
+      "fill": "#fff3dc",
+      "stroke": "#ee8a25",
+      "stroke_width": 3,
+      "corner_category": "straight",
+      "z_index": 15
+    },
+    {
+      "id": "note_box",
+      "type": "roundRect",
+      "box_px": [
+        309,
+        767,
+        1029,
+        120
+      ],
+      "fill": "#ffffff",
+      "stroke": "#9fc4ef",
+      "stroke_width": 2,
+      "dash": "dash",
+      "source_corner_radius_px": 12,
+      "corner_category": "small-radius",
+      "corner_reason": "bottom callout has lightly rounded dashed corners",
+      "z_index": 10
+    },
+    {
+      "id": "bulb_head",
+      "type": "ellipse",
+      "box_px": [
+        365,
+        811,
+        33,
+        42
+      ],
+      "fill": "#fffef4",
+      "stroke": "#2b7fd8",
+      "stroke_width": 3,
+      "z_index": 15
+    },
+    {
+      "id": "bulb_base",
+      "type": "rect",
+      "box_px": [
+        372,
+        853,
+        20,
+        12
+      ],
+      "fill": "#fffef4",
+      "stroke": "#2b7fd8",
+      "stroke_width": 2,
+      "corner_category": "straight",
+      "z_index": 15
+    },
+    {
+      "id": "bulb_ray_top",
+      "type": "line",
+      "points_px": [
+        383,
+        789,
+        383,
+        803
+      ],
+      "stroke": "#2b7fd8",
+      "stroke_width": 2,
+      "z_index": 15
+    },
+    {
+      "id": "bulb_ray_left",
+      "type": "line",
+      "points_px": [
+        353,
+        822,
+        340,
+        822
+      ],
+      "stroke": "#2b7fd8",
+      "stroke_width": 2,
+      "z_index": 15
+    },
+    {
+      "id": "bulb_ray_right",
+      "type": "line",
+      "points_px": [
+        410,
+        822,
+        423,
+        822
+      ],
+      "stroke": "#2b7fd8",
+      "stroke_width": 2,
+      "z_index": 15
+    },
+    {
+      "id": "note_underline_1",
+      "type": "line",
+      "points_px": [
+        1087,
+        855,
+        1251,
+        857
+      ],
+      "stroke": "#2b72c9",
+      "stroke_width": 3,
+      "z_index": 42
+    },
+    {
+      "id": "note_underline_2",
+      "type": "line",
+      "points_px": [
+        1070,
+        868,
+        1300,
+        858
+      ],
+      "stroke": "#2b72c9",
+      "stroke_width": 2,
+      "z_index": 42
+    }
+  ],
+  "text_boxes": [
+    {
+      "id": "title_text",
+      "text": "先绑定项目",
+      "box_px": [
+        576,
+        55,
+        530,
+        120
+      ],
+      "font": "Songti SC",
+      "preview_font": "/System/Library/Fonts/Supplemental/Songti.ttc",
+      "font_size": 45,
+      "color": "#07295f",
+      "bold": true,
+      "align": "center",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "discord_brand",
+      "text": "Discord",
+      "box_px": [
+        200,
+        294,
+        120,
+        40
+      ],
+      "font": "Comic Sans MS",
+      "preview_font": "/System/Library/Fonts/Supplemental/Comic Sans MS.ttf",
+      "font_size": 21,
+      "color": "#0756bd",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "channel_name",
+      "text": "api-项目",
+      "box_px": [
+        160,
+        371,
+        135,
+        40
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 18,
+      "color": "#111111",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "user_a",
+      "text": "用户A",
+      "box_px": [
+        170,
+        431,
+        78,
+        28
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 13,
+      "color": "#111111",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "user_b",
+      "text": "用户B",
+      "box_px": [
+        170,
+        515,
+        78,
+        28
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 13,
+      "color": "#111111",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "discord_more",
+      "text": "···",
+      "box_px": [
+        220,
+        590,
+        70,
+        26
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 16,
+      "color": "#6f7780",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "discord_label",
+      "text": "Discord 频道",
+      "box_px": [
+        143,
+        677,
+        220,
+        44
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 23,
+      "color": "#0756bd",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "command_title",
+      "text": "绑定命令",
+      "box_px": [
+        675,
+        350,
+        145,
+        42
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 19,
+      "color": "#2e6b35",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "command_line_1",
+      "runs": [
+        {
+          "text": "!bind",
+          "color": "#0756bd"
+        },
+        {
+          "text": " api \"/path/to/workspaces/api\"",
+          "color": "#111111"
+        }
+      ],
+      "box_px": [
+        600,
+        428,
+        520,
+        48
+      ],
+      "font": "Courier New",
+      "preview_font": "/Library/Fonts/Arial Unicode.ttf",
+      "font_size": 18,
+      "color": "#111111",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "command_line_2",
+      "runs": [
+        {
+          "text": "--engine ",
+          "color": "#111111"
+        },
+        {
+          "text": "codex",
+          "color": "#2e6b35"
+        }
+      ],
+      "box_px": [
+        610,
+        483,
+        330,
+        40
+      ],
+      "font": "Courier New",
+      "preview_font": "/Library/Fonts/Arial Unicode.ttf",
+      "font_size": 18,
+      "color": "#111111",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "badge_channel_text",
+      "text": "频道绑定",
+      "box_px": [
+        548,
+        649,
+        115,
+        37
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 16,
+      "color": "#0756bd",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "badge_codex_text",
+      "text": "默认 Codex",
+      "box_px": [
+        786,
+        647,
+        150,
+        37
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 16,
+      "color": "#2e6b35",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "badge_workdir_text",
+      "text": "工作目录",
+      "box_px": [
+        1052,
+        648,
+        110,
+        37
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 16,
+      "color": "#d95f04",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "folder_title",
+      "text": "本机项目目录",
+      "box_px": [
+        1270,
+        322,
+        190,
+        35
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 16,
+      "color": "#111111",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "folder_api",
+      "text": "api",
+      "box_px": [
+        1338,
+        378,
+        60,
+        32
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 16,
+      "color": "#111111",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "folder_path",
+      "text": "/path/to/workspaces/api",
+      "box_px": [
+        1338,
+        418,
+        240,
+        28
+      ],
+      "font": "Arial",
+      "preview_font": "/Library/Fonts/Arial Unicode.ttf",
+      "font_size": 11,
+      "italic": true,
+      "color": "#111111",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "file_src",
+      "text": "src/",
+      "box_px": [
+        1317,
+        466,
+        70,
+        26
+      ],
+      "font": "Arial",
+      "preview_font": "/Library/Fonts/Arial Unicode.ttf",
+      "font_size": 11,
+      "color": "#2b2f36",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "file_tests",
+      "text": "tests/",
+      "box_px": [
+        1317,
+        504,
+        80,
+        26
+      ],
+      "font": "Arial",
+      "preview_font": "/Library/Fonts/Arial Unicode.ttf",
+      "font_size": 11,
+      "color": "#2b2f36",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "file_readme",
+      "text": "README.md",
+      "box_px": [
+        1317,
+        542,
+        130,
+        26
+      ],
+      "font": "Arial",
+      "preview_font": "/Library/Fonts/Arial Unicode.ttf",
+      "font_size": 11,
+      "color": "#2b2f36",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "file_pyproject",
+      "text": "pyproject.toml",
+      "box_px": [
+        1317,
+        580,
+        150,
+        26
+      ],
+      "font": "Arial",
+      "preview_font": "/Library/Fonts/Arial Unicode.ttf",
+      "font_size": 11,
+      "color": "#2b2f36",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "file_more",
+      "text": "…",
+      "box_px": [
+        1364,
+        614,
+        65,
+        28
+      ],
+      "font": "Arial",
+      "preview_font": "/Library/Fonts/Arial Unicode.ttf",
+      "font_size": 17,
+      "color": "#111111",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "folder_label",
+      "text": "本机项目（工作目录）",
+      "box_px": [
+        1279,
+        675,
+        260,
+        48
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 20,
+      "color": "#d95f04",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "note_prefix",
+      "text": "绑定后，频道就成为这个项目的",
+      "box_px": [
+        453,
+        797,
+        610,
+        60
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 24,
+      "color": "#111111",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "note_remote",
+      "text": "远程入口",
+      "box_px": [
+        1076,
+        797,
+        190,
+        60
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 24,
+      "color": "#0756bd",
+      "wrap": "none",
+      "z_index": 40
+    },
+    {
+      "id": "note_period",
+      "text": "。",
+      "box_px": [
+        1264,
+        797,
+        40,
+        60
+      ],
+      "font": "STHeiti",
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "font_size": 24,
+      "color": "#111111",
+      "wrap": "none",
+      "z_index": 40
+    }
+  ],
+  "known_limits": [
+    "Hand-drawn wobble, hatching and logo/avatar details are approximated with native PowerPoint primitives rather than exact bitmap artwork.",
+    "The folder tab silhouette is simplified into editable rounded rectangles and straight icon primitives."
+  ],
+  "text_inventory_details": [
+    {
+      "id": "title",
+      "text": "先绑定项目",
+      "role": "main title",
+      "source_bbox_px": [
+        578,
+        72,
+        1100,
+        166
+      ]
+    },
+    {
+      "id": "discord_label",
+      "text": "Discord 频道",
+      "role": "bottom label",
+      "source_bbox_px": [
+        144,
+        682,
+        316,
+        714
+      ]
+    },
+    {
+      "id": "discord_brand",
+      "text": "Discord",
+      "role": "card header",
+      "source_bbox_px": [
+        202,
+        296,
+        308,
+        330
+      ]
+    },
+    {
+      "id": "channel_name",
+      "text": "# api-项目",
+      "role": "channel name",
+      "source_bbox_px": [
+        116,
+        372,
+        293,
+        405
+      ]
+    },
+    {
+      "id": "user_a",
+      "text": "用户A",
+      "role": "user label",
+      "source_bbox_px": [
+        170,
+        433,
+        227,
+        455
+      ]
+    },
+    {
+      "id": "user_b",
+      "text": "用户B",
+      "role": "user label",
+      "source_bbox_px": [
+        170,
+        517,
+        227,
+        540
+      ]
+    },
+    {
+      "id": "discord_more",
+      "text": "···",
+      "role": "ellipsis",
+      "source_bbox_px": [
+        222,
+        593,
+        258,
+        606
+      ]
+    },
+    {
+      "id": "command_title",
+      "text": "绑定命令",
+      "role": "command card heading",
+      "source_bbox_px": [
+        675,
+        354,
+        795,
+        389
+      ]
+    },
+    {
+      "id": "command_line_1",
+      "text": "!bind api \"/path/to/workspaces/api\"",
+      "role": "command text",
+      "source_bbox_px": [
+        602,
+        434,
+        1105,
+        465
+      ]
+    },
+    {
+      "id": "command_line_2",
+      "text": "--engine codex",
+      "role": "command text",
+      "source_bbox_px": [
+        610,
+        486,
+        906,
+        516
+      ]
+    },
+    {
+      "id": "binding_badge",
+      "text": "频道绑定",
+      "role": "legend badge",
+      "source_bbox_px": [
+        548,
+        654,
+        647,
+        682
+      ]
+    },
+    {
+      "id": "codex_badge",
+      "text": "默认 Codex",
+      "role": "legend badge",
+      "source_bbox_px": [
+        786,
+        652,
+        919,
+        682
+      ]
+    },
+    {
+      "id": "workdir_badge",
+      "text": "工作目录",
+      "role": "legend badge",
+      "source_bbox_px": [
+        1052,
+        652,
+        1148,
+        681
+      ]
+    },
+    {
+      "id": "local_title",
+      "text": "本机项目目录",
+      "role": "file card title",
+      "source_bbox_px": [
+        1271,
+        327,
+        1443,
+        350
+      ]
+    },
+    {
+      "id": "folder_api",
+      "text": "api",
+      "role": "folder name",
+      "source_bbox_px": [
+        1337,
+        383,
+        1376,
+        405
+      ]
+    },
+    {
+      "id": "path_api",
+      "text": "/path/to/workspaces/api",
+      "role": "path",
+      "source_bbox_px": [
+        1337,
+        421,
+        1518,
+        442
+      ]
+    },
+    {
+      "id": "src",
+      "text": "src/",
+      "role": "file entry",
+      "source_bbox_px": [
+        1318,
+        468,
+        1355,
+        489
+      ]
+    },
+    {
+      "id": "tests",
+      "text": "tests/",
+      "role": "file entry",
+      "source_bbox_px": [
+        1317,
+        506,
+        1369,
+        527
+      ]
+    },
+    {
+      "id": "readme",
+      "text": "README.md",
+      "role": "file entry",
+      "source_bbox_px": [
+        1317,
+        544,
+        1414,
+        565
+      ]
+    },
+    {
+      "id": "pyproject",
+      "text": "pyproject.toml",
+      "role": "file entry",
+      "source_bbox_px": [
+        1317,
+        582,
+        1443,
+        603
+      ]
+    },
+    {
+      "id": "file_more",
+      "text": "…",
+      "role": "ellipsis",
+      "source_bbox_px": [
+        1365,
+        618,
+        1398,
+        635
+      ]
+    },
+    {
+      "id": "local_label",
+      "text": "本机项目（工作目录）",
+      "role": "bottom label",
+      "source_bbox_px": [
+        1283,
+        682,
+        1512,
+        713
+      ]
+    },
+    {
+      "id": "note",
+      "text": "绑定后，频道就成为这个项目的远程入口。",
+      "role": "bottom note",
+      "source_bbox_px": [
+        454,
+        806,
+        1282,
+        848
+      ]
+    }
+  ]
+}

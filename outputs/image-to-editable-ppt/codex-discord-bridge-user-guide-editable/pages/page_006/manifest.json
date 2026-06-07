@@ -1,0 +1,3254 @@
+{
+  "schema_version": 1,
+  "run_id": "codex-discord-bridge-user-guide-editable",
+  "page_id": "page_006",
+  "strategy": "object-level editable rebuild using native text and native primitive shapes; no full-page raster source overlay",
+  "slide": {
+    "width": 13.333,
+    "height": 7.5,
+    "background": "#FFFDF9"
+  },
+  "source": {
+    "path": "source.png",
+    "width_px": 1672,
+    "height_px": 941
+  },
+  "preview_scale": 120,
+  "text_inventory": [
+    "原生生图与编辑图",
+    "输入（两种方式）",
+    "输出（返回 Discord）",
+    "T",
+    "文本提示词",
+    "用自然语言描述你想要的图，",
+    "越具体越好。",
+    "示例：生成一张架构图",
+    "上传图片",
+    "上传图片进行编辑、修改或",
+    "风格转换。",
+    "示例：编辑这张封面",
+    "直接生图",
+    "上传后编辑",
+    "C",
+    "Codex",
+    "image_generation /",
+    "GPT Image 2",
+    "理解你的需求",
+    "生成或编辑图片",
+    "输出 PNG 文件",
+    "Discord 频道 # api-项目",
+    "BOT",
+    "10:42",
+    "已生成图片，见附件：",
+    "系统架构图",
+    "用户",
+    "Web 前端",
+    "API 网关",
+    "服务层",
+    "数据库",
+    "缓存",
+    "Redis",
+    "对象存储",
+    "S3",
+    "architecture.png",
+    "1.2 MB",
+    "自动作为附件返回",
+    "图片任务请使用",
+    "默认 Codex",
+    "或 !codex，",
+    "不要用 !claude",
+    "覆盖。"
+  ],
+  "visual_inventory": [
+    {
+      "id": "title_decorations",
+      "type": "native-lines",
+      "box_px": [
+        370,
+        30,
+        930,
+        140
+      ],
+      "decision": "native primitive star, rays, and underline lines"
+    },
+    {
+      "id": "prompt_card_and_icon",
+      "type": "native-shapes",
+      "box_px": [
+        78,
+        244,
+        384,
+        201
+      ],
+      "decision": "editable rounded rectangles and text icon"
+    },
+    {
+      "id": "upload_card_and_icon",
+      "type": "native-shapes",
+      "box_px": [
+        80,
+        483,
+        383,
+        207
+      ],
+      "decision": "editable rounded rectangles and simplified picture icon"
+    },
+    {
+      "id": "input_to_model_arrows",
+      "type": "native-lines",
+      "box_px": [
+        477,
+        317,
+        146,
+        269
+      ],
+      "decision": "native line arrows with manual arrowheads"
+    },
+    {
+      "id": "model_node",
+      "type": "native-shapes",
+      "box_px": [
+        657,
+        245,
+        308,
+        436
+      ],
+      "decision": "native rounded card, cube lines, separator, and check bullets"
+    },
+    {
+      "id": "discord_return_card",
+      "type": "native-shapes",
+      "box_px": [
+        1083,
+        243,
+        497,
+        462
+      ],
+      "decision": "native simplified Discord container, message card, PNG preview, and attachment row"
+    },
+    {
+      "id": "png_architecture_preview",
+      "type": "native-shapes",
+      "box_px": [
+        1170,
+        414,
+        372,
+        207
+      ],
+      "decision": "native simplified diagram shapes instead of embedded screenshot"
+    },
+    {
+      "id": "return_attach_pill",
+      "type": "native-shapes",
+      "box_px": [
+        984,
+        727,
+        315,
+        53
+      ],
+      "decision": "native rounded pill and simplified paperclip"
+    },
+    {
+      "id": "takeaway_callout",
+      "type": "native-shapes",
+      "box_px": [
+        214,
+        809,
+        1238,
+        97
+      ],
+      "decision": "native dashed callout and lightbulb icon"
+    }
+  ],
+  "background_strategy": {
+    "mode": "native-or-script",
+    "source_consistency": "The source background is a plain warm off-white canvas with no complex occluded imagery; it is rebuilt as a native solid slide background.",
+    "removed_foreground": "None; all visible foreground text, containers, arrows, labels, simplified icons, Discord return panel, PNG preview, attachment row, and takeaway callout are rebuilt as independent editable objects.",
+    "comparison_note": "Preview preserves the flow layout, color coding, and object placement while simplifying hand-drawn icon details into native primitives."
+  },
+  "quality_checks": {
+    "font_size_calibrated": true,
+    "visual_inventory_matched": true,
+    "background_strategy_checked": true,
+    "shape_corner_geometry_checked": true,
+    "source_corner_geometry_notes": "Large cards and pills use roundRect with 8-20 px source radii; diagram boxes and page background use rect when source is straight-corner or primitive.",
+    "font_size_calibration_note": "Reduced body/UI/takeaway native font sizes after preview comparison to avoid overflow and match source density."
+  },
+  "text_boxes": [
+    {
+      "name": "title",
+      "text": "原生生图与编辑图",
+      "box_px": [
+        455,
+        44,
+        765,
+        96
+      ],
+      "font_size": 43,
+      "font": "HanziPen SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": true,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "input_label",
+      "text": "输入（两种方式）",
+      "box_px": [
+        150,
+        194,
+        230,
+        36
+      ],
+      "font_size": 20,
+      "font": "HanziPen SC",
+      "color": "#1057BE",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "output_label",
+      "text": "输出（返回 Discord）",
+      "box_px": [
+        1186,
+        194,
+        310,
+        36
+      ],
+      "font_size": 20,
+      "font": "HanziPen SC",
+      "color": "#F05A14",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "prompt_icon_T",
+      "text": "T",
+      "box_px": [
+        123,
+        284,
+        34,
+        35
+      ],
+      "font_size": 26,
+      "font": "PingFang SC",
+      "color": "#1057BE",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": true,
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "prompt_title",
+      "text": "文本提示词",
+      "box_px": [
+        188,
+        274,
+        165,
+        30
+      ],
+      "font_size": 19.2,
+      "font": "HanziPen SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "prompt_desc_1",
+      "text": "用自然语言描述你想要的图，",
+      "box_px": [
+        188,
+        312,
+        250,
+        26
+      ],
+      "font_size": 11.4,
+      "font": "HanziPen SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "prompt_desc_2",
+      "text": "越具体越好。",
+      "box_px": [
+        188,
+        343,
+        150,
+        24
+      ],
+      "font_size": 11.4,
+      "font": "HanziPen SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "prompt_example_text",
+      "text": "示例：生成一张架构图",
+      "box_px": [
+        197,
+        410,
+        240,
+        23
+      ],
+      "font_size": 14.8,
+      "font": "HanziPen SC",
+      "color": "#1057BE",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "upload_title",
+      "text": "上传图片",
+      "box_px": [
+        189,
+        510,
+        155,
+        30
+      ],
+      "font_size": 19.2,
+      "font": "HanziPen SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "upload_desc_1",
+      "text": "上传图片进行编辑、修改或",
+      "box_px": [
+        189,
+        548,
+        250,
+        26
+      ],
+      "font_size": 11.4,
+      "font": "HanziPen SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "upload_desc_2",
+      "text": "风格转换。",
+      "box_px": [
+        189,
+        580,
+        135,
+        24
+      ],
+      "font_size": 11.4,
+      "font": "HanziPen SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "upload_example_text",
+      "text": "示例：编辑这张封面",
+      "box_px": [
+        198,
+        655,
+        240,
+        23
+      ],
+      "font_size": 14.8,
+      "font": "HanziPen SC",
+      "color": "#246F2C",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "direct_generate_text",
+      "text": "直接生图",
+      "box_px": [
+        466,
+        744,
+        112,
+        24
+      ],
+      "font_size": 15.8,
+      "font": "HanziPen SC",
+      "color": "#1057BE",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "upload_edit_text",
+      "text": "上传后编辑",
+      "box_px": [
+        751,
+        744,
+        135,
+        24
+      ],
+      "font_size": 15.8,
+      "font": "HanziPen SC",
+      "color": "#246F2C",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "cube_C",
+      "text": "C",
+      "box_px": [
+        823,
+        320,
+        35,
+        42
+      ],
+      "font_size": 29,
+      "font": "HanziPen SC",
+      "color": "#246F2C",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "codex_word",
+      "text": "Codex",
+      "box_px": [
+        760,
+        393,
+        120,
+        35
+      ],
+      "font_size": 23.5,
+      "font": "HanziPen SC",
+      "color": "#246F2C",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "model_api_line_1",
+      "text": "image_generation /",
+      "box_px": [
+        705,
+        440,
+        210,
+        27
+      ],
+      "font_size": 16.8,
+      "font": "HanziPen SC",
+      "color": "#246F2C",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "model_api_line_2",
+      "text": "GPT Image 2",
+      "box_px": [
+        727,
+        473,
+        165,
+        27
+      ],
+      "font_size": 16.8,
+      "font": "HanziPen SC",
+      "color": "#246F2C",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "model_check_text_1",
+      "text": "理解你的需求",
+      "box_px": [
+        732,
+        533,
+        190,
+        25
+      ],
+      "font_size": 15.5,
+      "font": "HanziPen SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "model_check_text_2",
+      "text": "生成或编辑图片",
+      "box_px": [
+        732,
+        578,
+        190,
+        25
+      ],
+      "font_size": 15.5,
+      "font": "HanziPen SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "model_check_text_3",
+      "text": "输出 PNG 文件",
+      "box_px": [
+        732,
+        624,
+        190,
+        25
+      ],
+      "font_size": 15.5,
+      "font": "HanziPen SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "discord_channel_text",
+      "text": "Discord 频道 # api-项目",
+      "box_px": [
+        1171,
+        276,
+        300,
+        28
+      ],
+      "font_size": 15.0,
+      "font": "PingFang SC",
+      "color": "#1057BE",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "discord_sender",
+      "text": "Codex",
+      "box_px": [
+        1170,
+        346,
+        56,
+        22
+      ],
+      "font_size": 13.5,
+      "font": "PingFang SC",
+      "color": "#111111",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "bot_badge_text",
+      "text": "BOT",
+      "box_px": [
+        1236,
+        347,
+        31,
+        13
+      ],
+      "font_size": 7.7,
+      "font": "PingFang SC",
+      "color": "#FFFFFF",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "discord_time",
+      "text": "10:42",
+      "box_px": [
+        1282,
+        347,
+        55,
+        20
+      ],
+      "font_size": 11.3,
+      "font": "PingFang SC",
+      "color": "#34436B",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "discord_message_text",
+      "text": "已生成图片，见附件：",
+      "box_px": [
+        1170,
+        381,
+        210,
+        24
+      ],
+      "font_size": 13.0,
+      "font": "HanziPen SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "png_preview_title",
+      "text": "系统架构图",
+      "box_px": [
+        1304,
+        426,
+        100,
+        18
+      ],
+      "font_size": 9.0,
+      "font": "PingFang SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": true,
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "diagram_user_label",
+      "text": "用户",
+      "box_px": [
+        1187,
+        516,
+        32,
+        16
+      ],
+      "font_size": 6.8,
+      "font": "PingFang SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "diagram_web_label",
+      "text": "Web 前端",
+      "box_px": [
+        1249,
+        516,
+        50,
+        16
+      ],
+      "font_size": 6.8,
+      "font": "PingFang SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "diagram_api_label",
+      "text": "API 网关",
+      "box_px": [
+        1328,
+        516,
+        50,
+        16
+      ],
+      "font_size": 6.8,
+      "font": "PingFang SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "diagram_service_label",
+      "text": "服务层",
+      "box_px": [
+        1406,
+        516,
+        52,
+        16
+      ],
+      "font_size": 6.8,
+      "font": "PingFang SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "diagram_db_label",
+      "text": "数据库",
+      "box_px": [
+        1484,
+        516,
+        49,
+        16
+      ],
+      "font_size": 6.8,
+      "font": "PingFang SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "redis_label_cache",
+      "text": "缓存",
+      "box_px": [
+        1384,
+        581,
+        28,
+        12
+      ],
+      "font_size": 6.4,
+      "font": "PingFang SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "redis_label_name",
+      "text": "Redis",
+      "box_px": [
+        1382,
+        595,
+        34,
+        12
+      ],
+      "font_size": 6.4,
+      "font": "PingFang SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "s3_label_store",
+      "text": "对象存储",
+      "box_px": [
+        1456,
+        581,
+        48,
+        12
+      ],
+      "font_size": 6.4,
+      "font": "PingFang SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "s3_label_name",
+      "text": "S3",
+      "box_px": [
+        1468,
+        595,
+        25,
+        12
+      ],
+      "font_size": 6.4,
+      "font": "PingFang SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "center",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "attachment_filename",
+      "text": "architecture.png",
+      "box_px": [
+        1156,
+        653,
+        180,
+        22
+      ],
+      "font_size": 12.0,
+      "font": "PingFang SC",
+      "color": "#34436B",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "attachment_size",
+      "text": "1.2 MB",
+      "box_px": [
+        1344,
+        654,
+        70,
+        20
+      ],
+      "font_size": 10.2,
+      "font": "PingFang SC",
+      "color": "#34436B",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/Fonts/STHeiti Medium.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "return_attach_text",
+      "text": "自动作为附件返回",
+      "box_px": [
+        1057,
+        743,
+        205,
+        26
+      ],
+      "font_size": 15.5,
+      "font": "HanziPen SC",
+      "color": "#F05A14",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "takeaway_part_1",
+      "text": "图片任务请使用",
+      "box_px": [
+        335,
+        842,
+        290,
+        38
+      ],
+      "font_size": 21.5,
+      "font": "HanziPen SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "takeaway_part_2",
+      "text": "默认 Codex",
+      "box_px": [
+        630,
+        842,
+        220,
+        38
+      ],
+      "font_size": 21.5,
+      "font": "HanziPen SC",
+      "color": "#246F2C",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "takeaway_part_3",
+      "text": "或 !codex，",
+      "box_px": [
+        849,
+        842,
+        205,
+        38
+      ],
+      "font_size": 21.5,
+      "font": "HanziPen SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "takeaway_part_4",
+      "text": "不要用 !claude",
+      "box_px": [
+        1067,
+        842,
+        225,
+        38
+      ],
+      "font_size": 21.5,
+      "font": "HanziPen SC",
+      "color": "#F05A14",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    },
+    {
+      "name": "takeaway_part_5",
+      "text": "覆盖。",
+      "box_px": [
+        1297,
+        842,
+        110,
+        38
+      ],
+      "font_size": 21.5,
+      "font": "HanziPen SC",
+      "color": "#071941",
+      "z_index": 45,
+      "align": "left",
+      "valign": "top",
+      "wrap": "none",
+      "bold": false,
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/9fdda46cbe802833590494a09b2787378340c597.asset/AssetData/Hanzipen.ttc",
+      "preview_font_scale": 1.0
+    }
+  ],
+  "shapes": [
+    {
+      "name": "page_background",
+      "type": "rect",
+      "stroke": "none",
+      "fill": "#FFFDF9",
+      "stroke_width": 0,
+      "z_index": 0,
+      "box_px": [
+        0,
+        0,
+        1672,
+        941
+      ]
+    },
+    {
+      "name": "title_underline_1",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 12,
+      "points_px": [
+        432,
+        151,
+        1225,
+        151
+      ]
+    },
+    {
+      "name": "title_underline_2",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 12,
+      "points_px": [
+        505,
+        164,
+        1180,
+        142
+      ]
+    },
+    {
+      "name": "blue_sparkle_top_left_a",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 12,
+      "points_px": [
+        398,
+        43,
+        405,
+        65
+      ]
+    },
+    {
+      "name": "blue_sparkle_top_left_b",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 12,
+      "points_px": [
+        405,
+        65,
+        420,
+        72
+      ]
+    },
+    {
+      "name": "blue_sparkle_top_left_c",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 12,
+      "points_px": [
+        420,
+        72,
+        405,
+        80
+      ]
+    },
+    {
+      "name": "blue_sparkle_top_left_d",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 12,
+      "points_px": [
+        405,
+        80,
+        394,
+        103
+      ]
+    },
+    {
+      "name": "blue_sparkle_top_left_e",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 12,
+      "points_px": [
+        394,
+        103,
+        386,
+        79
+      ]
+    },
+    {
+      "name": "blue_sparkle_top_left_f",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 12,
+      "points_px": [
+        386,
+        79,
+        372,
+        72
+      ]
+    },
+    {
+      "name": "blue_sparkle_top_left_g",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 12,
+      "points_px": [
+        372,
+        72,
+        388,
+        65
+      ]
+    },
+    {
+      "name": "blue_sparkle_top_left_h",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 12,
+      "points_px": [
+        388,
+        65,
+        398,
+        43
+      ]
+    },
+    {
+      "name": "blue_sparkle_dash_1",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 12,
+      "points_px": [
+        400,
+        104,
+        418,
+        108
+      ]
+    },
+    {
+      "name": "blue_sparkle_dash_2",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 12,
+      "points_px": [
+        398,
+        119,
+        415,
+        123
+      ]
+    },
+    {
+      "name": "green_ray_1",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 4,
+      "z_index": 12,
+      "points_px": [
+        1247,
+        57,
+        1269,
+        30
+      ]
+    },
+    {
+      "name": "green_ray_2",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 4,
+      "z_index": 12,
+      "points_px": [
+        1274,
+        75,
+        1300,
+        60
+      ]
+    },
+    {
+      "name": "green_ray_3",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 4,
+      "z_index": 12,
+      "points_px": [
+        1267,
+        93,
+        1292,
+        107
+      ]
+    },
+    {
+      "name": "prompt_card",
+      "type": "roundRect",
+      "stroke": "#1F67D8",
+      "fill": "#FFFFFF",
+      "stroke_width": 2.5,
+      "z_index": 10,
+      "box_px": [
+        78,
+        244,
+        384,
+        133
+      ],
+      "source_corner_radius_px": 20,
+      "corner_category": "large-radius",
+      "corner_reason": "source object has visible hand-drawn rounded corners"
+    },
+    {
+      "name": "prompt_icon_box",
+      "type": "roundRect",
+      "stroke": "#1F67D8",
+      "fill": "#F8FBFF",
+      "stroke_width": 2.5,
+      "z_index": 11,
+      "box_px": [
+        108,
+        274,
+        61,
+        61
+      ],
+      "source_corner_radius_px": 9,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visible hand-drawn rounded corners"
+    },
+    {
+      "name": "prompt_example_bubble",
+      "type": "roundRect",
+      "stroke": "#1F67D8",
+      "fill": "#F8FBFF",
+      "stroke_width": 2.0,
+      "z_index": 10,
+      "box_px": [
+        174,
+        393,
+        283,
+        52
+      ],
+      "source_corner_radius_px": 13,
+      "corner_category": "large-radius",
+      "corner_reason": "source object has visible hand-drawn rounded corners"
+    },
+    {
+      "name": "prompt_bubble_notch_left",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 2.0,
+      "z_index": 11,
+      "points_px": [
+        381,
+        394,
+        389,
+        377
+      ]
+    },
+    {
+      "name": "prompt_bubble_notch_right",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 2.0,
+      "z_index": 11,
+      "points_px": [
+        389,
+        377,
+        397,
+        394
+      ]
+    },
+    {
+      "name": "upload_card",
+      "type": "roundRect",
+      "stroke": "#2A7030",
+      "fill": "#FFFFFF",
+      "stroke_width": 2.5,
+      "z_index": 10,
+      "box_px": [
+        80,
+        483,
+        383,
+        137
+      ],
+      "source_corner_radius_px": 20,
+      "corner_category": "large-radius",
+      "corner_reason": "source object has visible hand-drawn rounded corners"
+    },
+    {
+      "name": "upload_icon_box",
+      "type": "roundRect",
+      "stroke": "#2A7030",
+      "fill": "#F8FFF7",
+      "stroke_width": 2.5,
+      "z_index": 11,
+      "box_px": [
+        106,
+        512,
+        61,
+        61
+      ],
+      "source_corner_radius_px": 9,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visible hand-drawn rounded corners"
+    },
+    {
+      "name": "upload_icon_sun_a",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 5,
+      "z_index": 13,
+      "points_px": [
+        148,
+        524,
+        148,
+        524
+      ]
+    },
+    {
+      "name": "upload_icon_sun_dot",
+      "type": "ellipse",
+      "stroke": "#2A7030",
+      "fill": "#2A7030",
+      "stroke_width": 1,
+      "z_index": 13,
+      "box_px": [
+        144,
+        520,
+        8,
+        8
+      ]
+    },
+    {
+      "name": "upload_icon_mountain_left",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 4,
+      "z_index": 13,
+      "points_px": [
+        113,
+        562,
+        132,
+        539
+      ]
+    },
+    {
+      "name": "upload_icon_mountain_mid",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 4,
+      "z_index": 13,
+      "points_px": [
+        132,
+        539,
+        147,
+        557
+      ]
+    },
+    {
+      "name": "upload_icon_mountain_right",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 4,
+      "z_index": 13,
+      "points_px": [
+        147,
+        557,
+        159,
+        545
+      ]
+    },
+    {
+      "name": "upload_icon_ground",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 4,
+      "z_index": 13,
+      "points_px": [
+        115,
+        562,
+        158,
+        562
+      ]
+    },
+    {
+      "name": "upload_example_bubble",
+      "type": "roundRect",
+      "stroke": "#2A7030",
+      "fill": "#F8FFF7",
+      "stroke_width": 2.0,
+      "z_index": 10,
+      "box_px": [
+        174,
+        638,
+        284,
+        52
+      ],
+      "source_corner_radius_px": 13,
+      "corner_category": "large-radius",
+      "corner_reason": "source object has visible hand-drawn rounded corners"
+    },
+    {
+      "name": "upload_bubble_notch_left",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 2.0,
+      "z_index": 11,
+      "points_px": [
+        381,
+        638,
+        389,
+        620
+      ]
+    },
+    {
+      "name": "upload_bubble_notch_right",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 2.0,
+      "z_index": 11,
+      "points_px": [
+        389,
+        620,
+        397,
+        638
+      ]
+    },
+    {
+      "name": "direct_generate_pill",
+      "type": "roundRect",
+      "stroke": "#1F67D8",
+      "fill": "#F8FBFF",
+      "stroke_width": 2.0,
+      "z_index": 10,
+      "box_px": [
+        384,
+        727,
+        221,
+        53
+      ],
+      "source_corner_radius_px": 12,
+      "corner_category": "large-radius",
+      "corner_reason": "source object has visible hand-drawn rounded corners"
+    },
+    {
+      "name": "direct_icon_frame",
+      "type": "roundRect",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 2.0,
+      "z_index": 11,
+      "box_px": [
+        414,
+        739,
+        36,
+        29
+      ],
+      "source_corner_radius_px": 5,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visible hand-drawn rounded corners"
+    },
+    {
+      "name": "direct_icon_mount_1",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 2,
+      "z_index": 12,
+      "points_px": [
+        419,
+        762,
+        430,
+        750
+      ]
+    },
+    {
+      "name": "direct_icon_mount_2",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 2,
+      "z_index": 12,
+      "points_px": [
+        430,
+        750,
+        439,
+        759
+      ]
+    },
+    {
+      "name": "direct_icon_mount_3",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 2,
+      "z_index": 12,
+      "points_px": [
+        439,
+        759,
+        447,
+        748
+      ]
+    },
+    {
+      "name": "direct_icon_sun",
+      "type": "ellipse",
+      "stroke": "#1F67D8",
+      "fill": "#1F67D8",
+      "stroke_width": 1,
+      "z_index": 12,
+      "box_px": [
+        440,
+        743,
+        5,
+        5
+      ]
+    },
+    {
+      "name": "upload_edit_pill",
+      "type": "roundRect",
+      "stroke": "#2A7030",
+      "fill": "#F8FFF7",
+      "stroke_width": 2.0,
+      "z_index": 10,
+      "box_px": [
+        673,
+        727,
+        245,
+        53
+      ],
+      "source_corner_radius_px": 12,
+      "corner_category": "large-radius",
+      "corner_reason": "source object has visible hand-drawn rounded corners"
+    },
+    {
+      "name": "edit_pencil_body_1",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 4,
+      "z_index": 12,
+      "points_px": [
+        701,
+        761,
+        725,
+        737
+      ]
+    },
+    {
+      "name": "edit_pencil_body_2",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 4,
+      "z_index": 12,
+      "points_px": [
+        709,
+        769,
+        733,
+        745
+      ]
+    },
+    {
+      "name": "edit_pencil_tip",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 12,
+      "points_px": [
+        726,
+        737,
+        738,
+        733
+      ]
+    },
+    {
+      "name": "edit_pencil_base",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 12,
+      "points_px": [
+        697,
+        766,
+        697,
+        775
+      ]
+    },
+    {
+      "name": "blue_arrow_to_model_shaft",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 4.5,
+      "z_index": 17,
+      "points_px": [
+        477,
+        330,
+        623,
+        330
+      ]
+    },
+    {
+      "name": "blue_arrow_to_model_head_a",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 4.5,
+      "z_index": 17,
+      "points_px": [
+        623,
+        330,
+        603,
+        315.0
+      ]
+    },
+    {
+      "name": "blue_arrow_to_model_head_b",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 4.5,
+      "z_index": 17,
+      "points_px": [
+        623,
+        330,
+        603,
+        345.0
+      ]
+    },
+    {
+      "name": "green_arrow_to_model_shaft",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 4.5,
+      "z_index": 17,
+      "points_px": [
+        477,
+        572,
+        623,
+        572
+      ]
+    },
+    {
+      "name": "green_arrow_to_model_head_a",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 4.5,
+      "z_index": 17,
+      "points_px": [
+        623,
+        572,
+        603,
+        557.0
+      ]
+    },
+    {
+      "name": "green_arrow_to_model_head_b",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 4.5,
+      "z_index": 17,
+      "points_px": [
+        623,
+        572,
+        603,
+        587.0
+      ]
+    },
+    {
+      "name": "green_arrow_to_discord_shaft",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 4.0,
+      "z_index": 17,
+      "points_px": [
+        981,
+        446,
+        1060,
+        462
+      ]
+    },
+    {
+      "name": "green_arrow_to_discord_head_a",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 4.0,
+      "z_index": 17,
+      "points_px": [
+        1060,
+        462,
+        1043,
+        449.25
+      ]
+    },
+    {
+      "name": "green_arrow_to_discord_head_b",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 4.0,
+      "z_index": 17,
+      "points_px": [
+        1060,
+        462,
+        1043,
+        474.75
+      ]
+    },
+    {
+      "name": "model_node_card",
+      "type": "roundRect",
+      "stroke": "#2A7030",
+      "fill": "#FCFFFB",
+      "stroke_width": 2.8,
+      "z_index": 10,
+      "box_px": [
+        657,
+        245,
+        308,
+        436
+      ],
+      "source_corner_radius_px": 20,
+      "corner_category": "large-radius",
+      "corner_reason": "source object has visible hand-drawn rounded corners"
+    },
+    {
+      "name": "cube_top_left",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 13,
+      "points_px": [
+        761,
+        298,
+        809,
+        273
+      ]
+    },
+    {
+      "name": "cube_top_right",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 13,
+      "points_px": [
+        809,
+        273,
+        857,
+        298
+      ]
+    },
+    {
+      "name": "cube_right_top",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 13,
+      "points_px": [
+        857,
+        298,
+        857,
+        350
+      ]
+    },
+    {
+      "name": "cube_right_bottom",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 13,
+      "points_px": [
+        857,
+        350,
+        809,
+        378
+      ]
+    },
+    {
+      "name": "cube_left_bottom",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 13,
+      "points_px": [
+        809,
+        378,
+        760,
+        351
+      ]
+    },
+    {
+      "name": "cube_left_top",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 13,
+      "points_px": [
+        760,
+        351,
+        761,
+        298
+      ]
+    },
+    {
+      "name": "cube_mid_vertical",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 13,
+      "points_px": [
+        809,
+        326,
+        809,
+        378
+      ]
+    },
+    {
+      "name": "cube_mid_left",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 13,
+      "points_px": [
+        809,
+        326,
+        761,
+        298
+      ]
+    },
+    {
+      "name": "cube_mid_right",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 13,
+      "points_px": [
+        809,
+        326,
+        857,
+        298
+      ]
+    },
+    {
+      "name": "model_ray_left_1",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 13,
+      "points_px": [
+        712,
+        311,
+        724,
+        322
+      ]
+    },
+    {
+      "name": "model_ray_left_2",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 13,
+      "points_px": [
+        706,
+        332,
+        721,
+        336
+      ]
+    },
+    {
+      "name": "model_ray_left_3",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 13,
+      "points_px": [
+        712,
+        354,
+        724,
+        346
+      ]
+    },
+    {
+      "name": "model_ray_right_1",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 13,
+      "points_px": [
+        905,
+        311,
+        894,
+        322
+      ]
+    },
+    {
+      "name": "model_ray_right_2",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 13,
+      "points_px": [
+        911,
+        333,
+        896,
+        336
+      ]
+    },
+    {
+      "name": "model_ray_right_3",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 13,
+      "points_px": [
+        906,
+        354,
+        894,
+        346
+      ]
+    },
+    {
+      "name": "codex_underline",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 2,
+      "z_index": 13,
+      "points_px": [
+        763,
+        422,
+        874,
+        419
+      ]
+    },
+    {
+      "name": "model_dash_separator",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 2.0,
+      "z_index": 13,
+      "points_px": [
+        683,
+        507,
+        939,
+        507
+      ],
+      "dash": "dash"
+    },
+    {
+      "name": "model_check_circle_1",
+      "type": "ellipse",
+      "stroke": "#2A7030",
+      "fill": "#FFFFFF",
+      "stroke_width": 2,
+      "z_index": 13,
+      "box_px": [
+        688,
+        529,
+        27,
+        27
+      ]
+    },
+    {
+      "name": "model_check_1_a",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 2.4,
+      "z_index": 14,
+      "points_px": [
+        695,
+        543,
+        700,
+        549
+      ]
+    },
+    {
+      "name": "model_check_1_b",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 2.4,
+      "z_index": 14,
+      "points_px": [
+        700,
+        549,
+        710,
+        537
+      ]
+    },
+    {
+      "name": "model_check_circle_2",
+      "type": "ellipse",
+      "stroke": "#2A7030",
+      "fill": "#FFFFFF",
+      "stroke_width": 2,
+      "z_index": 13,
+      "box_px": [
+        688,
+        574,
+        27,
+        27
+      ]
+    },
+    {
+      "name": "model_check_2_a",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 2.4,
+      "z_index": 14,
+      "points_px": [
+        695,
+        588,
+        700,
+        594
+      ]
+    },
+    {
+      "name": "model_check_2_b",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 2.4,
+      "z_index": 14,
+      "points_px": [
+        700,
+        594,
+        710,
+        582
+      ]
+    },
+    {
+      "name": "model_check_circle_3",
+      "type": "ellipse",
+      "stroke": "#2A7030",
+      "fill": "#FFFFFF",
+      "stroke_width": 2,
+      "z_index": 13,
+      "box_px": [
+        688,
+        620,
+        27,
+        27
+      ]
+    },
+    {
+      "name": "model_check_3_a",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 2.4,
+      "z_index": 14,
+      "points_px": [
+        695,
+        634,
+        700,
+        640
+      ]
+    },
+    {
+      "name": "model_check_3_b",
+      "type": "line",
+      "stroke": "#2A7030",
+      "fill": "none",
+      "stroke_width": 2.4,
+      "z_index": 14,
+      "points_px": [
+        700,
+        640,
+        710,
+        628
+      ]
+    },
+    {
+      "name": "discord_outer_card",
+      "type": "roundRect",
+      "stroke": "#F05A14",
+      "fill": "#FFFFFF",
+      "stroke_width": 2.6,
+      "z_index": 10,
+      "box_px": [
+        1083,
+        243,
+        497,
+        462
+      ],
+      "source_corner_radius_px": 20,
+      "corner_category": "large-radius",
+      "corner_reason": "source object has visible hand-drawn rounded corners"
+    },
+    {
+      "name": "discord_logo_circle",
+      "type": "ellipse",
+      "stroke": "#5865F2",
+      "fill": "#5865F2",
+      "stroke_width": 2,
+      "z_index": 12,
+      "box_px": [
+        1107,
+        259,
+        51,
+        51
+      ]
+    },
+    {
+      "name": "discord_face_left_eye",
+      "type": "ellipse",
+      "stroke": "#FFFFFF",
+      "fill": "#FFFFFF",
+      "stroke_width": 1,
+      "z_index": 13,
+      "box_px": [
+        1123,
+        280,
+        6,
+        8
+      ]
+    },
+    {
+      "name": "discord_face_right_eye",
+      "type": "ellipse",
+      "stroke": "#FFFFFF",
+      "fill": "#FFFFFF",
+      "stroke_width": 1,
+      "z_index": 13,
+      "box_px": [
+        1138,
+        280,
+        6,
+        8
+      ]
+    },
+    {
+      "name": "discord_smile",
+      "type": "line",
+      "stroke": "#FFFFFF",
+      "fill": "none",
+      "stroke_width": 3,
+      "z_index": 13,
+      "points_px": [
+        1123,
+        296,
+        1145,
+        296
+      ]
+    },
+    {
+      "name": "discord_message_card",
+      "type": "roundRect",
+      "stroke": "#F05A14",
+      "fill": "#FFFFFF",
+      "stroke_width": 1.4,
+      "z_index": 10,
+      "box_px": [
+        1097,
+        323,
+        466,
+        330
+      ],
+      "source_corner_radius_px": 13,
+      "corner_category": "large-radius",
+      "corner_reason": "source object has visible hand-drawn rounded corners"
+    },
+    {
+      "name": "codex_avatar",
+      "type": "ellipse",
+      "stroke": "#2A7030",
+      "fill": "#5EA75D",
+      "stroke_width": 1.5,
+      "z_index": 12,
+      "box_px": [
+        1116,
+        340,
+        38,
+        38
+      ]
+    },
+    {
+      "name": "codex_avatar_inner",
+      "type": "ellipse",
+      "stroke": "#FFFFFF",
+      "fill": "none",
+      "stroke_width": 2,
+      "z_index": 13,
+      "box_px": [
+        1125,
+        349,
+        20,
+        20
+      ]
+    },
+    {
+      "name": "codex_avatar_tail",
+      "type": "line",
+      "stroke": "#FFFFFF",
+      "fill": "none",
+      "stroke_width": 2,
+      "z_index": 13,
+      "points_px": [
+        1141,
+        365,
+        1148,
+        370
+      ]
+    },
+    {
+      "name": "bot_badge",
+      "type": "roundRect",
+      "stroke": "#5865F2",
+      "fill": "#5865F2",
+      "stroke_width": 1,
+      "z_index": 12,
+      "box_px": [
+        1232,
+        344,
+        39,
+        19
+      ],
+      "source_corner_radius_px": 4,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visible hand-drawn rounded corners"
+    },
+    {
+      "name": "png_preview_box",
+      "type": "roundRect",
+      "stroke": "#A9B3C3",
+      "fill": "#FAFBFE",
+      "stroke_width": 1.6,
+      "z_index": 11,
+      "box_px": [
+        1170,
+        414,
+        372,
+        207
+      ],
+      "source_corner_radius_px": 8,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visible hand-drawn rounded corners"
+    },
+    {
+      "name": "diagram_user_head",
+      "type": "ellipse",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "box_px": [
+        1193,
+        471,
+        16,
+        16
+      ]
+    },
+    {
+      "name": "diagram_user_body_l",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "points_px": [
+        1192,
+        493,
+        1184,
+        509
+      ]
+    },
+    {
+      "name": "diagram_user_body_r",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "points_px": [
+        1209,
+        493,
+        1217,
+        509
+      ]
+    },
+    {
+      "name": "diagram_user_body_mid",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "points_px": [
+        1192,
+        493,
+        1209,
+        493
+      ]
+    },
+    {
+      "name": "diagram_arrow_1",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "points_px": [
+        1218,
+        488,
+        1247,
+        488
+      ]
+    },
+    {
+      "name": "diagram_arrow_1_h1",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "points_px": [
+        1247,
+        488,
+        1239,
+        482
+      ]
+    },
+    {
+      "name": "diagram_arrow_1_h2",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "points_px": [
+        1247,
+        488,
+        1239,
+        494
+      ]
+    },
+    {
+      "name": "diagram_monitor",
+      "type": "rect",
+      "stroke": "#1F67D8",
+      "fill": "#D8F1FF",
+      "stroke_width": 2,
+      "z_index": 13,
+      "box_px": [
+        1255,
+        471,
+        36,
+        28
+      ]
+    },
+    {
+      "name": "diagram_monitor_stand",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "points_px": [
+        1273,
+        499,
+        1273,
+        509
+      ]
+    },
+    {
+      "name": "diagram_monitor_base",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "points_px": [
+        1264,
+        509,
+        1282,
+        509
+      ]
+    },
+    {
+      "name": "diagram_arrow_2",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "points_px": [
+        1296,
+        488,
+        1326,
+        488
+      ]
+    },
+    {
+      "name": "diagram_arrow_2_h1",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "points_px": [
+        1326,
+        488,
+        1318,
+        482
+      ]
+    },
+    {
+      "name": "diagram_arrow_2_h2",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "points_px": [
+        1326,
+        488,
+        1318,
+        494
+      ]
+    },
+    {
+      "name": "diagram_api_box",
+      "type": "roundRect",
+      "stroke": "#0B2A62",
+      "fill": "#F8FBFF",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "box_px": [
+        1336,
+        471,
+        32,
+        32
+      ],
+      "source_corner_radius_px": 3,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visible hand-drawn rounded corners"
+    },
+    {
+      "name": "diagram_api_d1",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 14,
+      "points_px": [
+        1352,
+        477,
+        1361,
+        488
+      ]
+    },
+    {
+      "name": "diagram_api_d2",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 14,
+      "points_px": [
+        1361,
+        488,
+        1352,
+        499
+      ]
+    },
+    {
+      "name": "diagram_api_d3",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 14,
+      "points_px": [
+        1352,
+        499,
+        1343,
+        488
+      ]
+    },
+    {
+      "name": "diagram_api_d4",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 14,
+      "points_px": [
+        1343,
+        488,
+        1352,
+        477
+      ]
+    },
+    {
+      "name": "diagram_arrow_3",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "points_px": [
+        1374,
+        488,
+        1405,
+        488
+      ]
+    },
+    {
+      "name": "diagram_arrow_3_h1",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "points_px": [
+        1405,
+        488,
+        1397,
+        482
+      ]
+    },
+    {
+      "name": "diagram_arrow_3_h2",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "points_px": [
+        1405,
+        488,
+        1397,
+        494
+      ]
+    },
+    {
+      "name": "diagram_gear_circle",
+      "type": "ellipse",
+      "stroke": "#0B2A62",
+      "fill": "#F8FBFF",
+      "stroke_width": 1.7,
+      "z_index": 13,
+      "box_px": [
+        1414,
+        470,
+        35,
+        35
+      ]
+    },
+    {
+      "name": "diagram_gear_center",
+      "type": "ellipse",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 14,
+      "box_px": [
+        1426,
+        482,
+        11,
+        11
+      ]
+    },
+    {
+      "name": "diagram_gear_spoke_1",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 14,
+      "points_px": [
+        1432,
+        465,
+        1432,
+        472
+      ]
+    },
+    {
+      "name": "diagram_gear_spoke_2",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 14,
+      "points_px": [
+        1432,
+        503,
+        1432,
+        511
+      ]
+    },
+    {
+      "name": "diagram_gear_spoke_3",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 14,
+      "points_px": [
+        1409,
+        488,
+        1416,
+        488
+      ]
+    },
+    {
+      "name": "diagram_gear_spoke_4",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 14,
+      "points_px": [
+        1448,
+        488,
+        1456,
+        488
+      ]
+    },
+    {
+      "name": "diagram_gear_spoke_5",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 14,
+      "points_px": [
+        1416,
+        472,
+        1421,
+        477
+      ]
+    },
+    {
+      "name": "diagram_gear_spoke_6",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 14,
+      "points_px": [
+        1448,
+        472,
+        1443,
+        477
+      ]
+    },
+    {
+      "name": "diagram_gear_spoke_7",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 14,
+      "points_px": [
+        1417,
+        504,
+        1422,
+        499
+      ]
+    },
+    {
+      "name": "diagram_gear_spoke_8",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 14,
+      "points_px": [
+        1447,
+        504,
+        1442,
+        499
+      ]
+    },
+    {
+      "name": "diagram_arrow_4",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "points_px": [
+        1455,
+        488,
+        1484,
+        488
+      ]
+    },
+    {
+      "name": "diagram_arrow_4_h1",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "points_px": [
+        1484,
+        488,
+        1476,
+        482
+      ]
+    },
+    {
+      "name": "diagram_arrow_4_h2",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "points_px": [
+        1484,
+        488,
+        1476,
+        494
+      ]
+    },
+    {
+      "name": "diagram_db_body",
+      "type": "rect",
+      "stroke": "#0B2A62",
+      "fill": "#F8FBFF",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "box_px": [
+        1493,
+        478,
+        29,
+        27
+      ]
+    },
+    {
+      "name": "diagram_db_top",
+      "type": "ellipse",
+      "stroke": "#0B2A62",
+      "fill": "#F8FBFF",
+      "stroke_width": 1.5,
+      "z_index": 14,
+      "box_px": [
+        1493,
+        470,
+        29,
+        14
+      ]
+    },
+    {
+      "name": "diagram_db_bottom",
+      "type": "ellipse",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 14,
+      "box_px": [
+        1493,
+        498,
+        29,
+        14
+      ]
+    },
+    {
+      "name": "diagram_dashed_cache_1",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.2,
+      "z_index": 13,
+      "points_px": [
+        1431,
+        508,
+        1400,
+        556
+      ],
+      "dash": "dash"
+    },
+    {
+      "name": "diagram_dashed_cache_2",
+      "type": "line",
+      "stroke": "#0B2A62",
+      "fill": "none",
+      "stroke_width": 1.2,
+      "z_index": 13,
+      "points_px": [
+        1431,
+        508,
+        1474,
+        556
+      ],
+      "dash": "dash"
+    },
+    {
+      "name": "redis_box",
+      "type": "rect",
+      "stroke": "#0B2A62",
+      "fill": "#F8FBFF",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "box_px": [
+        1374,
+        574,
+        48,
+        36
+      ]
+    },
+    {
+      "name": "s3_box",
+      "type": "rect",
+      "stroke": "#0B2A62",
+      "fill": "#F8FBFF",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "box_px": [
+        1451,
+        574,
+        58,
+        36
+      ]
+    },
+    {
+      "name": "attachment_footer",
+      "type": "roundRect",
+      "stroke": "#F05A14",
+      "fill": "#FFFFFF",
+      "stroke_width": 1.2,
+      "z_index": 10,
+      "box_px": [
+        1097,
+        634,
+        466,
+        50
+      ],
+      "source_corner_radius_px": 9,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visible hand-drawn rounded corners"
+    },
+    {
+      "name": "file_icon_outline",
+      "type": "rect",
+      "stroke": "#536B95",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 13,
+      "box_px": [
+        1119,
+        649,
+        21,
+        27
+      ]
+    },
+    {
+      "name": "file_icon_fold_1",
+      "type": "line",
+      "stroke": "#536B95",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 14,
+      "points_px": [
+        1132,
+        649,
+        1140,
+        657
+      ]
+    },
+    {
+      "name": "file_icon_fold_2",
+      "type": "line",
+      "stroke": "#536B95",
+      "fill": "none",
+      "stroke_width": 1.5,
+      "z_index": 14,
+      "points_px": [
+        1140,
+        657,
+        1132,
+        657
+      ]
+    },
+    {
+      "name": "file_icon_line_1",
+      "type": "line",
+      "stroke": "#536B95",
+      "fill": "none",
+      "stroke_width": 1.2,
+      "z_index": 14,
+      "points_px": [
+        1125,
+        664,
+        1135,
+        664
+      ]
+    },
+    {
+      "name": "download_arrow_shaft",
+      "type": "line",
+      "stroke": "#536B95",
+      "fill": "none",
+      "stroke_width": 2,
+      "z_index": 13,
+      "points_px": [
+        1528,
+        650,
+        1528,
+        673
+      ]
+    },
+    {
+      "name": "download_arrow_left",
+      "type": "line",
+      "stroke": "#536B95",
+      "fill": "none",
+      "stroke_width": 2,
+      "z_index": 13,
+      "points_px": [
+        1528,
+        673,
+        1519,
+        664
+      ]
+    },
+    {
+      "name": "download_arrow_right",
+      "type": "line",
+      "stroke": "#536B95",
+      "fill": "none",
+      "stroke_width": 2,
+      "z_index": 13,
+      "points_px": [
+        1528,
+        673,
+        1537,
+        664
+      ]
+    },
+    {
+      "name": "download_arrow_base",
+      "type": "line",
+      "stroke": "#536B95",
+      "fill": "none",
+      "stroke_width": 2,
+      "z_index": 13,
+      "points_px": [
+        1519,
+        677,
+        1537,
+        677
+      ]
+    },
+    {
+      "name": "return_attach_pill",
+      "type": "roundRect",
+      "stroke": "#F05A14",
+      "fill": "#FFFDF9",
+      "stroke_width": 2.0,
+      "z_index": 10,
+      "box_px": [
+        984,
+        727,
+        315,
+        53
+      ],
+      "source_corner_radius_px": 12,
+      "corner_category": "large-radius",
+      "corner_reason": "source object has visible hand-drawn rounded corners"
+    },
+    {
+      "name": "paperclip_loop_outer_1",
+      "type": "line",
+      "stroke": "#F05A14",
+      "fill": "none",
+      "stroke_width": 4,
+      "z_index": 12,
+      "points_px": [
+        1016,
+        762,
+        1043,
+        735
+      ]
+    },
+    {
+      "name": "paperclip_loop_outer_2",
+      "type": "line",
+      "stroke": "#F05A14",
+      "fill": "none",
+      "stroke_width": 4,
+      "z_index": 12,
+      "points_px": [
+        1009,
+        755,
+        1036,
+        728
+      ]
+    },
+    {
+      "name": "paperclip_loop_inner_1",
+      "type": "line",
+      "stroke": "#F05A14",
+      "fill": "none",
+      "stroke_width": 2,
+      "z_index": 13,
+      "points_px": [
+        1024,
+        762,
+        1046,
+        740
+      ]
+    },
+    {
+      "name": "takeaway_box",
+      "type": "roundRect",
+      "stroke": "#7BB2FF",
+      "fill": "#FFFFFF",
+      "stroke_width": 2.0,
+      "z_index": 10,
+      "box_px": [
+        214,
+        809,
+        1238,
+        97
+      ],
+      "dash": "dash",
+      "source_corner_radius_px": 10,
+      "corner_category": "small-radius",
+      "corner_reason": "source object has visible hand-drawn rounded corners"
+    },
+    {
+      "name": "bulb_glass",
+      "type": "ellipse",
+      "stroke": "#1F67D8",
+      "fill": "#F8FBFF",
+      "stroke_width": 2.2,
+      "z_index": 12,
+      "box_px": [
+        257,
+        833,
+        38,
+        38
+      ]
+    },
+    {
+      "name": "bulb_base",
+      "type": "rect",
+      "stroke": "#1F67D8",
+      "fill": "#F8FBFF",
+      "stroke_width": 2.0,
+      "z_index": 12,
+      "box_px": [
+        268,
+        871,
+        17,
+        16
+      ]
+    },
+    {
+      "name": "bulb_base_line_1",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 2,
+      "z_index": 13,
+      "points_px": [
+        266,
+        879,
+        287,
+        879
+      ]
+    },
+    {
+      "name": "bulb_base_line_2",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 2,
+      "z_index": 13,
+      "points_px": [
+        270,
+        887,
+        284,
+        887
+      ]
+    },
+    {
+      "name": "bulb_ray_top",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 2,
+      "z_index": 13,
+      "points_px": [
+        276,
+        821,
+        276,
+        808
+      ]
+    },
+    {
+      "name": "bulb_ray_left",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 2,
+      "z_index": 13,
+      "points_px": [
+        250,
+        831,
+        239,
+        824
+      ]
+    },
+    {
+      "name": "bulb_ray_right",
+      "type": "line",
+      "stroke": "#1F67D8",
+      "fill": "none",
+      "stroke_width": 2,
+      "z_index": 13,
+      "points_px": [
+        303,
+        831,
+        314,
+        824
+      ]
+    }
+  ],
+  "images": [],
+  "asset_provenance": [],
+  "known_limits": [
+    "Hand-drawn line wobble and Discord/architecture micro-icon detail are approximated with editable native primitives rather than exact bitmap-style strokes.",
+    "The Discord logo, cube, paperclip, and PNG architecture preview are simplified native shapes to keep the page object-level editable."
+  ],
+  "qa_note": "All readable labels are native text; visual structure is reconstructed with editable native shapes and no full-slide source raster."
+}

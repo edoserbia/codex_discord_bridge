@@ -1,0 +1,16 @@
+{
+  "pptx": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/final/codex-discord-bridge-user-guide_edited.pptx",
+  "deck_manifest": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/deck_manifest.json",
+  "expected_pages": 8,
+  "slides": 8,
+  "page_manifests_missing": [],
+  "page_validation_missing": [],
+  "failed_page_validations": [],
+  "page_contract_violations": [],
+  "notes_expected": 8,
+  "notes_found": 8,
+  "notes_hash_mismatches": [],
+  "missing_parts": [],
+  "warnings": [],
+  "passed": true
+}

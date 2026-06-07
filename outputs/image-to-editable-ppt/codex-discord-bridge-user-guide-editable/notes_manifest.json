@@ -1,0 +1,69 @@
+{
+  "source": "input/codex-discord-bridge-user-guide.pptx",
+  "notes": [
+    {
+      "page_index": 1,
+      "text": "这份 PPT 介绍 Codex Discord Bridge 的基本使用方式。核心思路很简单：你在 Discord 发需求，Bridge 把它映射到本机项目和 Codex 会话，Codex 完成后再把结果发回 Discord。\n---\n注意点：强调这是“Discord 作为入口，本机 Codex 作为执行端”。",
+      "text_sha256": "b57a202c8838375e2d40edecb04c8a798e22ece93d8c03263cb47a4223924168",
+      "source_slide": "ppt/slides/slide1.xml",
+      "source_notes_part": "ppt/notesSlides/notesSlide1.xml",
+      "notes_xml": "input/notes/page_001/notesSlide.xml"
+    },
+    {
+      "page_index": 2,
+      "text": "开始使用前，需要用 `!bind` 把 Discord 频道和本机项目目录绑定起来。现在默认示例使用 Codex 引擎，必要时可以指定沙箱、审批和联网搜索配置。\n---\n注意点：提醒用户默认用 Codex，不再默认 Claude。",
+      "text_sha256": "440bf234613cab00d757378a5f607bf31498a5435377e41459f76b9529ad0fae",
+      "source_slide": "ppt/slides/slide2.xml",
+      "source_notes_part": "ppt/notesSlides/notesSlide2.xml",
+      "notes_xml": "input/notes/page_002/notesSlide.xml"
+    },
+    {
+      "page_index": 3,
+      "text": "绑定后，频道里的普通消息就会变成 Codex 任务。同一个频道会复用线程，因此 Codex 能延续上下文；如果临时需要切换引擎，可以用 `!codex` 或 `!claude`。\n---\n注意点：解释“频道等于一个长期工作会话”。",
+      "text_sha256": "b41cfba6f2170e1e4faa6e90a5686c64b86710e6f0fc9e6523a78c2456adb521",
+      "source_slide": "ppt/slides/slide3.xml",
+      "source_notes_part": "ppt/notesSlides/notesSlide3.xml",
+      "notes_xml": "input/notes/page_003/notesSlide.xml"
+    },
+    {
+      "page_index": 4,
+      "text": "如果在 Discord 上传附件，Bridge 会把文件同步到工作区的 inbox。图片、文档和代码文件都可以作为任务输入，Codex 可以基于这些文件继续处理。\n---\n注意点：适合演示“上传截图后让 Codex 修 UI”。",
+      "text_sha256": "79f45da340b0ff6907b23a657ece4ebaca1400b70b00301a99dd3a59d0e13533",
+      "source_slide": "ppt/slides/slide4.xml",
+      "source_notes_part": "ppt/notesSlides/notesSlide4.xml",
+      "notes_xml": "input/notes/page_004/notesSlide.xml"
+    },
+    {
+      "page_index": 5,
+      "text": "Codex 完成后，Bridge 会把最终总结发回 Discord。长回复会自动拆分；如果 Codex 输出 `BRIDGE_SEND_FILE` 结构化块，Bridge 会上传指定文件。\n---\n注意点：这是解决“生成文件如何回到 Discord”的关键机制。",
+      "text_sha256": "4b3e0fcf55e62215aff894d6855c46461e243b05425a89656e82781a8d8b70b0",
+      "source_slide": "ppt/slides/slide5.xml",
+      "source_notes_part": "ppt/notesSlides/notesSlide5.xml",
+      "notes_xml": "input/notes/page_005/notesSlide.xml"
+    },
+    {
+      "page_index": 6,
+      "text": "现在 Bridge 已支持 Codex 原生图片输出。你可以直接要求 GPT Image 2 生图，也可以上传图片要求编辑，生成或编辑后的 PNG 会自动作为 Discord 附件返回。\n---\n注意点：提醒不要用 `!claude` 覆盖这类请求。",
+      "text_sha256": "8a30f51d2298a5daac0a5f4fe2b3f27ebf653f2a0af0c7fe16cc689f8f41c507",
+      "source_slide": "ppt/slides/slide6.xml",
+      "source_notes_part": "ppt/notesSlides/notesSlide6.xml",
+      "notes_xml": "input/notes/page_006/notesSlide.xml"
+    },
+    {
+      "page_index": 7,
+      "text": "本机服务通过 LaunchAgent 运行，支持登录后启动、断线恢复和进程退出后重启。出现问题时，可以看日志和 Web 面板确认状态。\n---\n注意点：强调当前服务名是 codex-discord-bridge，不是 cc-bridge。",
+      "text_sha256": "c480088f4a4f1014f53edd354622876f56b6ed75b8e45db5594b5f976c0ccec7",
+      "source_slide": "ppt/slides/slide7.xml",
+      "source_notes_part": "ppt/notesSlides/notesSlide7.xml",
+      "notes_xml": "input/notes/page_007/notesSlide.xml"
+    },
+    {
+      "page_index": 8,
+      "text": "推荐的日常流程是：先绑定项目，再发任务，看进度，最后收结果。复杂任务最好拆成阶段，涉及文件时明确文件名和用途。\n---\n注意点：最后落到可执行习惯，帮助用户稳定使用。",
+      "text_sha256": "16600bf427ba2b9008fff888510cc83453d8615be9f0a2cc0a839275eda3605e",
+      "source_slide": "ppt/slides/slide8.xml",
+      "source_notes_part": "ppt/notesSlides/notesSlide8.xml",
+      "notes_xml": "input/notes/page_008/notesSlide.xml"
+    }
+  ]
+}

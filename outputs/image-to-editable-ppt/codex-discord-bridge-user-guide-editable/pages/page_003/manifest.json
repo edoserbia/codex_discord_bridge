@@ -1,0 +1,3023 @@
+{
+  "schema_version": 1,
+  "page_id": "page_003",
+  "slide": {
+    "width": 13.333,
+    "height": 7.5,
+    "background": "#fffdf8"
+  },
+  "source": {
+    "path": "source.png",
+    "width_px": 1672,
+    "height_px": 941
+  },
+  "preview_scale": 120,
+  "preview_font_scale": 1.0,
+  "page_strategy": "object-level editable rebuild with native PowerPoint text and primitive shapes; no full-slide raster fallback",
+  "text_inventory": [
+    "日常提问与会话续接",
+    "Discord 频道 # api-项目",
+    "Bridge 队列",
+    "Codex Thread (同一个线程)",
+    "C",
+    "用户 A",
+    "10:15",
+    "请帮我实现用户登录接口。",
+    ".....",
+    "10:18",
+    "登录后需要返回用户信息，",
+    "并生成 JWT。",
+    "10:25",
+    "再帮我写一个登录接口的",
+    "单元测试。",
+    "状态：待处理",
+    "Thread: api-项目",
+    "处理：实现用户登录接口",
+    "结果：",
+    "已完成",
+    "处理：返回用户信息并生成 JWT",
+    "处理：编写登录接口单元测试",
+    "上下文持续累积，线程保持不变",
+    "普通消息 = 任务",
+    "同频道复用线程",
+    "!codex / !claude  单次覆盖",
+    "频道像一个长期工作会话， Codex 能接住上下文。",
+    "1",
+    "2",
+    "3",
+    "✓",
+    "↻",
+    ">_"
+  ],
+  "visual_inventory": [
+    {
+      "id": "paper_background",
+      "type": "background",
+      "decision": "native solid off-white background",
+      "box_px": [
+        0,
+        0,
+        1672,
+        941
+      ]
+    },
+    {
+      "id": "title_underlines_and_decorations",
+      "type": "decorative lines",
+      "decision": "native line shapes approximate hand-drawn marks"
+    },
+    {
+      "id": "discord_logo",
+      "type": "symbol",
+      "decision": "native simplified circle/face shapes"
+    },
+    {
+      "id": "discord_message_cards",
+      "type": "structure",
+      "decision": "native rounded rectangles with avatar shapes"
+    },
+    {
+      "id": "blue_flow_arrows",
+      "type": "connector",
+      "decision": "native line arrows with V heads"
+    },
+    {
+      "id": "bridge_icon",
+      "type": "symbol",
+      "decision": "native line approximation"
+    },
+    {
+      "id": "bridge_queue_panel",
+      "type": "structure",
+      "decision": "native rounded panel, queue cards and dashed connectors"
+    },
+    {
+      "id": "green_flow_arrow",
+      "type": "connector",
+      "decision": "native line arrow with V head"
+    },
+    {
+      "id": "codex_cube_icon",
+      "type": "symbol",
+      "decision": "native line cube approximation"
+    },
+    {
+      "id": "thread_notebook_panel",
+      "type": "structure",
+      "decision": "native rounded panel, coils, row separators and check circles"
+    },
+    {
+      "id": "legend_pills",
+      "type": "structure",
+      "decision": "native rounded rectangles and simplified line icons"
+    },
+    {
+      "id": "bottom_callout",
+      "type": "structure",
+      "decision": "native dashed rounded rectangle and lightbulb lines"
+    }
+  ],
+  "background_strategy": {
+    "mode": "native-or-script",
+    "source_consistency_contract": "Use an off-white paper-like solid background and rebuild all foreground text, cards, arrows, labels, thread coils, and icons as editable native objects.",
+    "removed_foreground": "None removed from a clean base; all source foreground objects are independently reconstructed.",
+    "comparison_note": "The source page has a simple paper background without required bitmap identity, so a native solid background is acceptable and avoids baked text overlap."
+  },
+  "quality_checks": {
+    "font_size_calibrated": true,
+    "visual_inventory_matched": true,
+    "background_strategy_checked": true,
+    "shape_corner_geometry_checked": true
+  },
+  "text_boxes": [
+    {
+      "box_px": [
+        440,
+        48,
+        790,
+        92
+      ],
+      "text": "日常提问与会话续接",
+      "font_size": 43,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#001f5b",
+      "z_index": 50,
+      "bold": true,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.96
+    },
+    {
+      "box_px": [
+        166,
+        211,
+        310,
+        40
+      ],
+      "font_size": 18,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#1f72dd",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "runs": [
+        {
+          "text": "Discord 频道 # ",
+          "color": "#1f72dd",
+          "font_size": 18,
+          "font": "Hannotate SC"
+        },
+        {
+          "text": "api-项目",
+          "color": "#111827",
+          "font_size": 15,
+          "font": "Hannotate SC"
+        }
+      ],
+      "preview_font_scale": 0.88
+    },
+    {
+      "box_px": [
+        176,
+        295,
+        70,
+        29
+      ],
+      "text": "用户 A",
+      "font_size": 14,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        254,
+        299,
+        66,
+        24
+      ],
+      "text": "10:15",
+      "font_size": 13,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#5f6468",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        176,
+        329,
+        275,
+        33
+      ],
+      "text": "请帮我实现用户登录接口。",
+      "font_size": 15,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        184,
+        369,
+        80,
+        25
+      ],
+      "text": ".....",
+      "font_size": 14,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        176,
+        438,
+        70,
+        29
+      ],
+      "text": "用户 A",
+      "font_size": 14,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        254,
+        443,
+        66,
+        24
+      ],
+      "text": "10:18",
+      "font_size": 13,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#5f6468",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        176,
+        475,
+        300,
+        32
+      ],
+      "text": "登录后需要返回用户信息，",
+      "font_size": 15,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        176,
+        512,
+        150,
+        32
+      ],
+      "text": "并生成 JWT。",
+      "font_size": 15,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        184,
+        547,
+        80,
+        25
+      ],
+      "text": ".....",
+      "font_size": 14,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        176,
+        599,
+        70,
+        29
+      ],
+      "text": "用户 A",
+      "font_size": 14,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        254,
+        604,
+        66,
+        24
+      ],
+      "text": "10:25",
+      "font_size": 13,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#5f6468",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        176,
+        636,
+        275,
+        32
+      ],
+      "text": "再帮我写一个登录接口的",
+      "font_size": 15,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        176,
+        673,
+        140,
+        32
+      ],
+      "text": "单元测试。",
+      "font_size": 15,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        184,
+        704,
+        80,
+        25
+      ],
+      "text": ".....",
+      "font_size": 14,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        755,
+        216,
+        160,
+        35
+      ],
+      "text": "Bridge 队列",
+      "font_size": 18,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#2d743b",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.88
+    },
+    {
+      "box_px": [
+        638,
+        329,
+        43,
+        22
+      ],
+      "text": "1",
+      "font_size": 13,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#ffffff",
+      "z_index": 55,
+      "bold": true,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.8
+    },
+    {
+      "box_px": [
+        638,
+        441,
+        18,
+        22
+      ],
+      "text": "2",
+      "font_size": 13,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#ffffff",
+      "z_index": 55,
+      "bold": true,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.8
+    },
+    {
+      "box_px": [
+        638,
+        576,
+        18,
+        22
+      ],
+      "text": "3",
+      "font_size": 13,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#ffffff",
+      "z_index": 55,
+      "bold": true,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.8
+    },
+    {
+      "box_px": [
+        671,
+        330,
+        58,
+        25
+      ],
+      "text": "10:15",
+      "font_size": 13,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        742,
+        330,
+        238,
+        28
+      ],
+      "text": "请帮我实现用户登录接口。",
+      "font_size": 15,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        742,
+        365,
+        150,
+        27
+      ],
+      "text": "状态：待处理",
+      "font_size": 13.8,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        671,
+        441,
+        58,
+        25
+      ],
+      "text": "10:18",
+      "font_size": 13,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        742,
+        441,
+        236,
+        28
+      ],
+      "text": "登录后需要返回用户信息，",
+      "font_size": 15,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        742,
+        473,
+        145,
+        28
+      ],
+      "text": "并生成 JWT。",
+      "font_size": 15,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        742,
+        506,
+        150,
+        27
+      ],
+      "text": "状态：待处理",
+      "font_size": 13.8,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        671,
+        580,
+        58,
+        25
+      ],
+      "text": "10:25",
+      "font_size": 13,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        742,
+        579,
+        238,
+        28
+      ],
+      "text": "再帮我写一个登录接口的",
+      "font_size": 15,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        742,
+        612,
+        125,
+        27
+      ],
+      "text": "单元测试。",
+      "font_size": 14,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        742,
+        645,
+        150,
+        27
+      ],
+      "text": "状态：待处理",
+      "font_size": 13.8,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        1158,
+        225,
+        28,
+        32
+      ],
+      "text": "C",
+      "font_size": 21,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#f36a18",
+      "z_index": 50,
+      "bold": true,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.88
+    },
+    {
+      "box_px": [
+        1208,
+        218,
+        310,
+        36
+      ],
+      "text": "Codex Thread (同一个线程)",
+      "font_size": 18,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#f36a18",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.88
+    },
+    {
+      "box_px": [
+        1137,
+        322,
+        250,
+        31
+      ],
+      "text": "Thread: api-项目",
+      "font_size": 16,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        1144,
+        388,
+        17,
+        22
+      ],
+      "text": "1",
+      "font_size": 13,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#ffffff",
+      "z_index": 55,
+      "bold": true,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.8
+    },
+    {
+      "box_px": [
+        1144,
+        492,
+        17,
+        22
+      ],
+      "text": "2",
+      "font_size": 13,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#ffffff",
+      "z_index": 55,
+      "bold": true,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.8
+    },
+    {
+      "box_px": [
+        1144,
+        595,
+        17,
+        22
+      ],
+      "text": "3",
+      "font_size": 13,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#ffffff",
+      "z_index": 55,
+      "bold": true,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.8
+    },
+    {
+      "box_px": [
+        1183,
+        389,
+        61,
+        24
+      ],
+      "text": "10:15",
+      "font_size": 13,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        1250,
+        388,
+        280,
+        28
+      ],
+      "text": "处理：实现用户登录接口",
+      "font_size": 13.5,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        1183,
+        423,
+        70,
+        26
+      ],
+      "text": "结果：",
+      "font_size": 14,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        1262,
+        414,
+        24,
+        27
+      ],
+      "text": "✓",
+      "font_size": 18,
+      "font": "Arial Unicode MS",
+      "preview_font": "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+      "color": "#2e9b44",
+      "z_index": 55,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.75
+    },
+    {
+      "box_px": [
+        1296,
+        423,
+        90,
+        26
+      ],
+      "text": "已完成",
+      "font_size": 14,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        1183,
+        493,
+        61,
+        24
+      ],
+      "text": "10:18",
+      "font_size": 13,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        1250,
+        492,
+        330,
+        28
+      ],
+      "text": "处理：返回用户信息并生成 JWT",
+      "font_size": 13.5,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        1183,
+        527,
+        70,
+        26
+      ],
+      "text": "结果：",
+      "font_size": 14,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        1262,
+        518,
+        24,
+        27
+      ],
+      "text": "✓",
+      "font_size": 18,
+      "font": "Arial Unicode MS",
+      "preview_font": "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+      "color": "#2e9b44",
+      "z_index": 55,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.75
+    },
+    {
+      "box_px": [
+        1296,
+        527,
+        90,
+        26
+      ],
+      "text": "已完成",
+      "font_size": 14,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        1183,
+        596,
+        61,
+        24
+      ],
+      "text": "10:25",
+      "font_size": 13,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        1250,
+        595,
+        300,
+        28
+      ],
+      "text": "处理：编写登录接口单元测试",
+      "font_size": 13.5,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        1183,
+        630,
+        70,
+        26
+      ],
+      "text": "结果：",
+      "font_size": 14,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        1262,
+        621,
+        24,
+        27
+      ],
+      "text": "✓",
+      "font_size": 18,
+      "font": "Arial Unicode MS",
+      "preview_font": "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+      "color": "#2e9b44",
+      "z_index": 55,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.75
+    },
+    {
+      "box_px": [
+        1296,
+        630,
+        90,
+        26
+      ],
+      "text": "已完成",
+      "font_size": 14,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        1136,
+        676,
+        380,
+        32
+      ],
+      "text": "上下文持续累积，线程保持不变",
+      "font_size": 15,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.82
+    },
+    {
+      "box_px": [
+        400,
+        753,
+        180,
+        31
+      ],
+      "text": "普通消息 = 任务",
+      "font_size": 16,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#1f72dd",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.86
+    },
+    {
+      "box_px": [
+        673,
+        746,
+        40,
+        40
+      ],
+      "text": "↻",
+      "font_size": 24,
+      "font": "Arial Unicode MS",
+      "preview_font": "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+      "color": "#2d743b",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.88
+    },
+    {
+      "box_px": [
+        719,
+        754,
+        170,
+        31
+      ],
+      "text": "同频道复用线程",
+      "font_size": 16,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#2d743b",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.86
+    },
+    {
+      "box_px": [
+        969,
+        749,
+        30,
+        28
+      ],
+      "text": ">_",
+      "font_size": 14,
+      "font": "Arial Unicode MS",
+      "preview_font": "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+      "color": "#f36a18",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.88
+    },
+    {
+      "box_px": [
+        1014,
+        754,
+        295,
+        32
+      ],
+      "text": "!codex / !claude  单次覆盖",
+      "font_size": 16,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#f36a18",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "preview_font_scale": 0.86
+    },
+    {
+      "box_px": [
+        374,
+        846,
+        770,
+        52
+      ],
+      "font_size": 24,
+      "font": "Hannotate SC",
+      "preview_font": "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/8dc7805506cc9f233dcc19aabf593196842a47ae.asset/AssetData/Hannotate.ttc",
+      "color": "#111827",
+      "z_index": 50,
+      "bold": false,
+      "align": "left",
+      "wrap": "none",
+      "autofit": "none",
+      "runs": [
+        {
+          "text": "频道像一个",
+          "color": "#111827",
+          "font_size": 24,
+          "font": "Hannotate SC"
+        },
+        {
+          "text": "长期工作会话",
+          "color": "#1f72dd",
+          "font_size": 24,
+          "font": "Hannotate SC"
+        },
+        {
+          "text": "， Codex 能接住",
+          "color": "#111827",
+          "font_size": 24,
+          "font": "Hannotate SC"
+        },
+        {
+          "text": "上下文",
+          "color": "#1f72dd",
+          "font_size": 24,
+          "font": "Hannotate SC"
+        },
+        {
+          "text": "。",
+          "color": "#111827",
+          "font_size": 24,
+          "font": "Hannotate SC"
+        }
+      ],
+      "preview_font_scale": 0.9
+    }
+  ],
+  "shapes": [
+    {
+      "type": "line",
+      "points_px": [
+        424,
+        166,
+        1288,
+        154
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        486,
+        171,
+        1212,
+        162
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 2,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        386,
+        52,
+        394,
+        76
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        394,
+        76,
+        416,
+        86
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        394,
+        76,
+        383,
+        99
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        394,
+        76,
+        371,
+        68
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        388,
+        111,
+        402,
+        116
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        392,
+        128,
+        403,
+        134
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1311,
+        44,
+        1328,
+        18
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 4,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1330,
+        83,
+        1352,
+        91
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1327,
+        101,
+        1347,
+        112
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        86,
+        194,
+        62,
+        62
+      ],
+      "fill": "#5d72f2",
+      "stroke": "#4967e8",
+      "stroke_width": 2,
+      "z_index": 20
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        104,
+        217,
+        10,
+        10
+      ],
+      "fill": "#ffffff",
+      "stroke": "#ffffff",
+      "stroke_width": 1,
+      "z_index": 25
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        125,
+        217,
+        10,
+        10
+      ],
+      "fill": "#ffffff",
+      "stroke": "#ffffff",
+      "stroke_width": 1,
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        108,
+        239,
+        132,
+        239
+      ],
+      "stroke": "#ffffff",
+      "stroke_width": 4,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        86,
+        272,
+        376,
+        127
+      ],
+      "fill": "#ffffff",
+      "stroke": "#1f72dd",
+      "stroke_width": 2.2,
+      "source_corner_radius_px": 18,
+      "corner_category": "small-radius",
+      "corner_reason": "message cards have medium rounded corners",
+      "z_index": 10
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        86,
+        418,
+        376,
+        145
+      ],
+      "fill": "#ffffff",
+      "stroke": "#1f72dd",
+      "stroke_width": 2.2,
+      "source_corner_radius_px": 18,
+      "corner_category": "small-radius",
+      "corner_reason": "message cards have medium rounded corners",
+      "z_index": 10
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        86,
+        579,
+        376,
+        135
+      ],
+      "fill": "#ffffff",
+      "stroke": "#1f72dd",
+      "stroke_width": 2.2,
+      "source_corner_radius_px": 18,
+      "corner_category": "small-radius",
+      "corner_reason": "message cards have medium rounded corners",
+      "z_index": 10
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        106,
+        292,
+        49,
+        49
+      ],
+      "fill": "#dceeff",
+      "stroke": "#1f72dd",
+      "stroke_width": 2.5,
+      "z_index": 20
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        121,
+        300,
+        17,
+        17
+      ],
+      "fill": "#ffffff",
+      "stroke": "#1f72dd",
+      "stroke_width": 2,
+      "z_index": 25
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        114,
+        319,
+        31,
+        18
+      ],
+      "fill": "#ffffff",
+      "stroke": "#1f72dd",
+      "stroke_width": 2,
+      "z_index": 25
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        106,
+        435,
+        49,
+        49
+      ],
+      "fill": "#dceeff",
+      "stroke": "#1f72dd",
+      "stroke_width": 2.5,
+      "z_index": 20
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        121,
+        443,
+        17,
+        17
+      ],
+      "fill": "#ffffff",
+      "stroke": "#1f72dd",
+      "stroke_width": 2,
+      "z_index": 25
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        114,
+        462,
+        31,
+        18
+      ],
+      "fill": "#ffffff",
+      "stroke": "#1f72dd",
+      "stroke_width": 2,
+      "z_index": 25
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        106,
+        595,
+        49,
+        49
+      ],
+      "fill": "#dceeff",
+      "stroke": "#1f72dd",
+      "stroke_width": 2.5,
+      "z_index": 20
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        121,
+        603,
+        17,
+        17
+      ],
+      "fill": "#ffffff",
+      "stroke": "#1f72dd",
+      "stroke_width": 2,
+      "z_index": 25
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        114,
+        622,
+        31,
+        18
+      ],
+      "fill": "#ffffff",
+      "stroke": "#1f72dd",
+      "stroke_width": 2,
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        478,
+        344,
+        572,
+        344
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 4.5,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        548,
+        329.12,
+        572,
+        344
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 4.5,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        548,
+        358.88,
+        572,
+        344
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 4.5,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        478,
+        481,
+        572,
+        481
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 4.5,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        548,
+        466.12,
+        572,
+        481
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 4.5,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        548,
+        495.88,
+        572,
+        481
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 4.5,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        478,
+        632,
+        572,
+        632
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 4.5,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        548,
+        617.12,
+        572,
+        632
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 4.5,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        548,
+        646.88,
+        572,
+        632
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 4.5,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        613,
+        247,
+        737,
+        247
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        621,
+        232,
+        729,
+        232
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        635,
+        195,
+        635,
+        260
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        647,
+        195,
+        647,
+        260
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        700,
+        195,
+        700,
+        260
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        712,
+        195,
+        712,
+        260
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        604,
+        235,
+        640,
+        196
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        640,
+        196,
+        676,
+        235
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        676,
+        235,
+        706,
+        196
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        706,
+        196,
+        740,
+        235
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        594,
+        272,
+        415,
+        438
+      ],
+      "fill": "#f4f8ef",
+      "stroke": "#2d743b",
+      "stroke_width": 2.2,
+      "source_corner_radius_px": 28,
+      "corner_category": "large-radius",
+      "corner_reason": "main queue panel has large rounded corners",
+      "z_index": 8
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        614,
+        310,
+        374,
+        90
+      ],
+      "fill": "#fbfff8",
+      "stroke": "#90ba78",
+      "stroke_width": 1.8,
+      "source_corner_radius_px": 16,
+      "corner_category": "small-radius",
+      "corner_reason": "inner queue items have soft rounded corners",
+      "z_index": 12
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        614,
+        435,
+        374,
+        98
+      ],
+      "fill": "#fbfff8",
+      "stroke": "#90ba78",
+      "stroke_width": 1.8,
+      "source_corner_radius_px": 16,
+      "corner_category": "small-radius",
+      "corner_reason": "inner queue items have soft rounded corners",
+      "z_index": 12
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        614,
+        562,
+        374,
+        105
+      ],
+      "fill": "#fbfff8",
+      "stroke": "#90ba78",
+      "stroke_width": 1.8,
+      "source_corner_radius_px": 16,
+      "corner_category": "small-radius",
+      "corner_reason": "inner queue items have soft rounded corners",
+      "z_index": 12
+    },
+    {
+      "type": "line",
+      "points_px": [
+        793,
+        400,
+        793,
+        435
+      ],
+      "stroke": "#7faf75",
+      "stroke_width": 2,
+      "fill": "none",
+      "z_index": 14,
+      "dash": "dash"
+    },
+    {
+      "type": "line",
+      "points_px": [
+        793,
+        533,
+        793,
+        562
+      ],
+      "stroke": "#7faf75",
+      "stroke_width": 2,
+      "fill": "none",
+      "z_index": 14,
+      "dash": "dash"
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        630,
+        326,
+        29,
+        29
+      ],
+      "fill": "#4c8f44",
+      "stroke": "#438744",
+      "stroke_width": 1.5,
+      "z_index": 30
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        630,
+        438,
+        29,
+        29
+      ],
+      "fill": "#4c8f44",
+      "stroke": "#438744",
+      "stroke_width": 1.5,
+      "z_index": 30
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        630,
+        573,
+        29,
+        29
+      ],
+      "fill": "#4c8f44",
+      "stroke": "#438744",
+      "stroke_width": 1.5,
+      "z_index": 30
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1026,
+        470,
+        1093,
+        470
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 4,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1070,
+        455.74,
+        1093,
+        470
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 4,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1070,
+        484.26,
+        1093,
+        470
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 4,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1118,
+        210,
+        1151,
+        191
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.5,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1151,
+        191,
+        1183,
+        209
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.5,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1118,
+        210,
+        1151,
+        229
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.5,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1183,
+        209,
+        1151,
+        229
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.5,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1118,
+        210,
+        1118,
+        248
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.5,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1151,
+        229,
+        1151,
+        267
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.5,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1183,
+        209,
+        1183,
+        248
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.5,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1118,
+        248,
+        1151,
+        267
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.5,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1183,
+        248,
+        1151,
+        267
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.5,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        1106,
+        296,
+        486,
+        415
+      ],
+      "fill": "#fffefa",
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "source_corner_radius_px": 32,
+      "corner_category": "large-radius",
+      "corner_reason": "thread panel has large rounded notebook corners",
+      "z_index": 8
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1131,
+        283,
+        1568,
+        283
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.4,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1134,
+        270,
+        14,
+        27
+      ],
+      "fill": "none",
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1141,
+        283,
+        1141,
+        298
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1177,
+        270,
+        14,
+        27
+      ],
+      "fill": "none",
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1184,
+        283,
+        1184,
+        298
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1218,
+        270,
+        14,
+        27
+      ],
+      "fill": "none",
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1225,
+        283,
+        1225,
+        298
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1259,
+        270,
+        14,
+        27
+      ],
+      "fill": "none",
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1266,
+        283,
+        1266,
+        298
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1298,
+        270,
+        14,
+        27
+      ],
+      "fill": "none",
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1305,
+        283,
+        1305,
+        298
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1339,
+        270,
+        14,
+        27
+      ],
+      "fill": "none",
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1346,
+        283,
+        1346,
+        298
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1378,
+        270,
+        14,
+        27
+      ],
+      "fill": "none",
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1385,
+        283,
+        1385,
+        298
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1418,
+        270,
+        14,
+        27
+      ],
+      "fill": "none",
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1425,
+        283,
+        1425,
+        298
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1458,
+        270,
+        14,
+        27
+      ],
+      "fill": "none",
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1465,
+        283,
+        1465,
+        298
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1498,
+        270,
+        14,
+        27
+      ],
+      "fill": "none",
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1505,
+        283,
+        1505,
+        298
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1538,
+        270,
+        14,
+        27
+      ],
+      "fill": "none",
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1545,
+        283,
+        1545,
+        298
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 2.2,
+      "fill": "none",
+      "z_index": 25
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1137,
+        363,
+        1565,
+        363
+      ],
+      "stroke": "#8e8178",
+      "stroke_width": 2,
+      "fill": "none",
+      "z_index": 20,
+      "dash": "dash"
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1136,
+        385,
+        30,
+        30
+      ],
+      "fill": "#f36a18",
+      "stroke": "#f36a18",
+      "stroke_width": 1.5,
+      "z_index": 30
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1136,
+        489,
+        30,
+        30
+      ],
+      "fill": "#f36a18",
+      "stroke": "#f36a18",
+      "stroke_width": 1.5,
+      "z_index": 30
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1136,
+        592,
+        30,
+        30
+      ],
+      "fill": "#f36a18",
+      "stroke": "#f36a18",
+      "stroke_width": 1.5,
+      "z_index": 30
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1150,
+        425,
+        1150,
+        468
+      ],
+      "stroke": "#d0b197",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1139,
+        455,
+        1150,
+        469
+      ],
+      "stroke": "#d0b197",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1161,
+        455,
+        1150,
+        469
+      ],
+      "stroke": "#d0b197",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1150,
+        529,
+        1150,
+        572
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1139,
+        559,
+        1150,
+        573
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1161,
+        559,
+        1150,
+        573
+      ],
+      "stroke": "#f36a18",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1174,
+        471,
+        1563,
+        471
+      ],
+      "stroke": "#f5a062",
+      "stroke_width": 1.5,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1174,
+        574,
+        1563,
+        574
+      ],
+      "stroke": "#f5a062",
+      "stroke_width": 1.5,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1256,
+        419,
+        27,
+        27
+      ],
+      "fill": "none",
+      "stroke": "#2e9b44",
+      "stroke_width": 2.2,
+      "z_index": 35
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1256,
+        523,
+        27,
+        27
+      ],
+      "fill": "none",
+      "stroke": "#2e9b44",
+      "stroke_width": 2.2,
+      "z_index": 35
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        1256,
+        626,
+        27,
+        27
+      ],
+      "fill": "none",
+      "stroke": "#2e9b44",
+      "stroke_width": 2.2,
+      "z_index": 35
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        326,
+        736,
+        297,
+        58
+      ],
+      "fill": "#f7fbff",
+      "stroke": "#1f72dd",
+      "stroke_width": 1.8,
+      "source_corner_radius_px": 16,
+      "corner_category": "small-radius",
+      "corner_reason": "legend pill uses rounded corners",
+      "z_index": 10
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        348,
+        751,
+        36,
+        28
+      ],
+      "fill": "none",
+      "stroke": "#1f72dd",
+      "stroke_width": 2,
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        363,
+        778,
+        356,
+        788
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 2,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        358,
+        762,
+        3,
+        3
+      ],
+      "fill": "#1f72dd",
+      "stroke": "#1f72dd",
+      "stroke_width": 1,
+      "z_index": 22
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        366,
+        762,
+        3,
+        3
+      ],
+      "fill": "#1f72dd",
+      "stroke": "#1f72dd",
+      "stroke_width": 1,
+      "z_index": 22
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        374,
+        762,
+        3,
+        3
+      ],
+      "fill": "#1f72dd",
+      "stroke": "#1f72dd",
+      "stroke_width": 1,
+      "z_index": 22
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        655,
+        736,
+        258,
+        58
+      ],
+      "fill": "#f8fff6",
+      "stroke": "#2d743b",
+      "stroke_width": 1.8,
+      "source_corner_radius_px": 16,
+      "corner_category": "small-radius",
+      "corner_reason": "legend pill uses rounded corners",
+      "z_index": 10
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        945,
+        736,
+        398,
+        58
+      ],
+      "fill": "#fffdf8",
+      "stroke": "#f36a18",
+      "stroke_width": 1.8,
+      "source_corner_radius_px": 16,
+      "corner_category": "small-radius",
+      "corner_reason": "legend pill uses rounded corners",
+      "z_index": 10
+    },
+    {
+      "type": "rect",
+      "box_px": [
+        964,
+        752,
+        33,
+        26
+      ],
+      "fill": "none",
+      "stroke": "#f36a18",
+      "stroke_width": 2,
+      "z_index": 20
+    },
+    {
+      "type": "roundRect",
+      "box_px": [
+        260,
+        815,
+        1136,
+        101
+      ],
+      "fill": "none",
+      "stroke": "#9cc4f5",
+      "stroke_width": 2.2,
+      "source_corner_radius_px": 18,
+      "corner_category": "small-radius",
+      "corner_reason": "source bottom callout has small rounded dashed border",
+      "z_index": 10,
+      "dash": "dash"
+    },
+    {
+      "type": "ellipse",
+      "box_px": [
+        305,
+        844,
+        39,
+        39
+      ],
+      "fill": "none",
+      "stroke": "#1f72dd",
+      "stroke_width": 2.4,
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        317,
+        884,
+        335,
+        884
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 2.4,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        318,
+        891,
+        334,
+        891
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 2.4,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        323,
+        897,
+        330,
+        897
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 2.4,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        323,
+        833,
+        323,
+        819
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 2.3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        343,
+        842,
+        354,
+        833
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 2.3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        303,
+        842,
+        291,
+        833
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 2.3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        348,
+        863,
+        362,
+        866
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 2.3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        299,
+        864,
+        285,
+        867
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 2.3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1144,
+        891,
+        1278,
+        882
+      ],
+      "stroke": "#1f72dd",
+      "stroke_width": 2.5,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1322,
+        834,
+        1316,
+        858
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1341,
+        845,
+        1354,
+        836
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    },
+    {
+      "type": "line",
+      "points_px": [
+        1335,
+        862,
+        1354,
+        868
+      ],
+      "stroke": "#2d743b",
+      "stroke_width": 3,
+      "fill": "none",
+      "z_index": 20
+    }
+  ],
+  "images": [],
+  "asset_provenance": [],
+  "known_limits": [
+    "Hand-drawn texture, exact Discord/Codex icon artwork, and notebook coil irregularities are simplified as editable native shapes."
+  ]
+}

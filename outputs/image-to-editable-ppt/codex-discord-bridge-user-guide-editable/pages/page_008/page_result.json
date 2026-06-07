@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "codex-discord-bridge-user-guide-editable",
+  "page_id": "page_008",
+  "status": "completed",
+  "manifest": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_008/manifest.json",
+  "imagegen_jobs": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_008/imagegen-jobs.json",
+  "page_pptx": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_008/page.pptx",
+  "preview": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_008/preview.png",
+  "contact_sheet": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_008/split_assets_contact.png",
+  "validation": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_008/validation.json",
+  "validation_passed": true,
+  "qa_note": "Deterministic validation passes; native text and primitive shapes recreate the four-step workflow, best-practice list, and summary card without full-slide raster.",
+  "known_limits": [
+    "Hand-drawn jitter and detailed pictograms are simplified as native editable shapes."
+  ],
+  "output_hashes": {
+    "manifest": "6f7b1ce8cef2dcdb307c6d108d635880852b2ac76eb2f13e22e414412ece67af",
+    "imagegen_jobs": "2ab81152e8ae0325d8dc358e41002fca7d70dfb2a01b244c4592988b5a695167",
+    "page_pptx": "903cb7a9c6811e059e627e677427fa0164d9bd1d485f605267aac54a7073c43b",
+    "preview": "1b63f39c9c529acad45d4bfafddf9ba362efed88eac878a31ef51b0c511133e7",
+    "contact_sheet": "64234a4e6bc845f5311c68307db9da1387d0c8bfb82a0568e93492244e8fdd47",
+    "validation": "f4fb7390bd7f28cb762824aa06da637a5850e79a52305762f62de3e833add518"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "codex-discord-bridge-user-guide-editable",
+  "page_id": "page_002",
+  "status": "completed",
+  "manifest": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_002/manifest.json",
+  "imagegen_jobs": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_002/imagegen-jobs.json",
+  "page_pptx": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_002/page.pptx",
+  "preview": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_002/preview.png",
+  "contact_sheet": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_002/split_assets_contact.png",
+  "validation": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_002/validation.json",
+  "qa_note": "Validation passed; source/preview contact sheet inspected, with all readable Chinese labels and command snippets rebuilt as native editable text and workflow objects as native shapes.",
+  "known_limits": [
+    "Hand-drawn wobble, hatching and logo/avatar details are approximated with native PowerPoint primitives rather than exact bitmap artwork.",
+    "The folder tab silhouette is simplified into editable rounded rectangles and straight icon primitives."
+  ],
+  "validation_summary": {
+    "passed": true,
+    "slides": 1,
+    "editable_text_shapes": 25,
+    "shape_count": 107,
+    "images": 0,
+    "warnings": [],
+    "page_contract_violations": []
+  },
+  "output_hashes": {
+    "manifest": "73969edf642c595bab0f0866a9580b7907824b8e41aea57039eba2fe2a5587d1",
+    "imagegen_jobs": "4d1cd55702fb381cb83d64c03835a01473a417b5080415a8fd9e3efe98188a22",
+    "page_pptx": "dd988d3833feaac685d64c1c56c25b9c0708e16f464f66297897f6999812135e",
+    "preview": "91211fb6b0aca93f9cc581a0256096a939932ba2d03f335da7be40a0299186fa",
+    "contact_sheet": "a4f17ac2227780df7b8923389466f7bfef5e88de6d692b73d09ab49498fcd5c5",
+    "validation": "377febe7b2f7bb56f947547252856ef9f8274e6c53ce8081af7687485586b218"
+  },
+  "page_result": "/Users/mac/work/su/codex_discord_bridge/outputs/image-to-editable-ppt/codex-discord-bridge-user-guide-editable/pages/page_002/page_result.json"
+}
