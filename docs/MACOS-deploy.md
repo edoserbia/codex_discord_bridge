@@ -61,7 +61,7 @@
 
 1. 打开 [Discord Developer Portal](https://discord.com/developers/applications)
 2. 点击 `New Application`
-3. 为应用起名，例如 `CC Bridge`
+3. 为应用起名，例如 `Codex Discord Bridge`
 4. 左侧进入 `Bot`
 5. 点击 `Add Bot`
 6. 在 `Token` 区域点击 `Reset Token` 或 `Copy`
@@ -195,7 +195,7 @@ CODEX_DISCORD_BRIDGE_CA_CERT=/path/to/proxy-ca.pem
 进入项目目录后执行：
 
 ```bash
-cd /path/to/cc-bridge
+cd /path/to/codex-discord-bridge
 ./scripts/macos-bridge.sh deploy
 ```
 
@@ -613,11 +613,11 @@ sudo ./scripts/install-service.sh --mode daemon
 
 默认情况下：
 
-- 项目配置：`/path/to/cc-bridge/.env`
+- 项目配置：`/path/to/codex-discord-bridge/.env`
 - Discord 密钥：`~/.codex-tunning/secrets.env`
-- 运行日志：`/path/to/cc-bridge/logs/cc-bridge.log`
-- PID 文件：`/path/to/cc-bridge/.run/cc-bridge.pid`
-- 运行状态：`/path/to/cc-bridge/data/state.json`
+- 运行日志：`/path/to/codex-discord-bridge/logs/codex-discord-bridge.log`
+- PID 文件：`/path/to/codex-discord-bridge/.run/codex-discord-bridge.pid`
+- 运行状态：`/path/to/codex-discord-bridge/data/state.json`
 - Web 面板：`http://127.0.0.1:3769`
 - LaunchAgent：`~/Library/LaunchAgents/<label>.plist`
 - LaunchDaemon：`/Library/LaunchDaemons/<label>.plist`
@@ -957,7 +957,7 @@ bridgectl session resume <Resume ID>
 
 ### 3. 我只看到了最终结果，看不到过程
 
-现在机器人会实时更新一条“CC Bridge 实时进度”消息。
+现在机器人会实时更新一条“Codex Discord Bridge 实时进度”消息。
 
 如果你能看到进度消息，但里面一直只有很旧的内容、看不到最新草稿或最新计划，也应先升级到最新构建；当前版本已经把长消息截断策略调整为“最新状态优先”。
 

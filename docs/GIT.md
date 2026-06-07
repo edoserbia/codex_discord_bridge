@@ -91,7 +91,7 @@ git remote set-url origin git@<git-host>:<owner-or-namespace>/<repo>.git
 
 ```bash
 git add .
-git commit -m "初始化：建立 CC Bridge 项目"
+git commit -m "初始化：建立 Codex Discord Bridge 项目"
 git push -u origin main
 ```
 

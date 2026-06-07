@@ -30,7 +30,7 @@
 ## 1. 进入项目目录
 
 ```bash
-cd /path/to/cc-bridge
+cd /path/to/codex-discord-bridge
 ```
 
 ## 2. 一键部署
@@ -118,7 +118,7 @@ sudo ./scripts/install-service.sh --mode daemon
 
 你将看到：
 
-- 一条持续更新的“CC Bridge 实时进度”消息
+- 一条持续更新的“Codex Discord Bridge 实时进度”消息
 - 一条最终结果消息
 - 如果服务刚刚重启而上一个任务未完成，bridge 会优先自动恢复它，并在进度消息里标明这是恢复执行
 

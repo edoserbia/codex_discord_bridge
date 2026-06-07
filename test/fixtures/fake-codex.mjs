@@ -122,6 +122,7 @@ const scenario = (() => {
   if (prompt.includes('[plan-status]')) return 'plan-status';
   if (prompt.includes('[subagent]')) return 'subagent';
   if (prompt.includes('[attachments]')) return 'attachments';
+  if (prompt.includes('[bridge-send-file-long]')) return 'bridge-send-file-long';
   if (prompt.includes('[bridge-send-file]')) return 'bridge-send-file';
   if (prompt.includes('AUTOPILOT_REPORT')) return 'autopilot';
   return 'simple';
@@ -762,6 +763,21 @@ const finalText = scenario === 'attachments'
         }, null, 2),
         '```',
       ].join('\n')
+      : scenario === 'bridge-send-file-long'
+        ? [
+          'LONG_FINAL_REPLY_MARKER：已生成 report.pdf，并准备通过 bridge 发回当前线程。',
+          ...Array.from({ length: 90 }, (_, index) => (
+            `LONG_FINAL_REPLY_SEGMENT_${String(index + 1).padStart(3, '0')}：这是一段较长的最终总结内容，用来模拟 Codex 在完成项目后返回超过 Discord 单条消息限制的报告。`
+          )),
+          '',
+          'BRIDGE_SEND_FILE',
+          '```json',
+          JSON.stringify({
+            request: 'report.pdf',
+            caption: '已按要求发送 report.pdf。',
+          }, null, 2),
+          '```',
+        ].join('\n')
     : scenario === 'autopilot'
       ? [
         'Autopilot finished one low-risk task and validation passed.',

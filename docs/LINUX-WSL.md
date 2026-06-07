@@ -81,8 +81,8 @@ claude --version
 ## 四、拉代码并安装依赖
 
 ```bash
-git clone https://<git-host>/<owner-or-namespace>/cc-bridge.git
-cd cc-bridge
+git clone https://<git-host>/<owner-or-namespace>/codex-discord-bridge.git
+cd codex-discord-bridge
 npm ci
 cp .env.example .env
 ```

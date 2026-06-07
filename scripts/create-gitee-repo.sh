@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_NAME="${1:-cc-bridge}"
-DESCRIPTION="${DESCRIPTION:-CC Bridge for Codex and Claude with attachments, thread sessions, and web admin panel}"
+REPO_NAME="${1:-codex-discord-bridge}"
+DESCRIPTION="${DESCRIPTION:-Codex Discord Bridge for Codex and Claude with attachments, thread sessions, and web admin panel}"
 PRIVATE_FLAG="${PRIVATE:-true}"
 OWNER="${GITEE_OWNER:-}"
 TOKEN="${GITEE_TOKEN:-}"

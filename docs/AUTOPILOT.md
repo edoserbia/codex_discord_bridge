@@ -1,6 +1,6 @@
 # Autopilot
 
-这份文档专门说明 `cc-bridge` 里的 Autopilot 自动迭代能力，包括：
+这份文档专门说明 `codex-discord-bridge` 里的 Autopilot 自动迭代能力，包括：
 
 - 用户如何使用
 - 本机 CLI 如何控制

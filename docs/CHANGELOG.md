@@ -16,7 +16,7 @@
 ### Changed
 
 - README、`docs/QUICKSTART.md`、`docs/DEPLOYMENT.md`、`docs/MACOS-deploy.md` 已统一到当前实际行为：文件收发、代理自动探测、LaunchAgent 原子重启、任务恢复、Web 链接和管理员判定都已补齐。
-- 项目名称和用户界面从 Codex Discord Bridge 调整为 CC Bridge；`bridgectl` 保留为兼容 CLI 名称。
+- 项目名称和用户界面从 Codex Discord Bridge 调整为 Codex Discord Bridge；`bridgectl` 保留为兼容 CLI 名称。
 - Git 文档默认口径改为自建 GitLab；新增 `docs/GIT.md`，旧 `docs/GITEE.md` 改为兼容提示入口。
 - `bridgectl` 的文档安装方式已统一更新为当前行为：`setup` / `deploy` / `install-service` 自动安装到 PATH，不再要求手动 `npm link`。
 - 本机 `session resume` 的终端交互文档已补齐，包括多行粘贴整段发送、`/status` 和 `/exit` 的使用方式。

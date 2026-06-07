@@ -148,7 +148,7 @@ test('formatProgressMessage adds a clear process divider', () => {
   );
 
   assert.match(text, /-{8,} 过程进度 -{8,}/);
-  assert.match(text, /🛰️ \*\*CC Bridge 实时进度\*\*/);
+  assert.match(text, /🛰️ \*\*Codex Discord Bridge 实时进度\*\*/);
 });
 
 test('formatProgressMessage keeps the newest live draft visible when content is long', () => {

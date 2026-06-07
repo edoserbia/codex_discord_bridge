@@ -8,9 +8,9 @@ ENV_FILE="${ROOT_DIR}/.env"
 ENV_EXAMPLE_FILE="${ROOT_DIR}/.env.example"
 RUN_DIR="${ROOT_DIR}/.run"
 LOG_DIR="${ROOT_DIR}/logs"
-PID_FILE="${RUN_DIR}/cc-bridge.pid"
+PID_FILE="${RUN_DIR}/codex-discord-bridge.pid"
 LEGACY_PID_FILE="${RUN_DIR}/codex-discord-bridge.pid"
-LOG_FILE="${LOG_DIR}/cc-bridge.log"
+LOG_FILE="${LOG_DIR}/codex-discord-bridge.log"
 LEGACY_LOG_FILE="${LOG_DIR}/codex-discord-bridge.log"
 OPENCLAW_CONFIG_PATH="${OPENCLAW_CONFIG_PATH:-${HOME}/.openclaw/openclaw.json}"
 DEFAULT_ALLOWED_ROOTS="$HOME/work,$HOME/projects"
@@ -28,7 +28,7 @@ DEFAULT_DISCORD_PROBE_TIMEOUT_SECONDS='5'
 ENV_CREATED_THIS_RUN=0
 SERVICE_ARG_MODE=''
 SERVICE_ARG_ASSUME_YES=0
-SERVICE_LABEL_BASENAME="$(basename "${ROOT_REALPATH}" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-')"
+SERVICE_LABEL_BASENAME="$(printf '%s' "${CODEX_DISCORD_BRIDGE_SERVICE_NAME:-codex-discord-bridge}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//')"
 SERVICE_LABEL_HASH="$(printf '%s' "${ROOT_REALPATH}" | shasum -a 256 | awk '{print substr($1, 1, 10)}')"
 SERVICE_LABEL="com.codex-tunning.${SERVICE_LABEL_BASENAME:-bridge}.${SERVICE_LABEL_HASH}"
 
@@ -52,7 +52,7 @@ print_error() {
 
 usage() {
   cat <<USAGE
-CC Bridge macOS 管理脚本
+Codex Discord Bridge macOS 管理脚本
 
 用法：
   ./scripts/macos-bridge.sh doctor
@@ -249,16 +249,16 @@ append_block_if_missing() {
 persist_shell_path_entry() {
   local file_path="$1" install_dir="$2" path_literal='' marker='' block=''
   path_literal="$(shell_path_literal_for_dir "${install_dir}")"
-  marker='# >>> cc-bridge bridgectl >>>'
+  marker='# >>> codex-discord-bridge bridgectl >>>'
   printf -v block '%s\n' \
-    '# >>> cc-bridge bridgectl >>>' \
+    '# >>> codex-discord-bridge bridgectl >>>' \
     "if [ -d \"${path_literal}\" ]; then" \
     '  case ":$PATH:" in' \
     "    *\":${path_literal}:\"*) ;;" \
     "    *) export PATH=\"${path_literal}:\$PATH\" ;;" \
     '  esac' \
     'fi' \
-    '# <<< cc-bridge bridgectl <<<'
+    '# <<< codex-discord-bridge bridgectl <<<'
   append_block_if_missing "${file_path}" "${marker}" "${block}"
 }
 
@@ -1322,7 +1322,7 @@ ${programArgumentsXml}
   <key>KeepAlive</key>
   <true/>
   <key>ThrottleInterval</key>
-  <integer>3</integer>
+  <integer>10</integer>
   <key>ProcessType</key>
   <string>Background</string>
   <key>StandardOutPath</key>
@@ -1641,9 +1641,25 @@ run_service_run() {
 
   print_header '前台运行服务'
   cd "${ROOT_DIR}"
-  echo "$$" > "${PID_FILE}"
-  print_info "服务已进入前台运行，PID=$$"
-  exec node dist/index.js
+
+  local child_pid=''
+  local exit_code=0
+  trap 'if [[ -n "${child_pid:-}" ]]; then kill "${child_pid}" >/dev/null 2>&1 || true; fi; rm -f "${PID_FILE}" >/dev/null 2>&1 || true; exit 0' TERM INT
+
+  while true; do
+    echo "$$" > "${PID_FILE}"
+    print_info "服务已进入前台运行，PID=$$"
+    node dist/index.js &
+    child_pid=$!
+    set +e
+    wait "${child_pid}"
+    exit_code=$?
+    set -e
+    child_pid=''
+    rm -f "${PID_FILE}" >/dev/null 2>&1 || true
+    print_warn "服务进程已退出，exit=${exit_code}；10 秒后自动重连/重启。"
+    sleep 10
+  done
 }
 
 run_start_manual() {

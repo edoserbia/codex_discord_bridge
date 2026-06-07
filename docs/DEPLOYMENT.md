@@ -12,18 +12,18 @@
 假设项目位于：
 
 ```text
-/path/to/cc-bridge
+/path/to/codex-discord-bridge
 ```
 
 默认会涉及这些位置：
 
-- 项目环境变量：`/path/to/cc-bridge/.env`
+- 项目环境变量：`/path/to/codex-discord-bridge/.env`
 - Discord 密钥文件：`~/.codex-tunning/secrets.env`
-- 运行日志：`/path/to/cc-bridge/logs/cc-bridge.log`
-- PID 文件：`/path/to/cc-bridge/.run/cc-bridge.pid`
-- 状态文件：`/path/to/cc-bridge/data/state.json`
-- Transcript 日志：`/path/to/cc-bridge/data/transcripts/*.jsonl`
-- 上传附件缓存：`/path/to/cc-bridge/data/attachments/`
+- 运行日志：`/path/to/codex-discord-bridge/logs/codex-discord-bridge.log`
+- PID 文件：`/path/to/codex-discord-bridge/.run/codex-discord-bridge.pid`
+- 状态文件：`/path/to/codex-discord-bridge/data/state.json`
+- Transcript 日志：`/path/to/codex-discord-bridge/data/transcripts/*.jsonl`
+- 上传附件缓存：`/path/to/codex-discord-bridge/data/attachments/`
 - Web 面板：`http://127.0.0.1:3769`
 - LaunchAgent plist：`~/Library/LaunchAgents/<label>.plist`
 - LaunchDaemon plist：`/Library/LaunchDaemons/<label>.plist`
@@ -33,7 +33,7 @@
 ## 首次部署
 
 ```bash
-cd /path/to/cc-bridge
+cd /path/to/codex-discord-bridge
 ./scripts/macos-bridge.sh deploy
 ```
 

@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### 变更概览
-- 项目更名为 **CC Bridge**，用于表达 Codex + Claude 双引擎定位；npm 包名同步改为 `cc-bridge`，`bridgectl` 作为兼容 CLI 名称继续保留。
+- 项目更名为 **Codex Discord Bridge**，用于表达 Codex + Claude 双引擎定位；npm 包名同步改为 `codex-discord-bridge`，`bridgectl` 作为兼容 CLI 名称继续保留。
 - 新增 Claude CLI 引擎：支持 `!bind ... --engine claude`、`!claude <请求>`、`!codex <请求>`，并在 Codex / Claude 之间切换时保留各自原生 session 与共享 transcript 上下文。
 - 新增 `docs/ENGINES.md`，集中说明双引擎使用方法、上下文连续性、本机 resume 边界和 Autopilot 继承规则。
 - 补充 README 与 `docs/` 文档，统一说明当前 bridge 的文件收发、`!web`、管理员判定、`--skip-git-check`、`app-server` / `legacy-exec` 切换、任务自动恢复，以及 GitLab 远端使用方式。

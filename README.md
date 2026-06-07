@@ -1,4 +1,4 @@
-# CC Bridge
+# Codex Discord Bridge
 
 把本机 `codex` / `claude` CLI 接到 Discord 文本频道、线程和本机终端上，让你可以在手机、桌面端和 Terminal 之间驱动 Codex 或 Claude，同时保留实时进度、任务队列、文件收发、Autopilot 自动迭代和 Web 管理面板。
 
@@ -17,7 +17,7 @@
 - 遇到复杂任务时，随时从 Discord 切回本机 Terminal 接着同一个会话继续
 - 让自动巡检、补测试、低风险修复这类工作按周期自己跑
 
-`cc-bridge` 就是把这些能力合到同一个控制面里。
+`codex-discord-bridge` 就是把这些能力合到同一个控制面里。
 
 ## 功能概览
 
@@ -137,14 +137,14 @@ Bridge 会使用 Claude CLI 的 stream-json 输出，并为 Claude 单独保存 
 如果你在 macOS：
 
 ```bash
-cd /path/to/cc-bridge
+cd /path/to/codex-discord-bridge
 ./scripts/macos-bridge.sh deploy
 ```
 
 如果你在 Linux / WSL，推荐按这条路线走：
 
 ```bash
-cd /path/to/cc-bridge
+cd /path/to/codex-discord-bridge
 npm ci
 cp .env.example .env
 npm run check
@@ -241,7 +241,7 @@ http://127.0.0.1:3769/?token=<YOUR_WEB_AUTH_TOKEN>
 
 绑定完成后，该主频道中的普通消息会直接发给绑定默认引擎。你会同时看到：
 
-- 一条持续更新的“CC Bridge 实时进度”消息
+- 一条持续更新的“Codex Discord Bridge 实时进度”消息
 - 一条本轮最终结果回复
 
 如果最终结果回复在发送到 Discord 时碰到短暂网络抖动或连接中断，bridge 会先把这条回复加入待补发队列，恢复后自动重试，避免频道里只剩过程消息而丢掉总结性回复。

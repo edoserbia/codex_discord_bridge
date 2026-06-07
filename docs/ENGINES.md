@@ -1,6 +1,6 @@
 # Engine Usage
 
-CC Bridge supports two local execution engines:
+Codex Discord Bridge supports two local execution engines:
 
 - Codex CLI, selected as `codex`
 - Claude CLI, selected as `claude`
@@ -49,13 +49,13 @@ This does not change the channel binding. The next plain message returns to the 
 
 ## Context Continuity
 
-Codex and Claude do not share one native session. CC Bridge preserves continuity with three pieces of state:
+Codex and Claude do not share one native session. Codex Discord Bridge preserves continuity with three pieces of state:
 
 - the Codex thread id
 - the Claude session id
 - the shared Discord transcript
 
-When a conversation switches engines, CC Bridge injects a compact recent transcript into the new engine prompt. For example, after `codex -> claude -> codex`, the final Codex run resumes the original Codex thread and receives recent Claude-side transcript context.
+When a conversation switches engines, Codex Discord Bridge injects a compact recent transcript into the new engine prompt. For example, after `codex -> claude -> codex`, the final Codex run resumes the original Codex thread and receives recent Claude-side transcript context.
 
 `!reset` clears both native engine session ids for the current Discord channel or thread.
 

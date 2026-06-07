@@ -1522,6 +1522,26 @@ export class DiscordCodexBridge {
     return chunks.length > 0 ? chunks : [EMPTY_DISCORD_MESSAGE_FALLBACK];
   }
 
+  private normalizeDiscordSendPayloads(content: SendPayload): SendPayload[] {
+    if (typeof content === 'string') {
+      return this.normalizeDiscordTextChunks(content);
+    }
+
+    if (typeof content.content !== 'string' || content.content.trim().length === 0) {
+      return [content];
+    }
+
+    const chunks = this.normalizeDiscordTextChunks(content.content);
+    const firstChunk = chunks[0] ?? EMPTY_DISCORD_MESSAGE_FALLBACK;
+    const remainingChunks = chunks.slice(1);
+    const firstPayload: Exclude<SendPayload, string> = {
+      ...content,
+      content: firstChunk,
+    };
+
+    return [firstPayload, ...remainingChunks];
+  }
+
   private async safeMessageReply(message: Message, content: string): Promise<void> {
     await this.replyWithRetry(message, content).catch((error) => {
       this.logBridgeError(`reply message=${message.id}`, error);
@@ -4681,34 +4701,23 @@ export class DiscordCodexBridge {
     const originalMessage = isDiscordSnowflake(messageId)
       ? await this.fetchChannelMessageWithRetry(channel, messageId)
       : null;
-
-    if (typeof content !== 'string') {
-      if (originalMessage) {
-        await this.replyWithRetry(originalMessage, content);
-        return;
-      }
-
-      await this.sendWithRetry(channel, content);
-      return;
-    }
-
-    const chunks = this.normalizeDiscordTextChunks(content);
+    const payloads = this.normalizeDiscordSendPayloads(content);
 
     if (!originalMessage) {
-      for (const chunk of chunks) {
-        await this.sendWithRetry(channel, chunk);
+      for (const payload of payloads) {
+        await this.sendWithRetry(channel, payload);
       }
       return;
     }
 
-    const [firstChunk, ...remainingChunks] = chunks;
+    const [firstPayload, ...remainingPayloads] = payloads;
 
-    if (firstChunk) {
-      await this.replyWithRetry(originalMessage, firstChunk);
+    if (firstPayload) {
+      await this.replyWithRetry(originalMessage, firstPayload);
     }
 
-    for (const chunk of remainingChunks) {
-      await this.sendWithRetry(channel, chunk);
+    for (const payload of remainingPayloads) {
+      await this.sendWithRetry(channel, payload);
     }
   }
 

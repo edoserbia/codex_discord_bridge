@@ -245,7 +245,7 @@ function formatNamedCollabAgentState(state: CollabToolCall['agentsStates'][strin
 
 export function formatHelp(prefix: string): string {
   return [
-    '🤖 **CC Bridge 帮助**',
+    '🤖 **Codex Discord Bridge 帮助**',
     '',
     `- 绑定频道：\`${prefix}bind <项目名> <目录> [--engine codex|claude] [--sandbox ...] [--approval ...] [--search on|off]\``,
     `- 单次使用 Claude：\`${prefix}claude <请求内容>\``,
@@ -485,7 +485,7 @@ export function formatStatus(
       ];
   const lines = [
     ...resumeLines,
-    '🤖 **CC Bridge 状态面板**',
+    '🤖 **Codex Discord Bridge 状态面板**',
     `项目：**${binding.projectName}**`,
     `目录：\`${binding.workspacePath}\``,
     `默认引擎：${defaultEngine}`,
@@ -567,7 +567,7 @@ export function formatProgressMessage(
 
   const lines = [
     formatSectionDivider('过程进度', '-'),
-    '🛰️ **CC Bridge 实时进度**',
+    '🛰️ **Codex Discord Bridge 实时进度**',
     `项目：**${truncate(binding.projectName, 80)}**`,
     `引擎：${activeRun.engine ?? activeRun.task.engine ?? binding.engine ?? 'codex'}`,
     `请求人：${truncate(activeRun.task.requestedBy, 80)}`,
@@ -963,7 +963,7 @@ export function formatDashboardHtml(data: DashboardBinding[]): string {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CC Bridge</title>
+  <title>Codex Discord Bridge</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 24px; background: #0b1020; color: #eef2ff; }
     h1 { margin-bottom: 8px; }
@@ -978,7 +978,7 @@ export function formatDashboardHtml(data: DashboardBinding[]): string {
   </style>
 </head>
 <body>
-  <h1>CC Bridge 面板</h1>
+  <h1>Codex Discord Bridge 面板</h1>
   <p class="muted">创建/查看 Discord 频道到项目目录的映射，并查看当前会话运行状态。</p>
   <form id="bind-form">
     <input name="channelId" placeholder="Discord 频道 ID" required />

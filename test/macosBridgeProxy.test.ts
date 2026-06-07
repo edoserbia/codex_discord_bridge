@@ -11,6 +11,21 @@ import { cleanupDir, makeTempDir, startStaticServer } from './helpers/testUtils.
 const execFileAsync = promisify(execFile);
 const scriptPath = path.resolve('scripts/macos-bridge.sh');
 
+test('macos bridge script keeps this host on the codex discord bridge service identity', async () => {
+  const output = await runBash(
+    `source "${scriptPath}"
+printf 'label=%s\n' "$SERVICE_LABEL"
+printf 'pid=%s\n' "$PID_FILE"
+printf 'log=%s\n' "$LOG_FILE"`,
+    {},
+  );
+
+  assert.match(output, /^label=com\.codex-tunning\.codex-discord-bridge\.[a-f0-9]{10}$/m);
+  assert.match(output, /\/\.run\/codex-discord-bridge\.pid$/m);
+  assert.match(output, /\/logs\/codex-discord-bridge\.log$/m);
+  assert.doesNotMatch(output, new RegExp(`${'cc'}-bridge\\.(?:pid|log)`));
+});
+
 async function runBash(script: string, env: NodeJS.ProcessEnv): Promise<string> {
   const { stdout } = await execFileAsync('/bin/bash', ['-lc', script], {
     cwd: path.resolve('.'),
@@ -268,6 +283,52 @@ run_restart`,
 
   assert.match(output, /^stop$/m);
   assert.match(output, /^start$/m);
+});
+
+test('macos bridge launchd plist restarts crashed service every 10 seconds', async () => {
+  const rootDir = await makeTempDir('codex-bridge-launchd-restart-');
+  const plistPath = path.join(rootDir, 'com.example.codex-bridge.plist');
+
+  try {
+    await runBash(
+      `source "${scriptPath}"
+write_launchd_plist agent "${plistPath}"`,
+      {},
+    );
+
+    const plistContents = await readFile(plistPath, 'utf8');
+    assert.match(plistContents, /<key>KeepAlive<\/key>\s*<true\/>/);
+    assert.match(plistContents, /<key>ThrottleInterval<\/key>\s*<integer>10<\/integer>/);
+    assert.match(plistContents, /codex-discord-bridge\.log/);
+  } finally {
+    await cleanupDir(rootDir);
+  }
+});
+
+test('macos bridge service-run loops with a 10 second restart delay after node exits', async () => {
+  const output = await runBash(
+    `source "${scriptPath}"
+require_macos() { :; }
+augment_launch_path() { :; }
+require_command() { :; }
+ensure_env_file() { :; }
+check_optional_engine_commands() { :; }
+load_secret_env() { :; }
+migrate_project_token_to_secret_env() { :; }
+auto_configure_bridge_proxy() { :; }
+validate_required_env() { :; }
+maybe_export_proxy() { :; }
+maybe_configure_node_tls() { :; }
+sanitize_codex_desktop_env() { :; }
+node() { echo "node:$*"; return 42; }
+sleep() { echo "sleep:$1"; exit 0; }
+run_service_run`,
+    {},
+  );
+
+  assert.match(output, /^node:dist\/index\.js$/m);
+  assert.match(output, /10 秒后自动重连\/重启/);
+  assert.match(output, /^sleep:10$/m);
 });
 
 test('macos bridge setup installs the bridgectl command as part of setup', async () => {
