@@ -1180,13 +1180,19 @@ export class DiscordCodexBridge {
     const baseContent = visibleMessage
       ? formatSuccessReply(binding, task.requestedBy, result, { finalMessage: visibleMessage })
       : formatSuccessReply(binding, task.requestedBy, result);
+    const generatedImageFiles = await this.buildGeneratedFileAttachments(result, channel);
 
     if (!directive.request) {
       if (!directive.error) {
-        return baseContent;
+        return generatedImageFiles.length > 0
+          ? { content: baseContent, files: generatedImageFiles }
+          : baseContent;
       }
 
-      return `${baseContent}\n\nBridge 文件发送请求无效：${directive.error}`;
+      const content = `${baseContent}\n\nBridge 文件发送请求无效：${directive.error}`;
+      return generatedImageFiles.length > 0
+        ? { content, files: generatedImageFiles }
+        : content;
     }
 
     const resolution = await resolveFileRequest({
@@ -1199,12 +1205,18 @@ export class DiscordCodexBridge {
       case 'single': {
         const validationError = await this.getResolvedFileSendError(resolution.file, channel);
         if (validationError) {
-          return `${baseContent}\n\n${validationError}`;
+          const content = `${baseContent}\n\n${validationError}`;
+          return generatedImageFiles.length > 0
+            ? { content, files: generatedImageFiles }
+            : content;
         }
 
         return {
           content: baseContent,
-          files: [{ attachment: resolution.file.absolutePath, name: resolution.file.name }],
+          files: [
+            { attachment: resolution.file.absolutePath, name: resolution.file.name },
+            ...generatedImageFiles,
+          ],
         };
       }
       case 'candidates':
@@ -1212,11 +1224,49 @@ export class DiscordCodexBridge {
           candidates: resolution.candidates,
           expiresAtMs: Date.now() + FILE_SELECTION_TTL_MS,
         });
-        return `${baseContent}\n\n${formatFileCandidates(resolution.candidates, { commandPrefix: this.config.commandPrefix })}`;
+        {
+          const content = `${baseContent}\n\n${formatFileCandidates(resolution.candidates, { commandPrefix: this.config.commandPrefix })}`;
+          return generatedImageFiles.length > 0
+            ? { content, files: generatedImageFiles }
+            : content;
+        }
       case 'denied':
       case 'missing':
-        return `${baseContent}\n\n${resolution.message}`;
+        {
+          const content = `${baseContent}\n\n${resolution.message}`;
+          return generatedImageFiles.length > 0
+            ? { content, files: generatedImageFiles }
+            : content;
+        }
     }
+  }
+
+  private async buildGeneratedFileAttachments(
+    result: CodexRunResult,
+    channel: SendableChannel,
+  ): Promise<Array<{ attachment: string; name: string }>> {
+    const files: Array<{ attachment: string; name: string }> = [];
+
+    for (const file of result.generatedFiles ?? []) {
+      const validationError = await this.getResolvedFileSendError(
+        {
+          absolutePath: file.absolutePath,
+          workspaceRelativePath: file.workspaceRelativePath,
+          name: file.name,
+          size: 0,
+          modifiedAtMs: 0,
+          inWorkspace: true,
+          inInbox: false,
+        },
+        channel,
+      );
+
+      if (!validationError) {
+        files.push({ attachment: file.absolutePath, name: file.name });
+      }
+    }
+
+    return files;
   }
 
   private getVisibleAssistantMessage(result: CodexRunResult): string {

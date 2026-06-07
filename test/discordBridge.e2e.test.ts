@@ -2116,6 +2116,7 @@ test('bridge persists active runtime snapshots while a task is running', { concu
 
     await waitFor(() => findSent(rootChannel, /ok: \[slow\] persist this active run/), 15_000);
   } finally {
+    await bridge.stop();
     await cleanupDir(rootDir);
   }
 });
@@ -2717,6 +2718,38 @@ test('bridge can upload a file requested by a Codex file-send marker', { concurr
     await dispatch(bridge, createUserMessage(rootChannel, '[bridge-send-file] generate and deliver the report'));
     await waitFor(() => findSentFile(rootChannel, /report\.pdf/), 3_000);
   } finally {
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge uploads native Codex image generation output as a Discord attachment', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-native-image-generation-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeAppServerCommand,
+    driverMode: 'app-server',
+  });
+  const rootChannel = new FakeChannel('channel-native-image-generation', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+
+    await dispatch(bridge, createUserMessage(rootChannel, '[app-image-generation] generate a bridge icon image'));
+    await waitFor(() => findSentFile(rootChannel, /image-turn-[a-z0-9]+\.png/), 3_000);
+
+    const sentFile = rootChannel.sent
+      .flatMap((message) => message.sentFiles)
+      .find((file) => {
+        const value = typeof file === 'string' ? file : `${file.name ?? ''} ${file.attachment}`;
+        return /image-turn-[a-z0-9]+\.png/.test(value);
+      });
+    assert.ok(sentFile);
+    const attachmentPath = typeof sentFile === 'string' ? sentFile : sentFile.attachment;
+    assert.equal(await readFile(attachmentPath, 'utf8'), 'fake png payload');
+  } finally {
+    await bridge.stop();
     await cleanupDir(rootDir);
   }
 });

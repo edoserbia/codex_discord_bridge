@@ -143,6 +143,13 @@ export interface CommandRecord {
   exitCode: number | null;
 }
 
+export interface GeneratedFileRecord {
+  absolutePath: string;
+  workspaceRelativePath: string;
+  name: string;
+  kind: 'image';
+}
+
 export interface PlanItem {
   id?: string | undefined;
   text: string;
@@ -257,6 +264,7 @@ export interface CodexRunResult {
   planItems: PlanItem[];
   stderr: string[];
   commands: CommandRecord[];
+  generatedFiles?: GeneratedFileRecord[] | undefined;
 }
 
 export type AppServerPlanStatus = 'pending' | 'in_progress' | 'completed';
@@ -278,6 +286,8 @@ export type AppServerTurnEvent =
   | { type: 'item.started'; threadId: string; turnId: string; item: Record<string, unknown> }
   | { type: 'item.updated'; threadId: string; turnId: string; item: Record<string, unknown> }
   | { type: 'item.completed'; threadId: string; turnId: string; item: Record<string, unknown> }
+  | { type: 'image.generated'; threadId: string; turnId: string; itemId: string; base64: string }
+  | { type: 'image.generatedFile'; threadId: string; turnId: string; itemId: string; savedPath: string }
   | { type: 'command.output.delta'; threadId: string; turnId: string; itemId: string; delta: string }
   | { type: 'agent.message.delta'; threadId: string; turnId: string; itemId: string; delta: string }
   | { type: 'reasoning.summary.delta'; threadId: string; turnId: string; itemId: string; delta: string };

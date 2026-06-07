@@ -3,10 +3,11 @@ import { spawn } from 'node:child_process';
 import readline from 'node:readline';
 
 import type { AppConfig } from './config.js';
-import type { ChannelBinding, CodexDriverMode, CodexRunInput, CodexRunResult, CollabAgentState, CollabAgentStatus, CollabToolCall, CollabToolName, CollabToolStatus, CommandRecord, ExecutionDriverMode, PlanItem } from './types.js';
+import type { ChannelBinding, CodexDriverMode, CodexRunInput, CodexRunResult, CollabAgentState, CollabAgentStatus, CollabToolCall, CollabToolName, CollabToolStatus, CommandRecord, ExecutionDriverMode, GeneratedFileRecord, PlanItem } from './types.js';
 
 import { buildCodexChildEnv } from './codexChildEnv.js';
 import { normalizeCodexDiagnosticLine } from './codexDiagnostics.js';
+import { appendUniqueGeneratedFiles, collectGeneratedImageFilesForThread, writeGeneratedImageFile } from './generatedFiles.js';
 import { uniqueStrings } from './utils.js';
 
 export interface CodexRunHooks {
@@ -64,7 +65,9 @@ export class CodexRunner implements CodexExecutionDriver {
     const agentMessages: string[] = [];
     const reasoning: string[] = [];
     const stderr: string[] = [];
+    const generatedFiles: GeneratedFileRecord[] = [];
     let codexThreadId = existingThreadId;
+    const runStartedAtMs = Date.now();
     let planItems: PlanItem[] = [];
     let turnCompleted = false;
     let stdoutChain = Promise.resolve();
@@ -149,6 +152,18 @@ export class CodexRunner implements CodexExecutionDriver {
             if (item.type === 'agent_message' && event.type === 'item.completed' && typeof item.text === 'string') {
               agentMessages.push(item.text);
               await hooks.onAgentMessage?.(item.text);
+            }
+
+            if (item.type === 'image_generation_call' && event.type === 'item.completed' && typeof item.result === 'string') {
+              const file = await writeGeneratedImageFile({
+                workspacePath: binding.workspacePath,
+                itemId: readCodexItemId(item),
+                base64: item.result,
+              });
+              if (file && !generatedFiles.some((candidate) => candidate.absolutePath === file.absolutePath)) {
+                generatedFiles.push(file);
+                await hooks.onActivity?.(`已生成图片：${file.workspaceRelativePath}`);
+              }
             }
 
             if (item.type === 'command_execution' && typeof item.command === 'string') {
@@ -247,6 +262,14 @@ export class CodexRunner implements CodexExecutionDriver {
       stdoutInterface.close();
       stderrInterface.close();
 
+      if (generatedFiles.length === 0) {
+        appendUniqueGeneratedFiles(generatedFiles, await collectGeneratedImageFilesForThread({
+          workspacePath: binding.workspacePath,
+          threadId: codexThreadId,
+          sinceMs: runStartedAtMs,
+        }));
+      }
+
       if (cancelRequested && stderr.length === 0) {
         const cancellationMessage = signal
           ? `Codex process interrupted by ${signal}.`
@@ -267,6 +290,7 @@ export class CodexRunner implements CodexExecutionDriver {
         planItems,
         stderr,
         commands,
+        generatedFiles: generatedFiles.length > 0 ? generatedFiles : undefined,
       };
 
       await hooks.onExit?.(result);
@@ -642,6 +666,10 @@ export function extractReasoningText(item: Record<string, unknown>): string | un
   }
 
   return undefined;
+}
+
+function readCodexItemId(item: Record<string, unknown>): string {
+  return typeof item.id === 'string' && item.id.trim() ? item.id.trim() : 'unknown-item';
 }
 
 function extractTextValue(value: unknown): string | undefined {

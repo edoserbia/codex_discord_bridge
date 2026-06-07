@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 
 import type { AppConfig } from '../src/config.js';
 import type { ChannelBinding } from '../src/types.js';
@@ -115,6 +116,54 @@ test('app-server runner surfaces real Codex live item updates before final compl
     ]);
     assert.match(reasoningSnapshots.join('\n'), /Reading real-time event stream/);
     assert.match(agentMessageSnapshots.at(-1) ?? '', /Live draft from item\.updated/);
+  } finally {
+    await runner.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('app-server runner writes native image generation output into the workspace', async () => {
+  const rootDir = await makeTempDir('codex-app-server-runner-image-generation-');
+  const workspace = await createWorkspace(rootDir);
+  const runner = new CodexAppServerRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+
+  try {
+    const result = await runner.start(
+      binding,
+      { prompt: '[app-image-generation] generate a native image', imagePaths: [], extraAddDirs: [] },
+      undefined,
+      undefined,
+    ).done;
+
+    assert.equal(result.success, true);
+    assert.equal(result.generatedFiles?.length, 1);
+    assert.match(result.generatedFiles![0]!.workspaceRelativePath, /^codex-generated-images\/image-turn-[a-z0-9]+\.png$/);
+    assert.equal(await readFile(result.generatedFiles[0]!.absolutePath, 'utf8'), 'fake png payload');
+  } finally {
+    await runner.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('app-server runner records native imageGeneration saved paths from current Codex app-server items', async () => {
+  const rootDir = await makeTempDir('codex-app-server-runner-image-generation-item-');
+  const workspace = await createWorkspace(rootDir);
+  const runner = new CodexAppServerRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+
+  try {
+    const result = await runner.start(
+      binding,
+      { prompt: '[app-image-generation-item] generate a native image', imagePaths: [], extraAddDirs: [] },
+      undefined,
+      undefined,
+    ).done;
+
+    assert.equal(result.success, true);
+    assert.equal(result.generatedFiles?.length, 1);
+    assert.match(result.generatedFiles![0]!.workspaceRelativePath, /^codex-generated-images\/image-turn-[a-z0-9]+\.png$/);
+    assert.equal(await readFile(result.generatedFiles![0]!.absolutePath, 'utf8'), 'fake item png payload');
   } finally {
     await runner.stop();
     await cleanupDir(rootDir);

@@ -1,10 +1,11 @@
 import type { AppConfig } from './config.js';
-import type { AppServerTurnEvent, ChannelBinding, CodexRunInput, CodexRunResult, CommandRecord, PlanItem } from './types.js';
+import type { AppServerTurnEvent, ChannelBinding, CodexRunInput, CodexRunResult, CommandRecord, GeneratedFileRecord, PlanItem } from './types.js';
 import type { CodexExecutionDriver, CodexRunHooks, RunningCodexJob } from './codexRunner.js';
 
 import { normalizeCodexDiagnosticLine } from './codexDiagnostics.js';
 import { CodexAppServerClient } from './codexAppServerClient.js';
 import { extractReasoningText, parseCollabToolCall, parsePlanItems } from './codexRunner.js';
+import { appendUniqueGeneratedFiles, collectGeneratedImageFilesForThread, recordGeneratedImageFile, writeGeneratedImageFile } from './generatedFiles.js';
 
 interface AppServerCommandBuffer {
   command: string;
@@ -34,6 +35,8 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
     const agentMessages: string[] = [];
     const reasoning: string[] = [];
     const stderr: string[] = [];
+    const generatedFiles: GeneratedFileRecord[] = [];
+    const runStartedAtMs = Date.now();
     let planItems: PlanItem[] = [];
     let codexThreadId = existingThreadId;
     let cancelRequested = false;
@@ -107,6 +110,30 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
           await flushCommandBuffers(null);
           await hooks.onActivity?.('当前轮次已中断');
           break;
+        case 'image.generated': {
+          const file = await writeGeneratedImageFile({
+            workspacePath: binding.workspacePath,
+            itemId: event.itemId,
+            base64: event.base64,
+          });
+          if (file && !generatedFiles.some((item) => item.absolutePath === file.absolutePath)) {
+            generatedFiles.push(file);
+            await hooks.onActivity?.(`已生成图片：${file.workspaceRelativePath}`);
+          }
+          break;
+        }
+        case 'image.generatedFile': {
+          const file = await recordGeneratedImageFile({
+            workspacePath: binding.workspacePath,
+            itemId: event.itemId,
+            savedPath: event.savedPath,
+          });
+          if (file && !generatedFiles.some((item) => item.absolutePath === file.absolutePath)) {
+            generatedFiles.push(file);
+            await hooks.onActivity?.(`已生成图片：${file.workspaceRelativePath}`);
+          }
+          break;
+        }
         case 'thread.compacted':
         case 'context.compaction':
           await hooks.onActivity?.('Codex 已压缩上下文');
@@ -271,6 +298,14 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
         const turnResult = await turn.done;
         finished = true;
 
+        if (generatedFiles.length === 0) {
+          appendUniqueGeneratedFiles(generatedFiles, await collectGeneratedImageFilesForThread({
+            workspacePath: binding.workspacePath,
+            threadId: codexThreadId,
+            sinceMs: runStartedAtMs,
+          }));
+        }
+
         const result: CodexRunResult = {
           success: turnResult.success,
           exitCode: turnResult.success ? 0 : null,
@@ -283,6 +318,7 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
           planItems,
           stderr,
           commands,
+          generatedFiles: generatedFiles.length > 0 ? generatedFiles : undefined,
         };
 
         await hooks.onExit?.(result);
@@ -306,6 +342,7 @@ export class CodexAppServerRunner implements CodexExecutionDriver {
           planItems,
           stderr,
           commands,
+          generatedFiles: generatedFiles.length > 0 ? generatedFiles : undefined,
         };
 
         await hooks.onExit?.(result);

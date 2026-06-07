@@ -124,6 +124,7 @@ const scenario = (() => {
   if (prompt.includes('[attachments]')) return 'attachments';
   if (prompt.includes('[bridge-send-file-long]')) return 'bridge-send-file-long';
   if (prompt.includes('[bridge-send-file]')) return 'bridge-send-file';
+  if (prompt.includes('[image-generation]')) return 'image-generation';
   if (prompt.includes('AUTOPILOT_REPORT')) return 'autopilot';
   return 'simple';
 })();
@@ -735,6 +736,18 @@ if (scenario === 'command' || scenario === 'attachments') {
 if (scenario === 'invalid-json') {
   process.stdout.write('not-json\n');
   process.exit(0);
+}
+
+if (scenario === 'image-generation') {
+  event({
+    type: 'item.completed',
+    item: {
+      id: 'image_1',
+      type: 'image_generation_call',
+      status: 'completed',
+      result: Buffer.from('fake legacy png payload', 'utf8').toString('base64'),
+    },
+  });
 }
 
 if (scenario === 'fail') {

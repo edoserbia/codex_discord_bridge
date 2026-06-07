@@ -609,6 +609,13 @@ export class CodexAppServerClient {
         const turnId = typeof params.turnId === 'string' ? params.turnId : '';
         const item = (params.item ?? null) as Record<string, unknown> | null;
         if (threadId && turnId && item && !Array.isArray(item)) {
+          const imageGenerationEvent = buildImageGenerationEvent(threadId, turnId, item);
+          if (imageGenerationEvent && method === 'item/completed') {
+            await this.emitTurnEvent(turnId, {
+              event: imageGenerationEvent,
+            });
+          }
+
           if (normalizeAppServerItemType(item.type) === 'context_compaction') {
             await this.emitTurnEvent(turnId, {
               event: {
@@ -639,6 +646,19 @@ export class CodexAppServerClient {
         const target = this.resolveTurnReference(params);
         const item = normalizeRawResponseItem((params.item ?? null) as Record<string, unknown> | null);
         if (target && item) {
+          if (item.type === 'image_generation_call' && typeof item.result === 'string' && item.result.trim()) {
+            await this.emitTurnEvent(target.turnId, {
+              event: {
+                type: 'image.generated',
+                threadId: target.threadId,
+                turnId: target.turnId,
+                itemId: readAppServerItemId(item),
+                base64: item.result.trim(),
+              },
+            });
+            break;
+          }
+
           await this.emitTurnEvent(target.turnId, {
             event: {
               type: 'item.started',
@@ -1045,9 +1065,50 @@ function normalizeAppServerItemType(value: unknown): string | undefined {
   switch (value) {
     case 'contextCompaction':
       return 'context_compaction';
+    case 'imageGeneration':
+      return 'image_generation_call';
     default:
       return value;
   }
+}
+
+function buildImageGenerationEvent(
+  threadId: string,
+  turnId: string,
+  item: Record<string, unknown>,
+): AppServerTurnEvent | undefined {
+  if (normalizeAppServerItemType(item.type) !== 'image_generation_call') {
+    return undefined;
+  }
+
+  const itemId = readAppServerItemId(item);
+  const savedPath = readOptionalString(item.savedPath ?? item.saved_path);
+  if (savedPath) {
+    return {
+      type: 'image.generatedFile',
+      threadId,
+      turnId,
+      itemId,
+      savedPath,
+    };
+  }
+
+  const base64 = readOptionalString(item.result);
+  if (base64) {
+    return {
+      type: 'image.generated',
+      threadId,
+      turnId,
+      itemId,
+      base64,
+    };
+  }
+
+  return undefined;
+}
+
+function readOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
 function normalizeRawResponseItem(item: Record<string, unknown> | null): Record<string, unknown> | undefined {
@@ -1100,6 +1161,24 @@ function normalizeRawResponseItem(item: Record<string, unknown> | null): Record<
       status: item.status === 'completed' ? 'completed' : 'in_progress',
       aggregatedOutput: null,
       exitCode: null,
+    };
+  }
+
+  if (itemType === 'image_generation_call') {
+    const result = typeof item.result === 'string' ? item.result.trim() : '';
+    if (!result) {
+      return undefined;
+    }
+
+    return {
+      id: typeof item.id === 'string' && item.id.trim()
+        ? item.id.trim()
+        : typeof item.call_id === 'string' && item.call_id.trim()
+          ? item.call_id.trim()
+          : 'raw-image-generation',
+      type: 'image_generation_call',
+      status: typeof item.status === 'string' ? item.status : 'completed',
+      result,
     };
   }
 

@@ -137,6 +137,76 @@ test('app-server client surfaces raw exec function calls as command execution it
   }
 });
 
+test('app-server client surfaces native image generation raw response items', async () => {
+  const rootDir = await makeTempDir('codex-app-server-client-image-generation-');
+  const workspace = await createWorkspace(rootDir);
+  const binding = makeBinding(workspace);
+  const client = new CodexAppServerClient(makeConfig(rootDir));
+  const images: Array<{ itemId: string; base64: string }> = [];
+
+  try {
+    await client.start();
+    const threadId = await client.ensureThread(binding, undefined);
+    const turn = await client.startTurn(binding, threadId, {
+      prompt: '[app-image-generation] simulate native image_generation tool output',
+      imagePaths: [],
+      extraAddDirs: [],
+      onEvent: async (event) => {
+        if (event.type === 'image.generated') {
+          images.push({ itemId: event.itemId, base64: event.base64 });
+        }
+      },
+    });
+
+    const result = await turn.done;
+    assert.equal(result.success, true);
+    assert.deepEqual(images, [
+      {
+        itemId: `image-${turn.turnId}`,
+        base64: Buffer.from('fake png payload', 'utf8').toString('base64'),
+      },
+    ]);
+  } finally {
+    await client.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('app-server client surfaces native image generation item saved paths', async () => {
+  const rootDir = await makeTempDir('codex-app-server-client-image-generation-item-');
+  const workspace = await createWorkspace(rootDir);
+  const binding = makeBinding(workspace);
+  const client = new CodexAppServerClient(makeConfig(rootDir));
+  const images: Array<{ itemId: string; savedPath: string }> = [];
+
+  try {
+    await client.start();
+    const threadId = await client.ensureThread(binding, undefined);
+    const turn = await client.startTurn(binding, threadId, {
+      prompt: '[app-image-generation-item] simulate current Codex imageGeneration item output',
+      imagePaths: [],
+      extraAddDirs: [],
+      onEvent: async (event) => {
+        if (event.type === 'image.generatedFile') {
+          images.push({ itemId: event.itemId, savedPath: event.savedPath });
+        }
+      },
+    });
+
+    const result = await turn.done;
+    assert.equal(result.success, true);
+    assert.deepEqual(images, [
+      {
+        itemId: `image-${turn.turnId}`,
+        savedPath: path.join(workspace, 'codex-generated-images', `image-${turn.turnId}.png`),
+      },
+    ]);
+  } finally {
+    await client.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('app-server client can steer and interrupt an active turn on the same thread', async () => {
   const rootDir = await makeTempDir('codex-app-server-client-steer-');
   const workspace = await createWorkspace(rootDir);

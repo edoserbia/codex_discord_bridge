@@ -151,6 +151,7 @@ async function handleAsync(message) {
     }
     case 'turn/start': {
       const threadId = message.params?.threadId;
+      const cwd = message.params?.cwd ?? process.cwd();
       const prompt = message.params?.input?.[0]?.text ?? '';
       const turnId = `turn-${randomUUID().slice(0, 8)}`;
       activeTurns.set(turnId, {
@@ -208,6 +209,36 @@ async function handleAsync(message) {
         if (prompt.includes('[app-hang-after-raw-exec]')) {
           return;
         }
+      }
+
+      if (prompt.includes('[app-image-generation]')) {
+        notify('rawResponseItem/completed', {
+          threadId,
+          turnId,
+          item: {
+            id: `image-${turnId}`,
+            type: 'image_generation_call',
+            status: 'completed',
+            result: Buffer.from('fake png payload', 'utf8').toString('base64'),
+          },
+        });
+      }
+
+      if (prompt.includes('[app-image-generation-item]')) {
+        const savedPath = path.join(cwd, 'codex-generated-images', `image-${turnId}.png`);
+        await fs.mkdir(path.dirname(savedPath), { recursive: true });
+        await fs.writeFile(savedPath, 'fake item png payload', 'utf8');
+        notify('item/completed', {
+          threadId,
+          turnId,
+          item: {
+            id: `image-${turnId}`,
+            type: 'imageGeneration',
+            status: 'completed',
+            result: Buffer.from('fake item png payload', 'utf8').toString('base64'),
+            savedPath,
+          },
+        });
       }
 
       if (prompt.includes('[app-slow]')) {

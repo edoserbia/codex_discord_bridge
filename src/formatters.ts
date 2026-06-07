@@ -284,7 +284,7 @@ export function formatHelp(prefix: string): string {
     '显式绝对路径只允许管理员使用，例如 `!sendfile /absolute/path/to/report.pdf`。',
     '',
     '示例：',
-    `\`${prefix}bind api "/path/to/workspaces/api" --engine claude --sandbox danger-full-access --approval never --search on\``,
+    `\`${prefix}bind api "/path/to/workspaces/api" --engine codex --sandbox danger-full-access --approval never --search on\``,
     `\`${prefix}codex 修复刚才的测试失败\``,
     `\`把 report.pdf 发给我\``,
     `\`${prefix}sendfile report.pdf\``,

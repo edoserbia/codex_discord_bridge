@@ -18,6 +18,13 @@ test('help text documents workspace inbox mirroring and file-send workflows', ()
   assert.match(text, /!model project clear/);
 });
 
+test('help text uses Codex as the default engine in bind examples', () => {
+  const text = formatHelp('!');
+
+  assert.match(text, /!bind api "\/path\/to\/workspaces\/api" --engine codex --sandbox danger-full-access --approval never --search on/);
+  assert.doesNotMatch(text, /!bind api "\/path\/to\/workspaces\/api" --engine claude/);
+});
+
 test('formatSuccessReply falls back when Codex returns blank text', () => {
   const text = formatSuccessReply(
     {

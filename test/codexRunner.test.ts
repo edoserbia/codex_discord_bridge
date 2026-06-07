@@ -137,6 +137,28 @@ test('runner does not forward bridge-managed proxy env vars into codex child pro
   }
 });
 
+test('runner writes native image generation output from JSON events into the workspace', async () => {
+  const rootDir = await makeTempDir('codex-runner-image-generation-');
+  const workspace = await createWorkspace(rootDir);
+  const runner = new CodexRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+
+  try {
+    const result = await runner.start(
+      binding,
+      { prompt: '[image-generation] generate a native image', imagePaths: [], extraAddDirs: [] },
+      undefined,
+    ).done;
+
+    assert.equal(result.success, true);
+    assert.equal(result.generatedFiles?.length, 1);
+    assert.equal(result.generatedFiles![0]!.workspaceRelativePath, 'codex-generated-images/image_1.png');
+    assert.equal(await readFile(result.generatedFiles![0]!.absolutePath, 'utf8'), 'fake legacy png payload');
+  } finally {
+    await cleanupDir(rootDir);
+  }
+});
+
 test('runner surfaces reasoning and todo list updates', async () => {
   const rootDir = await makeTempDir('codex-runner-plan-');
   const workspace = await createWorkspace(rootDir);
