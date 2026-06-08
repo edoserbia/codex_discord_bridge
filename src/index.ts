@@ -5,6 +5,7 @@ import { loadConfig } from './config.js';
 import { DiscordCodexBridge } from './discordBot.js';
 import { JsonStateStore } from './store.js';
 import { AdminWebServer } from './webServer.js';
+import { describeProcessError, isKnownDiscordWebSocketNetworkError } from './processErrors.js';
 
 process.on('unhandledRejection', (reason) => {
   console.error('[process] unhandledRejection', reason);
@@ -12,6 +13,15 @@ process.on('unhandledRejection', (reason) => {
 
 process.on('uncaughtExceptionMonitor', (error) => {
   console.error('[process] uncaughtException', error);
+});
+
+process.on('uncaughtException', (error) => {
+  if (isKnownDiscordWebSocketNetworkError(error)) {
+    console.warn(`[process] suppressed transient Discord websocket error: ${describeProcessError(error).split('\n')[0]}`);
+    return;
+  }
+
+  throw error;
 });
 
 async function main(): Promise<void> {

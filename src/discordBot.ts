@@ -450,6 +450,18 @@ export class DiscordCodexBridge {
       this.logBridgeError('discord-client', error);
     });
 
+    this.client.on('shardError', (error, shardId) => {
+      this.logBridgeError(`discord-shard shard=${shardId}`, error);
+    });
+
+    this.client.on('shardDisconnect', (event, shardId) => {
+      console.warn(`[discord-shard] disconnected shard=${shardId} code=${event.code} clean=${event.wasClean}`);
+    });
+
+    this.client.on('shardReconnecting', (shardId) => {
+      console.warn(`[discord-shard] reconnecting shard=${shardId}`);
+    });
+
     this.client.on('warn', (warning) => {
       console.warn(`[discord-client] ${warning}`);
     });

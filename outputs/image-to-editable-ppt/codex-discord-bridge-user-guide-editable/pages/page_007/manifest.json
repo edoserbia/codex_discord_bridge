@@ -13,7 +13,7 @@
     "width_px": 1672,
     "height_px": 941
   },
-  "rebuild_strategy": "Object-level editable recreation using native PowerPoint text boxes and primitive shapes; no full-page source raster and no cc-bridge text.",
+  "rebuild_strategy": "Object-level editable recreation using native PowerPoint text boxes and primitive shapes; no full-page source raster and no legacy bridge branding text.",
   "background_strategy": {
     "mode": "native-or-script",
     "source_consistency_contract": "Preserve the original off-white hand-drawn guide layout with native slide background, cards, arrows, badges, and callout shapes.",

@@ -51,8 +51,8 @@
     },
     {
       "page_index": 7,
-      "text": "本机服务通过 LaunchAgent 运行，支持登录后启动、断线恢复和进程退出后重启。出现问题时，可以看日志和 Web 面板确认状态。\n---\n注意点：强调当前服务名是 codex-discord-bridge，不是 cc-bridge。",
-      "text_sha256": "c480088f4a4f1014f53edd354622876f56b6ed75b8e45db5594b5f976c0ccec7",
+      "text": "本机服务通过 LaunchAgent 运行，支持登录后启动、断线恢复和进程退出后重启。出现问题时，可以看日志和 Web 面板确认状态。\n---\n注意点：强调当前服务名是 codex-discord-bridge，并保持 Codex Discord Bridge 服务身份。",
+      "text_sha256": "8cfae45e45bd245e34e9322dd784b09aaf2a518a05d4792935b76b951fb27288",
       "source_slide": "ppt/slides/slide7.xml",
       "source_notes_part": "ppt/notesSlides/notesSlide7.xml",
       "notes_xml": "input/notes/page_007/notesSlide.xml"
