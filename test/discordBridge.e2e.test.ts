@@ -682,6 +682,76 @@ test('bridge cancel clears queued prompts instead of starting them after the act
   }
 });
 
+test('bridge cancel clears a detached terminal active run even when no job is attached', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-cancel-detached-terminal-run-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeAppServerCommand,
+    driverMode: 'app-server',
+  });
+  const rootChannel = new FakeChannel('channel-cancel-detached-terminal-run', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await store.updateSession(rootChannel.id, {
+      codexThreadId: 'thread-detached-cancelled',
+      driver: 'app-server',
+      fallbackActive: false,
+    }, rootChannel.id);
+
+    const runtime = (bridge as any).getRuntime(rootChannel.id);
+    runtime.activeRun = {
+      task: {
+        id: 'detached-cancelled-task',
+        prompt: 'long task that was already cancelled',
+        effectivePrompt: 'long task that was already cancelled',
+        rootPrompt: 'long task that was already cancelled',
+        rootEffectivePrompt: 'long task that was already cancelled',
+        requestedBy: 'jupiter072288',
+        requestedById: 'user-1',
+        messageId: 'message-detached-cancelled',
+        enqueuedAt: '2026-06-11T02:00:00.000Z',
+        bindingChannelId: rootChannel.id,
+        conversationId: rootChannel.id,
+        attachments: [],
+        extraAddDirs: [],
+        origin: 'user',
+      },
+      engine: 'codex',
+      driverMode: 'app-server',
+      status: 'cancelled',
+      startedAt: '2026-06-11T02:00:00.000Z',
+      updatedAt: '2026-06-11T02:44:54.410Z',
+      latestActivity: '已由 jupiter072288 请求取消',
+      agentMessages: ['still shown in status panel'],
+      reasoningSummaries: [],
+      planItems: [],
+      collabToolCalls: [],
+      timeline: ['[10:44] 🗑️ 已清空等待队列 1 条'],
+      stderr: ['Codex turn failed: exceeded retry limit, last status: 429 Too Many Requests'],
+      usedResume: true,
+      codexThreadId: 'thread-detached-cancelled',
+      cancellationReason: 'user_cancel',
+    };
+    await store.upsertRuntimeState(runtime);
+    (bridge as any).activeJobs.delete(rootChannel.id);
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!cancel', { userId: 'admin-user' }));
+
+    await waitFor(() => findSent(rootChannel, /已清理.*残留/), 15_000);
+    await waitFor(() => {
+      const nextRuntime = (bridge as any).getRuntime(rootChannel.id);
+      return !nextRuntime.activeRun && nextRuntime.queue.length === 0;
+    }, 15_000);
+    assert.ok(!(bridge as any).getDashboardData().some((entry: any) => entry.conversations.some((conversation: any) => conversation.status === 'cancelled')));
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge keeps live reasoning, command, and subagent progress in app-server mode', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-app-server-progress-');
   const workspace = await createWorkspace(rootDir);

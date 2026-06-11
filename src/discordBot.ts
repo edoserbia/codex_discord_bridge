@@ -811,7 +811,7 @@ export class DiscordCodexBridge {
     };
   }
 
-  private getRuntime(conversationId: string): ChannelRuntime {
+  private getRuntime(conversationId: string, options: { recoverDetached?: boolean } = {}): ChannelRuntime {
     let runtime = this.runtimes.get(conversationId);
 
     if (!runtime) {
@@ -820,7 +820,9 @@ export class DiscordCodexBridge {
       this.runtimes.set(conversationId, runtime);
     }
 
-    this.recoverDetachedActiveRun(conversationId, runtime);
+    if (options.recoverDetached !== false) {
+      this.recoverDetachedActiveRun(conversationId, runtime);
+    }
     return runtime;
   }
 
@@ -2093,11 +2095,34 @@ export class DiscordCodexBridge {
       return;
     }
 
-    const runtime = this.getRuntime(resolved.conversationId);
+    const runtime = this.getRuntime(resolved.conversationId, { recoverDetached: false });
     let activeJob = this.activeJobs.get(resolved.conversationId);
 
     if (!activeJob && runtime.activeRun) {
       activeJob = await this.waitForActiveJob(resolved.conversationId);
+    }
+
+    if (!activeJob && runtime.activeRun) {
+      const clearedQueueCount = runtime.queue.length;
+      const detachedRunStatus = runtime.activeRun.status;
+      runtime.activeRun.status = 'cancelled';
+      runtime.activeRun.latestActivity = `已由 ${message.author.username} 请求取消并清理残留状态`;
+      runtime.activeRun.cancellationReason = 'user_cancel';
+      runtime.queue = [];
+      this.activeJobs.delete(resolved.conversationId);
+      runtime.activeRun = undefined;
+      this.scheduleRuntimeStateSave(resolved.conversationId, true);
+
+      const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
+      await this.refreshStatusPanel(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
+
+      const queueSuffix = clearedQueueCount > 0 ? `，并清空等待队列 ${clearedQueueCount} 条` : '';
+      await message.reply(
+        isTerminalRunStatus(detachedRunStatus)
+          ? `已清理当前会话残留的已结束任务状态${queueSuffix}。`
+          : `未找到可发送取消信号的运行进程，已清理当前会话残留任务状态${queueSuffix}。`,
+      );
+      return;
     }
 
     if (!activeJob || !runtime.activeRun) {
