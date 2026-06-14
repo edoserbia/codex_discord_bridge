@@ -1161,6 +1161,35 @@ test('bridge falls back when app-server initialize hangs so queued messages do n
   }
 });
 
+test('bridge fails and clears a submitted app-server turn that never finishes', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-app-server-turn-timeout-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeAppServerCommand,
+    driverMode: 'app-server',
+    appServerTurnTimeoutMs: 200,
+    codexMaxAttempts: 2,
+  });
+  const rootChannel = new FakeChannel('channel-app-server-turn-timeout', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[app-started-no-events] never completes'));
+
+    await waitFor(() => findSent(rootChannel, /执行失败/), 5_000);
+    assert.ok(rootChannel.sent.some((message) => /app-server turn .*timed out after 200ms/.test(message.content)));
+    await waitFor(() => {
+      const runtime = (bridge as any).getRuntime(rootChannel.id);
+      return !runtime.activeRun && runtime.queue.length === 0;
+    }, 5_000);
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge falls back to queued guidance instead of native steer after the active run switches to legacy fallback', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-app-server-fallback-guide-');
   const workspace = await createWorkspace(rootDir);

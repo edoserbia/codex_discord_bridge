@@ -528,6 +528,7 @@ sudo ./scripts/uninstall-service.sh --mode daemon
 | `DEFAULT_CODEX_SEARCH` | 默认是否开启搜索 |
 | `DEFAULT_CODEX_SKIP_GIT_REPO_CHECK` | 默认是否跳过 Git 仓库检查，默认 `true` |
 | `CODEX_COMMAND` | Codex CLI 命令，默认 `codex` |
+| `CODEX_APP_SERVER_TURN_TIMEOUT_MS` | app-server 已提交轮次后无任何事件的卡死保护，默认 `600000`；设为 `0` 可禁用 |
 | `CLAUDE_COMMAND` | Claude CLI 命令，默认 `claude` |
 | `WEB_PORT` | Web 面板端口，默认 `3769` |
 | `WEB_AUTH_TOKEN` | Web 面板鉴权 token |

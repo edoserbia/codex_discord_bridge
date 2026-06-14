@@ -12,7 +12,7 @@ import { cleanupDir, createWorkspace, makeTempDir, waitFor } from './helpers/tes
 
 const fakeAppServerCommand = path.resolve('test/fixtures/fake-codex-app-server.mjs');
 
-function makeConfig(rootDir: string, codexCommand = fakeAppServerCommand): AppConfig {
+function makeConfig(rootDir: string, codexCommand = fakeAppServerCommand, overrides: Partial<AppConfig> = {}): AppConfig {
   return {
     discordToken: 'test-token',
     commandPrefix: '!',
@@ -38,6 +38,7 @@ function makeConfig(rootDir: string, codexCommand = fakeAppServerCommand): AppCo
       port: 0,
       authToken: undefined,
     },
+    ...overrides,
   };
 }
 
@@ -220,6 +221,31 @@ test('app-server runner reports that a turn was submitted before the first strea
     job.cancel();
     const result = await job.done;
     assert.equal(result.success, false);
+  } finally {
+    await runner.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('app-server runner times out a submitted turn that never emits a completion event', async () => {
+  const rootDir = await makeTempDir('codex-app-server-runner-turn-timeout-');
+  const workspace = await createWorkspace(rootDir);
+  const runner = new CodexAppServerRunner(makeConfig(rootDir, fakeAppServerCommand, {
+    codexAppServerTurnTimeoutMs: 100,
+  }));
+  const binding = makeBinding(workspace);
+
+  try {
+    const result = await runner.start(
+      binding,
+      { prompt: '[app-started-no-events] never completes', imagePaths: [], extraAddDirs: [] },
+      undefined,
+      undefined,
+    ).done;
+
+    assert.equal(result.success, false);
+    assert.equal(result.turnCompleted, false);
+    assert.match(result.stderr.join('\n'), /app-server turn .* timed out after 100ms without a completion event/);
   } finally {
     await runner.stop();
     await cleanupDir(rootDir);

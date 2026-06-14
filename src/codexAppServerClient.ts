@@ -31,6 +31,7 @@ interface ActiveTurnState {
   resolve: (result: AppServerTurnResult) => void;
   reject: (error: unknown) => void;
   done: Promise<AppServerTurnResult>;
+  idleTimeout?: NodeJS.Timeout | undefined;
   completed: boolean;
 }
 
@@ -199,9 +200,11 @@ export class CodexAppServerClient {
       resolve: resolveDone,
       reject: rejectDone,
       done,
+      idleTimeout: undefined,
       completed: false,
     };
     this.activeTurns.set(turnId, activeTurn);
+    this.resetTurnIdleTimeout(activeTurn);
 
     await this.flushBufferedTurnEvents(turnId);
 
@@ -756,6 +759,8 @@ export class CodexAppServerClient {
       return;
     }
 
+    this.resetTurnIdleTimeout(activeTurn);
+
     if (activeTurn.onEvent) {
       await activeTurn.onEvent(entry.event);
     }
@@ -775,7 +780,35 @@ export class CodexAppServerClient {
     this.activeTurns.delete(turnId);
     this.bufferedTurnEvents.delete(turnId);
     this.pendingTurnFailureMessages.delete(turnId);
+    if (activeTurn.idleTimeout) {
+      clearTimeout(activeTurn.idleTimeout);
+    }
     activeTurn.resolve(result);
+  }
+
+  private resetTurnIdleTimeout(activeTurn: ActiveTurnState): void {
+    if (activeTurn.completed) {
+      return;
+    }
+
+    const timeoutMs = this.getTurnTimeoutMs();
+    if (activeTurn.idleTimeout) {
+      clearTimeout(activeTurn.idleTimeout);
+      activeTurn.idleTimeout = undefined;
+    }
+
+    if (timeoutMs <= 0) {
+      return;
+    }
+
+    activeTurn.idleTimeout = setTimeout(() => {
+      if (activeTurn.completed) {
+        return;
+      }
+
+      this.failDriver(new Error(`app-server turn ${activeTurn.turnId} timed out after ${timeoutMs}ms without a completion event`));
+    }, timeoutMs);
+    activeTurn.idleTimeout.unref?.();
   }
 
   private failDriver(error: unknown): void {
@@ -801,6 +834,9 @@ export class CodexAppServerClient {
     this.pendingRequests.clear();
 
     for (const turn of this.activeTurns.values()) {
+      if (turn.idleTimeout) {
+        clearTimeout(turn.idleTimeout);
+      }
       turn.reject(normalized);
     }
     this.activeTurns.clear();
@@ -940,6 +976,10 @@ export class CodexAppServerClient {
 
   private getRequestTimeoutMs(): number {
     return Math.max(1, this.config.codexAppServerRequestTimeoutMs ?? this.getStartupTimeoutMs());
+  }
+
+  private getTurnTimeoutMs(): number {
+    return Math.max(0, this.config.codexAppServerTurnTimeoutMs ?? 10 * 60_000);
   }
 
   private rememberTurnFailureMessage(turnId: string, message: string): void {

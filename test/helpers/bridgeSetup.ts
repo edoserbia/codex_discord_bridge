@@ -23,6 +23,7 @@ export async function createBridgeTestRig(options: {
   codexConfigPath?: string;
   driverMode?: 'legacy-exec' | 'app-server';
   appServerStartupTimeoutMs?: number;
+  appServerTurnTimeoutMs?: number;
   codexMaxAttempts?: number;
   codexRateLimitMaxAttempts?: number;
   codexRateLimitBaseDelayMs?: number;
@@ -47,6 +48,7 @@ export async function createBridgeTestRig(options: {
     claudeCommand: options.claudeCommand ?? 'claude',
     codexDriverMode: options.driverMode ?? 'legacy-exec',
     codexAppServerStartupTimeoutMs: options.appServerStartupTimeoutMs,
+    codexAppServerTurnTimeoutMs: options.appServerTurnTimeoutMs,
     codexMaxAttempts: options.codexMaxAttempts ?? 10,
     codexRateLimitMaxAttempts: options.codexRateLimitMaxAttempts ?? 0,
     codexRateLimitBaseDelayMs: options.codexRateLimitBaseDelayMs ?? 5_000,
