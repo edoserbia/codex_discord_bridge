@@ -32,6 +32,7 @@ interface ActiveTurnState {
   reject: (error: unknown) => void;
   done: Promise<AppServerTurnResult>;
   idleTimeout?: NodeJS.Timeout | undefined;
+  interruptTimeout?: NodeJS.Timeout | undefined;
   completed: boolean;
 }
 
@@ -201,6 +202,7 @@ export class CodexAppServerClient {
       reject: rejectDone,
       done,
       idleTimeout: undefined,
+      interruptTimeout: undefined,
       completed: false,
     };
     this.activeTurns.set(turnId, activeTurn);
@@ -249,6 +251,7 @@ export class CodexAppServerClient {
       threadId,
       turnId,
     });
+    this.scheduleInterruptTimeout(threadId, turnId);
   }
 
   private async startTransport(startupWorkspacePath: string): Promise<void> {
@@ -783,6 +786,9 @@ export class CodexAppServerClient {
     if (activeTurn.idleTimeout) {
       clearTimeout(activeTurn.idleTimeout);
     }
+    if (activeTurn.interruptTimeout) {
+      clearTimeout(activeTurn.interruptTimeout);
+    }
     activeTurn.resolve(result);
   }
 
@@ -811,6 +817,49 @@ export class CodexAppServerClient {
     activeTurn.idleTimeout.unref?.();
   }
 
+  private scheduleInterruptTimeout(threadId: string, turnId: string): void {
+    const activeTurn = this.activeTurns.get(turnId);
+    if (!activeTurn || activeTurn.completed) {
+      return;
+    }
+
+    const timeoutMs = this.getInterruptTimeoutMs();
+    if (activeTurn.interruptTimeout) {
+      clearTimeout(activeTurn.interruptTimeout);
+      activeTurn.interruptTimeout = undefined;
+    }
+
+    if (timeoutMs <= 0) {
+      return;
+    }
+
+    activeTurn.interruptTimeout = setTimeout(() => {
+      const latestTurn = this.activeTurns.get(turnId);
+      if (!latestTurn || latestTurn.completed) {
+        return;
+      }
+
+      const message = `app-server turn ${turnId} interrupt timed out after ${timeoutMs}ms without a completion event`;
+      void this.emitTurnEvent(turnId, {
+        event: {
+          type: 'turn.failed',
+          threadId,
+          turnId,
+          message,
+        },
+        terminalResult: {
+          success: false,
+          threadId,
+          turnId,
+          interrupted: true,
+        },
+      }).catch((error) => {
+        this.failDriver(error);
+      });
+    }, timeoutMs);
+    activeTurn.interruptTimeout.unref?.();
+  }
+
   private failDriver(error: unknown): void {
     const normalized = this.normalizeDriverFailure(error);
     const child = this.child;
@@ -836,6 +885,9 @@ export class CodexAppServerClient {
     for (const turn of this.activeTurns.values()) {
       if (turn.idleTimeout) {
         clearTimeout(turn.idleTimeout);
+      }
+      if (turn.interruptTimeout) {
+        clearTimeout(turn.interruptTimeout);
       }
       turn.reject(normalized);
     }
@@ -980,6 +1032,10 @@ export class CodexAppServerClient {
 
   private getTurnTimeoutMs(): number {
     return Math.max(0, this.config.codexAppServerTurnTimeoutMs ?? 10 * 60_000);
+  }
+
+  private getInterruptTimeoutMs(): number {
+    return Math.max(0, this.config.codexAppServerInterruptTimeoutMs ?? 15_000);
   }
 
   private rememberTurnFailureMessage(turnId: string, message: string): void {

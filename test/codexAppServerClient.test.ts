@@ -25,6 +25,7 @@ function makeConfig(rootDir: string, codexCommand = fakeAppServerCommand): AppCo
     codexRateLimitMaxAttempts: 0,
     codexRateLimitBaseDelayMs: 5_000,
     codexRateLimitMaxDelayMs: 60_000,
+    codexAppServerInterruptTimeoutMs: 15_000,
     allowedWorkspaceRoots: [rootDir],
     adminUserIds: new Set(),
     defaultCodex: {

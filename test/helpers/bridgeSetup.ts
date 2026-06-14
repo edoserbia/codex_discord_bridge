@@ -24,6 +24,7 @@ export async function createBridgeTestRig(options: {
   driverMode?: 'legacy-exec' | 'app-server';
   appServerStartupTimeoutMs?: number;
   appServerTurnTimeoutMs?: number;
+  appServerInterruptTimeoutMs?: number;
   codexMaxAttempts?: number;
   codexRateLimitMaxAttempts?: number;
   codexRateLimitBaseDelayMs?: number;
@@ -49,6 +50,7 @@ export async function createBridgeTestRig(options: {
     codexDriverMode: options.driverMode ?? 'legacy-exec',
     codexAppServerStartupTimeoutMs: options.appServerStartupTimeoutMs,
     codexAppServerTurnTimeoutMs: options.appServerTurnTimeoutMs,
+    codexAppServerInterruptTimeoutMs: options.appServerInterruptTimeoutMs,
     codexMaxAttempts: options.codexMaxAttempts ?? 10,
     codexRateLimitMaxAttempts: options.codexRateLimitMaxAttempts ?? 0,
     codexRateLimitBaseDelayMs: options.codexRateLimitBaseDelayMs ?? 5_000,

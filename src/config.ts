@@ -34,6 +34,7 @@ export interface AppConfig {
   codexAppServerStartupTimeoutMs?: number | undefined;
   codexAppServerRequestTimeoutMs?: number | undefined;
   codexAppServerTurnTimeoutMs?: number | undefined;
+  codexAppServerInterruptTimeoutMs?: number | undefined;
   allowedWorkspaceRoots: string[];
   adminUserIds: Set<string>;
   defaultCodex: BindingCodexOptions;
@@ -152,6 +153,7 @@ export function loadConfig(): AppConfig {
     codexAppServerStartupTimeoutMs: parseInteger(process.env.CODEX_APP_SERVER_STARTUP_TIMEOUT_MS, 10_000),
     codexAppServerRequestTimeoutMs: parseInteger(process.env.CODEX_APP_SERVER_REQUEST_TIMEOUT_MS, 10_000),
     codexAppServerTurnTimeoutMs: parseInteger(process.env.CODEX_APP_SERVER_TURN_TIMEOUT_MS, 10 * 60_000),
+    codexAppServerInterruptTimeoutMs: parseInteger(process.env.CODEX_APP_SERVER_INTERRUPT_TIMEOUT_MS, 15_000),
     allowedWorkspaceRoots: parseList(process.env.ALLOWED_WORKSPACE_ROOTS).map((item) => path.resolve(item)),
     adminUserIds: new Set(parseList(process.env.DISCORD_ADMIN_USER_IDS)),
     defaultCodex: {

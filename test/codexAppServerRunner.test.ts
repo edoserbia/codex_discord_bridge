@@ -22,6 +22,7 @@ function makeConfig(rootDir: string, codexCommand = fakeAppServerCommand, overri
     codexRateLimitMaxAttempts: 0,
     codexRateLimitBaseDelayMs: 5_000,
     codexRateLimitMaxDelayMs: 60_000,
+    codexAppServerInterruptTimeoutMs: 15_000,
     allowedWorkspaceRoots: [rootDir],
     adminUserIds: new Set(),
     defaultCodex: {
@@ -221,6 +222,45 @@ test('app-server runner reports that a turn was submitted before the first strea
     job.cancel();
     const result = await job.done;
     assert.equal(result.success, false);
+  } finally {
+    await runner.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('app-server runner releases a cancelled turn when interrupt never emits a terminal event', async () => {
+  const rootDir = await makeTempDir('codex-app-server-runner-interrupt-timeout-');
+  const workspace = await createWorkspace(rootDir);
+  const runner = new CodexAppServerRunner(makeConfig(rootDir, fakeAppServerCommand, {
+    codexAppServerTurnTimeoutMs: 5_000,
+    codexAppServerInterruptTimeoutMs: 100,
+  }));
+  const binding = makeBinding(workspace);
+  const activities: string[] = [];
+  const timeoutSentinel = Symbol.for('timeout');
+
+  try {
+    const job = runner.start(
+      binding,
+      { prompt: '[app-ignore-interrupt] [app-started-no-events] wait before events', imagePaths: [], extraAddDirs: [] },
+      undefined,
+      {
+        onActivity: async (activity) => {
+          activities.push(activity);
+        },
+      },
+    );
+
+    await waitFor(() => activities.includes('Codex 轮次已提交，等待模型响应'), 1_500);
+    job.cancel();
+    const result = await Promise.race([
+      job.done,
+      new Promise((resolve) => setTimeout(() => resolve(timeoutSentinel), 700)),
+    ]);
+
+    assert.notEqual(result, timeoutSentinel);
+    assert.equal((result as { success: boolean }).success, false);
+    assert.match((result as { stderr: string[] }).stderr.join('\n'), /interrupt.*100ms|100ms.*interrupt/i);
   } finally {
     await runner.stop();
     await cleanupDir(rootDir);
