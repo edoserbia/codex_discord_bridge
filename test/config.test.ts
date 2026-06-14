@@ -125,6 +125,44 @@ test('loadConfig defaults to app-server driver mode', { concurrency: false }, as
   }
 });
 
+test('loadConfig exposes a finite app-server turn watchdog timeout', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-config-turn-timeout-');
+  const secretFile = path.join(rootDir, 'secrets.env');
+  await fs.writeFile(secretFile, 'CODEX_TUNNING_DISCORD_BOT_TOKEN="secret-token-from-file"\n', 'utf8');
+
+  const previous = {
+    CODEX_TUNNING_SECRETS_FILE: process.env.CODEX_TUNNING_SECRETS_FILE,
+    CODEX_TUNNING_DISCORD_BOT_TOKEN: process.env.CODEX_TUNNING_DISCORD_BOT_TOKEN,
+    DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
+    DISCORD_TOKEN: process.env.DISCORD_TOKEN,
+    DATA_DIR: process.env.DATA_DIR,
+    WEB_ENABLED: process.env.WEB_ENABLED,
+    CODEX_APP_SERVER_TURN_TIMEOUT_MS: process.env.CODEX_APP_SERVER_TURN_TIMEOUT_MS,
+  };
+
+  delete process.env.CODEX_TUNNING_DISCORD_BOT_TOKEN;
+  delete process.env.DISCORD_BOT_TOKEN;
+  delete process.env.DISCORD_TOKEN;
+  process.env.CODEX_TUNNING_SECRETS_FILE = secretFile;
+  process.env.DATA_DIR = rootDir;
+  process.env.WEB_ENABLED = 'false';
+  process.env.CODEX_APP_SERVER_TURN_TIMEOUT_MS = '12345';
+
+  try {
+    const config = loadConfig();
+    assert.equal(config.codexAppServerTurnTimeoutMs, 12_345);
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+    await cleanupDir(rootDir);
+  }
+});
+
 test('loadConfig defaults web bind to lan-friendly 0.0.0.0', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-config-default-web-bind-');
   const secretFile = path.join(rootDir, 'secrets.env');
