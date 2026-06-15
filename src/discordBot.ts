@@ -215,6 +215,29 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function cancellableSleep(ms: number, shouldCancel: () => boolean, pollMs = 100): Promise<boolean> {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+
+    const tick = () => {
+      if (shouldCancel()) {
+        resolve(false);
+        return;
+      }
+
+      const elapsedMs = Date.now() - startedAt;
+      if (elapsedMs >= ms) {
+        resolve(true);
+        return;
+      }
+
+      setTimeout(tick, Math.min(pollMs, ms - elapsedMs)).unref?.();
+    };
+
+    tick();
+  });
+}
+
 interface PendingRuntimeViewRefresh {
   channel: SendableChannel;
   binding: ChannelBinding;
@@ -3907,7 +3930,7 @@ export class DiscordCodexBridge {
 
           this.scheduleRuntimeStateSave(conversationId, true);
           await this.refreshRuntimeViews(channel, binding, nextSession, runtime, isThreadConversation);
-          await this.waitBeforeRetry(
+          const shouldContinueRetry = await this.waitBeforeRetry(
             conversationId,
             runtime,
             channel,
@@ -3917,6 +3940,9 @@ export class DiscordCodexBridge {
             failureDiagnosis.kind,
             attemptsUsed,
           );
+          if (!shouldContinueRetry) {
+            break;
+          }
           continue;
         }
 
@@ -4279,10 +4305,10 @@ export class DiscordCodexBridge {
     isThreadConversation: boolean,
     kind: ReturnType<typeof diagnoseCodexFailure>['kind'],
     attempt: number,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const delayMs = this.getRetryDelayMs(kind, attempt);
     if (delayMs <= 0 || !runtime.activeRun) {
-      return;
+      return !runtime.activeRun?.cancellationReason;
     }
 
     this.touchActiveRun(runtime.activeRun);
@@ -4291,7 +4317,7 @@ export class DiscordCodexBridge {
     this.pushRunTimeline(runtime, `⏱️ 上游返回 429 限流，等待 ${formatDurationMs(delayMs)} 后继续重试`);
     this.scheduleRuntimeStateSave(conversationId, true);
     await this.refreshRuntimeViews(channel, binding, session, runtime, isThreadConversation);
-    await sleep(delayMs);
+    return await cancellableSleep(delayMs, () => Boolean(runtime.activeRun?.cancellationReason));
   }
 
   private logCodexAttemptStart(

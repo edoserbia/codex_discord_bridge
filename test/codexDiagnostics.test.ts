@@ -110,6 +110,24 @@ test('diagnostics classifies surfaced 429 retry exhaustion as rate-limit', () =>
   assert.equal(diagnosis.kind, 'rate-limit');
 });
 
+test('diagnostics classifies selected model capacity failures as rate-limit', () => {
+  const diagnosis = diagnoseCodexFailure({
+    success: false,
+    exitCode: null,
+    signal: null,
+    usedResume: true,
+    turnCompleted: false,
+    agentMessages: [],
+    reasoning: [],
+    planItems: [],
+    stderr: ['Codex turn failed: Selected model is at capacity. Please try a different model.'],
+    commands: [],
+  });
+
+  assert.equal(diagnosis.retryable, true);
+  assert.equal(diagnosis.kind, 'rate-limit');
+});
+
 test('diagnostics classifies stale resume failures separately from generic exits', () => {
   const diagnosis = diagnoseCodexFailure({
     success: false,
@@ -121,6 +139,24 @@ test('diagnostics classifies stale resume failures separately from generic exits
     reasoning: [],
     planItems: [],
     stderr: ['Codex turn failed: conversation session not found for resume thread'],
+    commands: [],
+  });
+
+  assert.equal(diagnosis.retryable, true);
+  assert.equal(diagnosis.kind, 'stale-session');
+});
+
+test('diagnostics treats app-server turn completion timeouts as stale app-server sessions', () => {
+  const diagnosis = diagnoseCodexFailure({
+    success: false,
+    exitCode: null,
+    signal: null,
+    usedResume: true,
+    turnCompleted: false,
+    agentMessages: [],
+    reasoning: [],
+    planItems: [],
+    stderr: ['app-server turn 019ec908-23b1-7250-9966-14673bfaf13b timed out after 600000ms without a completion event'],
     commands: [],
   });
 

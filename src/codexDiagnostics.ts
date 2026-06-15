@@ -22,12 +22,15 @@ const TRANSIENT_CODEX_FAILURE_PATTERNS = [
 
 const RATE_LIMIT_CODEX_FAILURE_PATTERNS = [
   /rate limit/i,
+  /model is at capacity/i,
+  /capacity.*try (again|a different model)/i,
   /too many requests/i,
   /\b429\b/,
 ];
 
 const STALE_SESSION_FAILURE_PATTERNS = [
   /(thread|conversation|session).*(not found|missing|unknown|invalid|expired|stale)/i,
+  /app-server turn .* timed out after \d+ms without a completion event/i,
   /failed to resume/i,
   /could not resume/i,
   /resume.*failed/i,

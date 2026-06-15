@@ -48,6 +48,37 @@ async function writeStateFile(rootDir: string, nextState: any): Promise<void> {
   await writeFile(path.join(rootDir, 'data', 'state.json'), JSON.stringify(nextState, null, 2), 'utf8');
 }
 
+async function countFakeAppServerTurnStarts(logDir: string): Promise<number> {
+  const payloads = await readCompleteJsonLogs<{
+    method?: string;
+  }>(logDir);
+
+  return payloads.filter((payload) => payload.method === 'turn/start').length;
+}
+
+async function readCompleteJsonLogs<T>(logDir: string): Promise<T[]> {
+  const logFiles = await readdir(logDir).catch(() => []);
+  const payloads: T[] = [];
+
+  for (const fileName of logFiles) {
+    const raw = await readFile(path.join(logDir, fileName), 'utf8').catch(() => '');
+    if (!raw.trim()) {
+      continue;
+    }
+
+    try {
+      payloads.push(JSON.parse(raw) as T);
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  return payloads;
+}
+
 test('bridge binds a root channel and reuses session on follow-up prompts', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-root-');
   const workspace = await createWorkspace(rootDir);
@@ -1260,6 +1291,44 @@ test('bridge fails and clears a submitted app-server turn that never finishes', 
   }
 });
 
+test('bridge resets app-server thread after submitted turn timeouts before retrying', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-app-server-turn-timeout-reset-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-app-server-turn-timeout-reset-logs');
+  process.env.FAKE_CODEX_APP_SERVER_LOG_DIR = logDir;
+  const { bridge, store, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeAppServerCommand,
+    driverMode: 'app-server',
+    appServerTurnTimeoutMs: 100,
+    codexMaxAttempts: 2,
+  });
+  const rootChannel = new FakeChannel('channel-app-server-turn-timeout-reset', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[app-started-no-events] never completes'));
+
+    await waitFor(() => findSent(rootChannel, /执行失败/), 5_000);
+
+    const payloads = await readCompleteJsonLogs<{
+      method: string;
+      params?: { threadId?: string; input?: Array<{ text?: string }> };
+    }>(logDir);
+    const turnStarts = payloads.filter((payload) => payload.method === 'turn/start'
+      && String(payload.params?.input?.[0]?.text ?? '').includes('[app-started-no-events]'));
+
+    assert.equal(turnStarts.length, 2);
+    assert.notEqual(turnStarts[0]?.params?.threadId, turnStarts[1]?.params?.threadId);
+    assert.equal(store.getSession(rootChannel.id)?.codexThreadId, turnStarts[1]?.params?.threadId);
+  } finally {
+    await (bridge as any).stop?.();
+    delete process.env.FAKE_CODEX_APP_SERVER_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge falls back to queued guidance instead of native steer after the active run switches to legacy fallback', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-app-server-fallback-guide-');
   const workspace = await createWorkspace(rootDir);
@@ -1586,15 +1655,14 @@ test('autopilot prompts include the self-hosted GitLab host for managed projects
     await dispatch(bridge, createUserMessage(rootChannel, '!autopilot server on', { userId: 'admin-user' }));
     await dispatch(bridge, createUserMessage(rootChannel, '!autopilot project on', { userId: 'admin-user' }));
     await dispatch(bridge, createUserMessage(rootChannel, '!autopilot project run', { userId: 'admin-user' }));
+    let payloads: Array<{ prompt: string }> = [];
     await waitFor(async () => {
-      const files = await readdir(logDir).catch(() => []);
-      return files.length > 0;
+      payloads = await readCompleteJsonLogs<{
+        prompt: string;
+      }>(logDir);
+      return payloads.some((payload) => /https:\/\/mytokens\.live/.test(payload.prompt))
+        && payloads.some((payload) => /自建 GitLab/.test(payload.prompt));
     }, 15_000);
-
-    const logFiles = await readdir(logDir);
-    const payloads = await Promise.all(logFiles.map(async (fileName) => JSON.parse(await readFile(path.join(logDir, fileName), 'utf8')) as {
-      prompt: string;
-    }));
 
     assert.ok(payloads.some((payload) => /https:\/\/mytokens\.live/.test(payload.prompt)));
     assert.ok(payloads.some((payload) => /自建 GitLab/.test(payload.prompt)));
@@ -2009,6 +2077,49 @@ test('bridge backs off and keeps retrying app-server 429 failures until the task
   }
 });
 
+test('bridge cancels app-server retries during rate-limit backoff before another turn starts', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-app-rate-limit-cancel-backoff-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-app-rate-limit-cancel-backoff-logs');
+  process.env.FAKE_CODEX_APP_SERVER_LOG_DIR = logDir;
+  const { bridge, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeAppServerCommand,
+    driverMode: 'app-server',
+    codexRateLimitBaseDelayMs: 800,
+    codexRateLimitMaxDelayMs: 800,
+    codexRateLimitMaxAttempts: 20,
+  });
+  const rootChannel = new FakeChannel('channel-app-rate-limit-cancel-backoff', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[app-rate-limit-permanent] please keep going'));
+
+    await waitFor(async () => {
+      const runtime = (bridge as any).getRuntime(rootChannel.id);
+      const turnStarts = await countFakeAppServerTurnStarts(logDir);
+      return turnStarts === 1
+        && /429|限流/.test(runtime.activeRun?.latestActivity ?? '');
+    }, 10_000);
+
+    const turnStartsBeforeCancel = await countFakeAppServerTurnStarts(logDir);
+    await dispatch(bridge, createUserMessage(rootChannel, '!cancel', { userId: 'admin-user' }));
+    await waitFor(() => !(bridge as any).getDashboardData().some((entry: any) => entry.binding.channelId === rootChannel.id
+      && entry.conversations.some((conversation: any) => conversation.conversationId === rootChannel.id
+        && ['starting', 'running'].includes(conversation.status))), 10_000);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    const turnStartsAfterCancel = await countFakeAppServerTurnStarts(logDir);
+    assert.equal(turnStartsAfterCancel, turnStartsBeforeCancel);
+  } finally {
+    await (bridge as any).stop?.();
+    delete process.env.FAKE_CODEX_APP_SERVER_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge does not fail the Discord task while app-server keeps returning 429 rate limits', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-app-rate-limit-permanent-');
   const workspace = await createWorkspace(rootDir);
@@ -2041,10 +2152,15 @@ test('bridge does not fail the Discord task while app-server keeps returning 429
       && entry.conversations.some((conversation: any) => conversation.conversationId === rootChannel.id
         && ['starting', 'running'].includes(conversation.status))));
 
+    const turnStartsBeforeCancel = await countFakeAppServerTurnStarts(logDir);
     await dispatch(bridge, createUserMessage(rootChannel, '!cancel', { userId: 'admin-user' }));
     await waitFor(() => !(bridge as any).getDashboardData().some((entry: any) => entry.binding.channelId === rootChannel.id
       && entry.conversations.some((conversation: any) => conversation.conversationId === rootChannel.id
         && ['starting', 'running'].includes(conversation.status))), 10_000);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    const turnStartsAfterCancel = await countFakeAppServerTurnStarts(logDir);
+    assert.equal(turnStartsAfterCancel, turnStartsBeforeCancel);
   } finally {
     await (bridge as any).stop?.();
     delete process.env.FAKE_CODEX_APP_SERVER_LOG_DIR;
