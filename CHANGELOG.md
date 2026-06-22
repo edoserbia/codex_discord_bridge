@@ -8,6 +8,15 @@
 - 新增 `docs/ENGINES.md`，集中说明双引擎使用方法、上下文连续性、本机 resume 边界和 Autopilot 继承规则。
 - 补充 README 与 `docs/` 文档，统一说明当前 bridge 的文件收发、`!web`、管理员判定、`--skip-git-check`、`app-server` / `legacy-exec` 切换、任务自动恢复，以及 GitLab 远端使用方式。
 - 新增 `docs/GIT.md` 作为当前 Git / GitLab 主文档，旧 `docs/GITEE.md` 改为兼容提示入口。
+- 修复 macOS 服务化运行时 Discord REST / Gateway 代理不一致的问题：为 Node fetch/undici 和 Discord Gateway WebSocket 同时注入本地 HTTP CONNECT 代理，避免本机网络直连 Discord 时出现 TLS 证书错配或连接重置。
+
+### 版本差异表
+
+| 改动项 | 旧版本行为 | 新版本行为 | 改动原因 |
+| --- | --- | --- | --- |
+| Discord REST 代理 | Node fetch/undici 可能不稳定继承本地代理 | 通过 preload 在启动早期设置 undici `ProxyAgent` | 确保 Discord API 请求稳定走本地代理 |
+| Discord Gateway WebSocket 代理 | `ws` 不自动识别 `HTTP_PROXY` / `HTTPS_PROXY`，可能绕过代理直连 | 新增 `scripts/ws-proxy-preload.cjs`，为 Discord Gateway WebSocket 注入 HTTP CONNECT agent | 修复网关 TLS 证书错配、连接重置，保证 bot 能登录 |
+| macOS 服务启动参数 | 只注入系统证书参数 | 同时注入系统证书与 WebSocket 代理 preload | 让 LaunchDaemon 开机自启后也具备同样网络修复能力 |
 
 ## v0.3.3 - 2026-03-14
 

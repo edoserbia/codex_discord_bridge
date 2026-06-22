@@ -1057,7 +1057,9 @@ maybe_configure_node_tls() {
   raw_ca_cert="$(read_bridge_ca_cert_value || true)"
 
   append_node_option_flag '--use-system-ca'
+  append_node_option_flag "--require=${ROOT_DIR}/scripts/ws-proxy-preload.cjs"
   print_info '已为 Node 启用系统证书信任（--use-system-ca）'
+  print_info '已为 Discord Gateway WebSocket 启用代理预加载补丁'
 
   if [[ -n "${raw_ca_cert}" ]]; then
     ca_cert="$(expand_home_path "${raw_ca_cert}")"
