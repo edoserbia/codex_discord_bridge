@@ -3,10 +3,11 @@ import { spawn } from 'node:child_process';
 import readline from 'node:readline';
 
 import type { AppConfig } from './config.js';
-import type { ApprovalPolicy, ChannelBinding, CodexRunInput, CodexRunResult, CommandRecord } from './types.js';
+import type { ApprovalPolicy, ChannelBinding, ClaudePermissionRequest, CodexRunInput, CodexRunResult, CommandRecord } from './types.js';
 import type { CodexExecutionDriver, CodexRunHooks, RunningCodexJob } from './codexRunner.js';
 
 import { buildCodexChildEnv } from './codexChildEnv.js';
+import { readEffectiveClaudeModelSync } from './claudeSettings.js';
 import { uniqueStrings } from './utils.js';
 
 export class ClaudeRunner implements CodexExecutionDriver {
@@ -33,6 +34,7 @@ export class ClaudeRunner implements CodexExecutionDriver {
     const agentMessages: string[] = [];
     const reasoning: string[] = [];
     const stderr: string[] = [];
+    const claudePermissionRequests: ClaudePermissionRequest[] = [];
     let claudeSessionId = existingSessionId;
     let turnCompleted = false;
     let stdoutChain = Promise.resolve();
@@ -85,6 +87,13 @@ export class ClaudeRunner implements CodexExecutionDriver {
             await hooks.onAgentMessage?.(message);
           },
           appendDiagnostic: emitDiagnosticLine,
+          appendPermissionRequest: async (request) => {
+            if (!claudePermissionRequests.some((candidate) => candidate.id === request.id)) {
+              claudePermissionRequests.push(request);
+            }
+            const description = request.description ? ` · ${request.description}` : '';
+            await emitDiagnosticLine(`Claude permission required [${request.id}]: ${request.toolPattern}${description}`);
+          },
           markCompleted: () => {
             turnCompleted = true;
           },
@@ -163,6 +172,7 @@ export class ClaudeRunner implements CodexExecutionDriver {
         planItems: [],
         stderr,
         commands,
+        claudePermissionRequests: claudePermissionRequests.length > 0 ? claudePermissionRequests : undefined,
       };
 
       await hooks.onExit?.(result);
@@ -181,14 +191,15 @@ export class ClaudeRunner implements CodexExecutionDriver {
   }
 
   private buildArgs(binding: ChannelBinding, input: CodexRunInput, existingSessionId: string | undefined): string[] {
-    const args = ['-p', '--input-format', 'text', '--output-format', 'stream-json'];
+    const args = ['-p', '--verbose', '--input-format', 'text', '--output-format', 'stream-json'];
 
     if (existingSessionId) {
       args.push('--resume', existingSessionId);
     }
 
-    if (binding.codex.model) {
-      args.push('--model', binding.codex.model);
+    const effectiveClaudeModel = readEffectiveClaudeModelSync(binding.workspacePath, this.config.claudeSettingsPath).model;
+    if (effectiveClaudeModel) {
+      args.push('--model', effectiveClaudeModel);
     }
 
     args.push('--permission-mode', resolveClaudePermissionMode(binding.codex.sandboxMode, binding.codex.approvalPolicy));
@@ -206,6 +217,7 @@ export class ClaudeRunner implements CodexExecutionDriver {
       publishSessionId: (sessionId: string) => Promise<void>;
       appendAgentMessage: (message: string) => Promise<void>;
       appendDiagnostic: (line: string) => Promise<void>;
+      appendPermissionRequest: (request: ClaudePermissionRequest) => Promise<void>;
       markCompleted: () => void;
     },
   ): Promise<void> {
@@ -219,6 +231,14 @@ export class ClaudeRunner implements CodexExecutionDriver {
       const text = extractClaudeAssistantText(event);
       if (text) {
         await handlers.appendAgentMessage(text);
+      }
+      return;
+    }
+
+    if (type === 'permission_request' || type === 'permission-request' || type === 'tool_permission') {
+      const request = extractClaudePermissionRequest(event);
+      if (request) {
+        await handlers.appendPermissionRequest(request);
       }
       return;
     }
@@ -278,6 +298,28 @@ function extractClaudeAssistantText(event: Record<string, unknown>): string | un
   });
 
   return parts.join('\n').trim() || undefined;
+}
+
+function extractClaudePermissionRequest(event: Record<string, unknown>): ClaudePermissionRequest | undefined {
+  const id = extractString(event.id ?? event.request_id ?? event.requestId)
+    ?? `claude-${Math.random().toString(16).slice(2, 10)}`;
+  const toolPattern = extractString(
+    event.toolPattern
+      ?? event.tool_pattern
+      ?? event.tool
+      ?? event.tool_name
+      ?? event.toolName,
+  );
+
+  if (!toolPattern) {
+    return undefined;
+  }
+
+  return {
+    id,
+    toolPattern,
+    description: extractString(event.description ?? event.reason ?? event.message),
+  };
 }
 
 function terminateChild(child: ReturnType<typeof spawn>): void {

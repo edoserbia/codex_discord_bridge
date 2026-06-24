@@ -70,6 +70,15 @@ import { buildPromptWithAttachments, downloadAttachments, extractMessageAttachme
 import { appendBridgeFileSendInstructions, extractBridgeFileSendDirective } from './bridgeFileSendProtocol.js';
 import { diagnoseCodexFailure, filterDiagnosticStderr, isIgnorableCodexStderrLine } from './codexDiagnostics.js';
 import { loadCodexGlobalModel, resolveCodexConfigPath, writeCodexGlobalModel } from './codexConfig.js';
+import {
+  allowClaudeProjectTool,
+  clearClaudeProjectModel,
+  readClaudeGlobalModel,
+  readClaudeProjectModel,
+  readEffectiveClaudeModel,
+  writeClaudeGlobalModel,
+  writeClaudeProjectModel,
+} from './claudeSettings.js';
 import { isCommandMessage, parseCommand } from './commandParser.js';
 import { buildEngineContextPrompt, shouldInjectEngineContext } from './engineContext.js';
 import { appendBridgeProjectContext } from './projectContext.js';
@@ -254,6 +263,18 @@ interface PendingFileSelection {
 interface PendingLocalSessionTurn {
   resolve: (result: LocalSessionSendResult) => void;
   reject: (error: Error) => void;
+}
+
+interface PendingClaudePermission {
+  id: string;
+  bindingChannelId: string;
+  conversationId: string;
+  workspacePath: string;
+  projectName: string;
+  toolPattern: string;
+  description?: string | undefined;
+  task: PromptTask;
+  createdAt: string;
 }
 
 interface AutopilotControlResult {
@@ -452,6 +473,7 @@ export class DiscordCodexBridge {
   private readonly autopilotBoardSnapshots = new Map<string, AutopilotProjectState['board']>();
   private readonly pendingFileSelections = new Map<string, PendingFileSelection>();
   private readonly pendingLocalSessionTurns = new Map<string, PendingLocalSessionTurn>();
+  private readonly pendingClaudePermissions = new Map<string, PendingClaudePermission>();
   private autopilotTicker: NodeJS.Timeout | undefined;
   private autopilotTickInFlight = false;
 
@@ -1770,6 +1792,20 @@ export class DiscordCodexBridge {
         }
         await this.handleModelCommand(message, resolved, command);
         return;
+      case 'claude-model':
+        if (command.action !== 'status' && !this.isAdmin(message)) {
+          await message.reply('只有管理员才能切换 Claude 模型。');
+          return;
+        }
+        await this.handleClaudeModelCommand(message, resolved, command);
+        return;
+      case 'claude-permission':
+        if (!this.isAdmin(message)) {
+          await message.reply('只有管理员才能批准或拒绝 Claude 权限。');
+          return;
+        }
+        await this.handleClaudePermissionCommand(message, command);
+        return;
       case 'autopilot':
         if (command.scope === 'help') {
           await this.replyWithChunks(message, formatAutopilotHelp(this.config.commandPrefix));
@@ -1994,6 +2030,235 @@ export class DiscordCodexBridge {
     );
   }
 
+  private async handleClaudeModelCommand(
+    message: Message,
+    resolved: ResolvedConversation | undefined,
+    command: Extract<ParsedCommand, { kind: 'claude-model' }>,
+  ): Promise<void> {
+    if (command.scope === 'global') {
+      if (command.action === 'status') {
+        const globalModel = await readClaudeGlobalModel(this.getClaudeSettingsPath());
+        await message.reply(
+          [
+            '🧠 **Claude 全局模型**',
+            `全局模型：${globalModel ? `\`${globalModel}\`` : '未在配置文件中显式设置'}`,
+            `配置文件：\`${this.getClaudeSettingsPath()}\``,
+            '说明：Claude 运行前会先读取项目 `.claude/settings.json`，没有项目覆盖时再读取这个全局配置。',
+          ].join('\n'),
+        );
+        return;
+      }
+
+      const nextModel = command.model.trim();
+      await writeClaudeGlobalModel(this.getClaudeSettingsPath(), nextModel);
+      await this.refreshStatusPanelsForBindings(this.store.listBindings().map((binding) => binding.channelId));
+      await message.reply(
+        [
+          `已切换 Claude 全局模型为 \`${nextModel}\`。`,
+          `配置文件：\`${this.getClaudeSettingsPath()}\``,
+          '运行中的任务不会被打断；下一轮 Claude 请求开始使用新模型，除非项目有自己的覆盖配置。',
+        ].join('\n'),
+      );
+      return;
+    }
+
+    if (!resolved) {
+      await message.reply('当前频道未绑定项目。先执行 `!bind`。');
+      return;
+    }
+
+    const binding = this.store.getBinding(resolved.bindingChannelId);
+    if (!binding) {
+      await message.reply('当前频道未绑定项目。先执行 `!bind`。');
+      return;
+    }
+
+    if (command.action === 'status') {
+      await message.reply(await this.formatClaudeProjectModelStatusMessage(binding));
+      return;
+    }
+
+    if (command.action === 'set') {
+      const nextModel = command.model.trim();
+      await writeClaudeProjectModel(binding.workspacePath, nextModel);
+      await this.refreshStatusPanelsForBindings([binding.channelId]);
+      await message.reply(
+        [
+          `已将 Claude 项目模型切换为 \`${nextModel}\`。`,
+          `项目：**${binding.projectName}**`,
+          `配置文件：\`${path.join(binding.workspacePath, '.claude', 'settings.json')}\``,
+          '来源：项目覆盖',
+          '运行中的任务不会被打断；下一轮 Claude 请求开始使用新模型。',
+        ].join('\n'),
+      );
+      return;
+    }
+
+    await clearClaudeProjectModel(binding.workspacePath);
+    await this.refreshStatusPanelsForBindings([binding.channelId]);
+    const globalModel = await readClaudeGlobalModel(this.getClaudeSettingsPath());
+    await message.reply(
+      [
+        '已清除当前项目的 Claude 模型覆盖，恢复跟随全局。',
+        `项目：**${binding.projectName}**`,
+        `全局模型：${globalModel ? `\`${globalModel}\`` : '未在配置文件中显式设置'}`,
+        '运行中的任务不会被打断；下一轮 Claude 请求开始使用新的生效配置。',
+      ].join('\n'),
+    );
+  }
+
+  private async handleClaudePermissionCommand(
+    message: Message,
+    command: Extract<ParsedCommand, { kind: 'claude-permission' }>,
+  ): Promise<void> {
+    const requestId = command.requestId.trim();
+    const pending = this.pendingClaudePermissions.get(requestId);
+
+    if (!pending) {
+      await message.reply(`找不到待处理的 Claude 权限请求：\`${requestId}\`。可能已经处理或 bridge 已重启。`);
+      return;
+    }
+
+    this.pendingClaudePermissions.delete(requestId);
+
+    if (command.action === 'deny') {
+      await message.reply(
+        [
+          `已拒绝 Claude 权限 \`${requestId}\`。`,
+          `项目：**${pending.projectName}**`,
+          `规则：\`${pending.toolPattern}\``,
+          '原任务不会自动重试。',
+        ].join('\n'),
+      );
+      return;
+    }
+
+    await allowClaudeProjectTool(pending.workspacePath, pending.toolPattern);
+
+    if (pending.task.attachments.length > 0 || pending.task.attachmentDir) {
+      await message.reply(
+        [
+          `已批准 Claude 权限 \`${requestId}\`。`,
+          `项目：**${pending.projectName}**`,
+          `规则：\`${pending.toolPattern}\``,
+          `配置文件：\`${path.join(pending.workspacePath, '.claude', 'settings.json')}\``,
+          '原请求包含附件；为避免使用已清理的临时文件，bridge 不会自动重试。请重新发送原请求。',
+        ].join('\n'),
+      );
+      return;
+    }
+
+    await this.enqueueClaudePermissionRetry(pending);
+    await message.reply(
+      [
+        `已批准 Claude 权限 \`${requestId}\`。`,
+        `项目：**${pending.projectName}**`,
+        `规则：\`${pending.toolPattern}\``,
+        `配置文件：\`${path.join(pending.workspacePath, '.claude', 'settings.json')}\``,
+        '已把原任务重新加入队列并优先执行。',
+      ].join('\n'),
+    );
+  }
+
+  private async enqueueClaudePermissionRetry(pending: PendingClaudePermission): Promise<void> {
+    const binding = this.store.getBinding(pending.bindingChannelId);
+    if (!binding) {
+      return;
+    }
+
+    const channel = await this.fetchChannel(pending.conversationId);
+    if (!channel) {
+      return;
+    }
+
+    const runtime = this.getRuntime(pending.conversationId);
+    const retryTask: PromptTask = {
+      ...structuredClone(pending.task),
+      id: randomUUID(),
+      engine: pending.task.engine ?? 'claude',
+      prompt: pending.task.rootPrompt,
+      effectivePrompt: pending.task.rootEffectivePrompt,
+      rootPrompt: pending.task.rootPrompt,
+      rootEffectivePrompt: pending.task.rootEffectivePrompt,
+      guidancePrompt: undefined,
+      enqueuedAt: new Date().toISOString(),
+      attachments: [],
+      attachmentDir: undefined,
+      priority: 'normal',
+      recovery: undefined,
+    };
+
+    runtime.queue.unshift(retryTask);
+    this.scheduleRuntimeStateSave(pending.conversationId, true);
+    const session = await this.store.ensureSession(pending.bindingChannelId, pending.conversationId);
+    await this.safeRefreshStatusPanel(channel, binding, session, runtime, pending.conversationId !== pending.bindingChannelId);
+    this.startProcessQueue(pending.conversationId);
+  }
+
+  private registerClaudePermissionRequests(
+    binding: ChannelBinding,
+    task: PromptTask,
+    result: CodexRunResult,
+  ): string | undefined {
+    const requests = result.claudePermissionRequests ?? [];
+    if (requests.length === 0) {
+      return undefined;
+    }
+
+    const lines = [
+      'Claude 需要权限才能继续执行。',
+      `项目：**${binding.projectName}**`,
+    ];
+
+    for (const request of requests) {
+      const requestId = this.allocateClaudePermissionRequestId(request.id);
+      this.pendingClaudePermissions.set(requestId, {
+        id: requestId,
+        bindingChannelId: task.bindingChannelId,
+        conversationId: task.conversationId,
+        workspacePath: binding.workspacePath,
+        projectName: binding.projectName,
+        toolPattern: request.toolPattern,
+        description: request.description,
+        task: structuredClone(task),
+        createdAt: new Date().toISOString(),
+      });
+
+      lines.push(
+        '',
+        `请求：\`${requestId}\``,
+        `规则：\`${request.toolPattern}\``,
+      );
+
+      if (request.description) {
+        lines.push(`说明：${truncate(request.description, 240)}`);
+      }
+
+      lines.push(
+        `批准：\`${this.config.commandPrefix}approve ${requestId}\``,
+        `拒绝：\`${this.config.commandPrefix}deny ${requestId}\``,
+      );
+    }
+
+    return lines.join('\n');
+  }
+
+  private allocateClaudePermissionRequestId(rawId: string): string {
+    const baseId = rawId.trim() || `claude-${randomUUID().slice(0, 8)}`;
+    if (!this.pendingClaudePermissions.has(baseId)) {
+      return baseId;
+    }
+
+    for (let index = 2; index < 100; index += 1) {
+      const candidate = `${baseId}-${index}`;
+      if (!this.pendingClaudePermissions.has(candidate)) {
+        return candidate;
+      }
+    }
+
+    return `${baseId}-${randomUUID().slice(0, 8)}`;
+  }
+
   private async handleUnbindCommand(message: Message): Promise<void> {
     const existing = await this.unbindChannel(message.channelId);
 
@@ -2007,6 +2272,10 @@ export class DiscordCodexBridge {
 
   private getCodexConfigPath(): string {
     return resolveCodexConfigPath(this.config.codexConfigPath);
+  }
+
+  private getClaudeSettingsPath(): string {
+    return this.config.claudeSettingsPath;
   }
 
   private async getGlobalCodexModel(): Promise<string | undefined> {
@@ -2051,6 +2320,23 @@ export class DiscordCodexBridge {
       `全局模型：${globalModel ? `\`${globalModel}\`` : '未在配置文件中显式设置'}`,
       `当前生效：${effectiveModel ? `\`${effectiveModel}\`` : 'Codex 默认配置'}`,
       '说明：切换模型不会 reset 当前会话；运行中的本轮继续使用旧模型，下一轮开始使用新模型。',
+    ].join('\n');
+  }
+
+  private async formatClaudeProjectModelStatusMessage(binding: ChannelBinding): Promise<string> {
+    const globalModel = await readClaudeGlobalModel(this.getClaudeSettingsPath());
+    const projectModel = await readClaudeProjectModel(binding.workspacePath);
+    const effectiveModel = await readEffectiveClaudeModel(binding.workspacePath, this.getClaudeSettingsPath());
+
+    return [
+      '🧠 **Claude 项目模型**',
+      `项目：**${binding.projectName}**`,
+      `项目模型：${projectModel ? `\`${projectModel}\`（项目覆盖）` : '跟随全局'}`,
+      `全局模型：${globalModel ? `\`${globalModel}\`` : '未在配置文件中显式设置'}`,
+      `当前生效：${effectiveModel.model ? `\`${effectiveModel.model}\`` : 'Claude CLI 默认配置'}`,
+      `项目配置：\`${effectiveModel.projectSettingsPath}\``,
+      `全局配置：\`${effectiveModel.globalSettingsPath}\``,
+      '说明：Claude 模型切换不会 reset 当前会话；运行中的本轮继续使用旧模型，下一轮开始使用新模型。',
     ].join('\n');
   }
 
@@ -4005,6 +4291,9 @@ export class DiscordCodexBridge {
       }
       nextSession = await this.store.updateSession(conversationId, completedSessionPatch, currentTask.bindingChannelId);
 
+      const claudePermissionNotice = !result.success && currentTask.origin === 'user'
+        ? this.registerClaudePermissionRequests(binding, currentTask, result)
+        : undefined;
       await this.safeRefreshProgressMessage(channel, binding, runtime);
       nextSession = await this.recordTranscriptForCompletedTask(
         channel,
@@ -4018,7 +4307,10 @@ export class DiscordCodexBridge {
       if (!suppressReply && currentTask.origin === 'user') {
         const replyPayload = result.success
           ? await this.buildSuccessReplyPayload(channel, binding, currentTask, result)
-          : formatFailureReply(binding, currentTask.requestedBy, result);
+          : [
+              formatFailureReply(binding, currentTask.requestedBy, result),
+              claudePermissionNotice,
+            ].filter((value): value is string => Boolean(value)).join('\n\n');
         await this.safeReplyToOriginalMessage(
           channel,
           runtime,

@@ -19,6 +19,7 @@ function makeConfig(rootDir: string): AppConfig {
     dataDir: path.join(rootDir, 'data'),
     codexCommand: fakeCodexCommand,
     claudeCommand: fakeClaudeCommand,
+    claudeSettingsPath: path.join(rootDir, '.claude', 'settings.json'),
     codexDriverMode: 'legacy-exec',
     codexMaxAttempts: 10,
     codexRateLimitMaxAttempts: 0,

@@ -145,6 +145,13 @@ sudo ./scripts/install-service.sh --mode daemon
 !status
 !claude <请求内容>
 !codex <请求内容>
+!claude-model status
+!claude-model set claude-opus-4-6
+!claude-model project status
+!claude-model project set claude-sonnet-4-6
+!claude-model project clear
+!approve <Claude权限请求ID>
+!deny <Claude权限请求ID>
 !queue
 !queue insert 2
 !queue remove 2
@@ -167,6 +174,15 @@ sudo ./scripts/install-service.sh --mode daemon
 `!claude` 和 `!codex` 是单次请求覆盖默认引擎，不会修改频道绑定。例如：默认绑定 Claude 后，临时发 `!codex 按刚才的结论改代码`，下一条普通消息仍然回到 Claude。
 
 切换引擎不会清掉另一边上下文。Bridge 会分别保存 Codex thread 和 Claude session，并在跨引擎时把最近 transcript 摘要带给新引擎。
+
+Claude 模型切换使用 settings JSON 文件：
+
+- `!claude-model set <模型>` 写全局 Claude settings，默认是 `~/.claude/settings.json`
+- `!claude-model project set <模型>` 写当前绑定目录里的 `.claude/settings.json`
+- 当前项目的 `.claude/settings.json` 优先于全局 settings
+- `!claude-model project clear` 只清除当前项目的 `model`，恢复跟随全局
+
+如果 Claude CLI 需要工具权限，Bridge 会在 Discord 中返回请求 ID。管理员可以发送 `!approve <请求ID>` 批准，或 `!deny <请求ID>` 拒绝。批准只会写当前项目目录下的 `.claude/settings.json`。
 
 `!guide` 的语义是“插入中途引导，再继续原任务”，不是直接丢弃当前复杂任务。
 

@@ -8,6 +8,7 @@ import { createBridgeTestRig } from './helpers/bridgeSetup.js';
 import { cleanupDir, createWorkspace, makeTempDir, waitFor } from './helpers/testUtils.js';
 
 const fakeAppServerCommand = path.resolve('test/fixtures/fake-codex-app-server.mjs');
+const fakeClaudeCommand = path.resolve('test/fixtures/fake-claude.mjs');
 
 async function dispatch(bridge: unknown, message: unknown): Promise<void> {
   await (bridge as any).handleMessage(message as any);
@@ -160,6 +161,54 @@ test('project model clear returns the binding to the global model and reports th
     await waitFor(() => rootChannel.sent.some((message) => /全局模型：`gpt-global`/.test(message.content)), 15_000);
     assert.ok(rootChannel.sent.some((message) => /项目模型：跟随全局/.test(message.content)));
   } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('Claude model commands write global and project settings files and project override wins', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-claude-model-');
+  const workspace = await createWorkspace(rootDir);
+  const claudeSettingsPath = path.join(rootDir, '.claude', 'settings.json');
+  const claudeLogDir = path.join(rootDir, 'fake-claude-logs');
+  process.env.FAKE_CLAUDE_LOG_DIR = claudeLogDir;
+
+  const { bridge, channels } = await createBridgeTestRig({
+    rootDir,
+    claudeCommand: fakeClaudeCommand,
+    claudeSettingsPath,
+  });
+  const rootChannel = new FakeChannel('channel-claude-model', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}" --engine claude`, { userId: 'admin-user' }));
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!claude-model set claude-global', { userId: 'admin-user' }));
+    await waitFor(() => rootChannel.sent.some((message) => /Claude 全局模型/.test(message.content) && /claude-global/.test(message.content)), 15_000);
+
+    const globalSettings = JSON.parse(await readFile(claudeSettingsPath, 'utf8')) as { model?: string };
+    assert.equal(globalSettings.model, 'claude-global');
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!claude-model project set claude-project', { userId: 'admin-user' }));
+    await waitFor(() => rootChannel.sent.some((message) => /Claude 项目模型/.test(message.content) && /claude-project/.test(message.content)), 15_000);
+
+    const projectSettingsPath = path.join(workspace, '.claude', 'settings.json');
+    const projectSettings = JSON.parse(await readFile(projectSettingsPath, 'utf8')) as { model?: string };
+    assert.equal(projectSettings.model, 'claude-project');
+
+    await dispatch(bridge, createUserMessage(rootChannel, 'use claude project model'));
+    await waitFor(() => rootChannel.sent.some((message) => /Claude final: use claude project model/.test(message.content)), 5_000);
+
+    const logFiles = await readdir(claudeLogDir);
+    const payload = JSON.parse(await readFile(path.join(claudeLogDir, logFiles.sort().at(-1)!), 'utf8')) as {
+      args: {
+        model?: string;
+      };
+    };
+    assert.equal(payload.args.model, 'claude-project');
+  } finally {
+    delete process.env.FAKE_CLAUDE_LOG_DIR;
     await (bridge as any).stop?.();
     await cleanupDir(rootDir);
   }

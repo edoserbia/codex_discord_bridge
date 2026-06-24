@@ -233,3 +233,50 @@ test('parse project model clear command', () => {
     action: 'clear',
   });
 });
+
+test('parse Claude global model set command', () => {
+  const parsed = parseCommand('!claude-model set claude-opus-4-8', '!');
+  assert.deepEqual(parsed, {
+    kind: 'claude-model',
+    scope: 'global',
+    action: 'set',
+    model: 'claude-opus-4-8',
+  });
+});
+
+test('parse Claude project model set command', () => {
+  const parsed = parseCommand('!claude-model project set claude-sonnet-4-7', '!');
+  assert.deepEqual(parsed, {
+    kind: 'claude-model',
+    scope: 'project',
+    action: 'set',
+    model: 'claude-sonnet-4-7',
+  });
+});
+
+test('parse Claude project model clear command', () => {
+  const parsed = parseCommand('!claude-model project clear', '!');
+  assert.deepEqual(parsed, {
+    kind: 'claude-model',
+    scope: 'project',
+    action: 'clear',
+  });
+});
+
+test('parse Claude permission approval command', () => {
+  const parsed = parseCommand('!approve perm-123', '!');
+  assert.deepEqual(parsed, {
+    kind: 'claude-permission',
+    action: 'approve',
+    requestId: 'perm-123',
+  });
+});
+
+test('parse Claude permission denial command', () => {
+  const parsed = parseCommand('!deny perm-123', '!');
+  assert.deepEqual(parsed, {
+    kind: 'claude-permission',
+    action: 'deny',
+    requestId: 'perm-123',
+  });
+});

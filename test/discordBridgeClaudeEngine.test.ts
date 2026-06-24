@@ -155,3 +155,61 @@ test('bridge preserves native sessions when switching Codex to Claude and back t
     await cleanupDir(rootDir);
   }
 });
+
+test('bridge can approve a Claude permission request in Discord and retry the original task', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-claude-permission-approve-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeCodexCommand,
+    claudeCommand: fakeClaudeCommand,
+  });
+  const rootChannel = new FakeChannel('channel-claude-permission-approve', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}" --engine claude --sandbox workspace-write --approval on-request`, { userId: 'admin-user' }));
+
+    await dispatch(bridge, createUserMessage(rootChannel, '[permission] please run fake tool'));
+    await waitFor(() => findSent(rootChannel, /Claude 需要权限/) && findSent(rootChannel, /!approve perm-fake/), 5_000);
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!approve perm-fake', { userId: 'admin-user' }));
+    await waitFor(() => findSent(rootChannel, /已批准 Claude 权限/) && findSent(rootChannel, /Claude final: \[permission\] please run fake tool/), 5_000);
+
+    const projectSettings = JSON.parse(await readFile(path.join(workspace, '.claude', 'settings.json'), 'utf8')) as {
+      permissions?: { allow?: string[] };
+    };
+    assert.deepEqual(projectSettings.permissions?.allow, ['Bash(fake:*)']);
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('bridge can deny a Claude permission request without writing project allow rules', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-claude-permission-deny-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeCodexCommand,
+    claudeCommand: fakeClaudeCommand,
+  });
+  const rootChannel = new FakeChannel('channel-claude-permission-deny', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}" --engine claude --sandbox workspace-write --approval on-request`, { userId: 'admin-user' }));
+
+    await dispatch(bridge, createUserMessage(rootChannel, '[permission] please run fake tool'));
+    await waitFor(() => findSent(rootChannel, /Claude 需要权限/) && findSent(rootChannel, /!deny perm-fake/), 5_000);
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!deny perm-fake', { userId: 'admin-user' }));
+    await waitFor(() => findSent(rootChannel, /已拒绝 Claude 权限/), 5_000);
+
+    await assert.rejects(readFile(path.join(workspace, '.claude', 'settings.json'), 'utf8'), /ENOENT/);
+    assert.equal(rootChannel.sent.filter((message) => /Claude final: \[permission\] please run fake tool/.test(message.content)).length, 0);
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});

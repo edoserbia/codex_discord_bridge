@@ -25,6 +25,18 @@ CLAUDE_COMMAND=/opt/homebrew/bin/claude
 
 The macOS management script accepts a machine with only one engine installed, as long as at least one of `CODEX_COMMAND` or `CLAUDE_COMMAND` resolves to an executable command.
 
+Claude global settings default to:
+
+```text
+~/.claude/settings.json
+```
+
+Set `CLAUDE_SETTINGS_PATH` if the global settings file lives somewhere else. Project overrides always live directly in the bound workspace:
+
+```text
+<workspace>/.claude/settings.json
+```
+
 ## Bind Default Engine
 
 Use `--engine` when binding a Discord text channel:
@@ -46,6 +58,49 @@ Use a command prefix for a single request:
 ```
 
 This does not change the channel binding. The next plain message returns to the binding default engine.
+
+## Claude Model Selection
+
+Claude model switching is implemented through JSON settings files, not Claude CLI interactive model commands.
+
+```text
+!claude-model status
+!claude-model set claude-opus-4-6
+!claude-model project status
+!claude-model project set claude-sonnet-4-6
+!claude-model project clear
+```
+
+Resolution order for every Claude run:
+
+1. `<workspace>/.claude/settings.json`
+2. `CLAUDE_SETTINGS_PATH`, defaulting to `~/.claude/settings.json`
+3. Claude CLI default behavior
+
+Changing a model does not reset the Bridge conversation or the native Claude session id. A running turn keeps the model it already started with; the next Claude turn reads the latest JSON settings.
+
+## Claude Permissions
+
+Bridge asks Claude CLI to avoid interactive terminal prompts where possible. If Claude still emits a tool permission request, Bridge surfaces it in Discord:
+
+```text
+Claude 需要权限才能继续执行。
+批准：!approve <请求ID>
+拒绝：!deny <请求ID>
+```
+
+Approving writes the requested tool rule into the current project settings file only:
+
+```json
+{
+  "permissions": {
+    "allow": ["Bash(example:*)"],
+    "deny": []
+  }
+}
+```
+
+If the original request had no attachments, Bridge automatically requeues the original task after approval. If the original request had attachments, Bridge asks you to resend the request so it does not reuse cleaned-up temporary files.
 
 ## Context Continuity
 

@@ -25,6 +25,11 @@ export type ParsedCommand =
   | { kind: 'model'; scope: 'global'; action: 'set'; model: string }
   | { kind: 'model'; scope: 'project'; action: 'status' | 'clear' }
   | { kind: 'model'; scope: 'project'; action: 'set'; model: string }
+  | { kind: 'claude-model'; scope: 'global'; action: 'status' }
+  | { kind: 'claude-model'; scope: 'global'; action: 'set'; model: string }
+  | { kind: 'claude-model'; scope: 'project'; action: 'status' | 'clear' }
+  | { kind: 'claude-model'; scope: 'project'; action: 'set'; model: string }
+  | { kind: 'claude-permission'; action: 'approve' | 'deny'; requestId: string }
   | { kind: 'autopilot'; scope: 'help' }
   | { kind: 'autopilot'; scope: 'server'; action: 'on' | 'off' | 'clear' | 'status' }
   | { kind: 'autopilot'; scope: 'server'; action: 'concurrency'; parallelism: number }
@@ -168,6 +173,63 @@ function parseModelCommand(body: string): Extract<ParsedCommand, { kind: 'model'
   }
 
   throw new Error('用法：!model status | !model set <模型名> | !model project <status|set <模型名>|clear>');
+}
+
+function parseClaudeModelCommand(body: string): Extract<ParsedCommand, { kind: 'claude-model' }> {
+  const tokens = tokenizeCommand(body);
+  tokens.shift();
+
+  const scopeOrAction = tokens.shift()?.toLowerCase();
+
+  if (!scopeOrAction || scopeOrAction === 'status') {
+    return {
+      kind: 'claude-model',
+      scope: 'global',
+      action: 'status',
+    };
+  }
+
+  if (scopeOrAction === 'set') {
+    return {
+      kind: 'claude-model',
+      scope: 'global',
+      action: 'set',
+      model: readValue(tokens, '!claude-model set'),
+    };
+  }
+
+  if (scopeOrAction !== 'project') {
+    throw new Error('用法：!claude-model status | !claude-model set <模型名> | !claude-model project <status|set <模型名>|clear>');
+  }
+
+  const action = tokens.shift()?.toLowerCase();
+
+  if (!action || action === 'status') {
+    return {
+      kind: 'claude-model',
+      scope: 'project',
+      action: 'status',
+    };
+  }
+
+  if (action === 'set') {
+    return {
+      kind: 'claude-model',
+      scope: 'project',
+      action: 'set',
+      model: readValue(tokens, '!claude-model project set'),
+    };
+  }
+
+  if (action === 'clear') {
+    return {
+      kind: 'claude-model',
+      scope: 'project',
+      action: 'clear',
+    };
+  }
+
+  throw new Error('用法：!claude-model status | !claude-model set <模型名> | !claude-model project <status|set <模型名>|clear>');
 }
 
 function parseAutopilotCommand(body: string): Extract<ParsedCommand, { kind: 'autopilot' }> {
@@ -374,6 +436,16 @@ export function parseCommand(content: string, prefix: string): ParsedCommand {
       return parseAutopilotCommand(body);
     case 'model':
       return parseModelCommand(body);
+    case 'claude-model':
+    case 'claudemodel':
+      return parseClaudeModelCommand(body);
+    case 'approve':
+    case 'deny':
+      return {
+        kind: 'claude-permission',
+        action: command,
+        requestId: readValue(tokens, `!${command}`),
+      };
     case 'claude':
     case 'codex': {
       const prompt = body.slice(command.length).trim();

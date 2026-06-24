@@ -20,6 +20,7 @@ export async function createBridgeTestRig(options: {
   rootDir: string;
   codexCommand?: string;
   claudeCommand?: string;
+  claudeSettingsPath?: string;
   codexConfigPath?: string;
   driverMode?: 'legacy-exec' | 'app-server';
   appServerStartupTimeoutMs?: number;
@@ -47,6 +48,7 @@ export async function createBridgeTestRig(options: {
     codexConfigPath: options.codexConfigPath ?? path.join(options.rootDir, '.codex', 'config.toml'),
     codexCommand: options.codexCommand ?? 'codex',
     claudeCommand: options.claudeCommand ?? 'claude',
+    claudeSettingsPath: options.claudeSettingsPath ?? path.join(options.rootDir, '.claude', 'settings.json'),
     codexDriverMode: options.driverMode ?? 'legacy-exec',
     codexAppServerStartupTimeoutMs: options.appServerStartupTimeoutMs,
     codexAppServerTurnTimeoutMs: options.appServerTurnTimeoutMs,

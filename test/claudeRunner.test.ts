@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { readdir, readFile, realpath } from 'node:fs/promises';
+import { mkdir, readdir, readFile, realpath, writeFile } from 'node:fs/promises';
 
 import type { AppConfig } from '../src/config.js';
 import type { ChannelBinding } from '../src/types.js';
@@ -19,6 +19,7 @@ function makeConfig(rootDir: string, claudeCommand = fakeClaudeCommand): AppConf
     dataDir: path.join(rootDir, 'data'),
     codexCommand: 'codex',
     claudeCommand,
+    claudeSettingsPath: path.join(rootDir, '.claude', 'settings.json'),
     codexMaxAttempts: 10,
     codexRateLimitMaxAttempts: 0,
     codexRateLimitBaseDelayMs: 5_000,
@@ -84,7 +85,7 @@ test('claude runner handles simple execution and session creation', async () => 
   await cleanupDir(rootDir);
 });
 
-test('claude runner resumes an existing session and forwards model add-dir and permission args', async () => {
+test('claude runner resumes an existing session and forwards add-dir and permission args', async () => {
   const rootDir = await makeTempDir('claude-runner-args-');
   const workspace = await createWorkspace(rootDir);
   const extraDir = await createWorkspace(path.join(rootDir, 'extra'));
@@ -111,6 +112,7 @@ test('claude runner resumes an existing session and forwards model add-dir and p
       argv: string[];
       args: {
         print: boolean;
+        verbose: boolean;
         inputFormat: string;
         outputFormat: string;
         resumeSessionId?: string;
@@ -123,19 +125,82 @@ test('claude runner resumes an existing session and forwards model add-dir and p
     };
 
     assert.equal(payload.args.print, true);
+    assert.equal(payload.args.verbose, true);
     assert.equal(payload.args.inputFormat, 'text');
     assert.equal(payload.args.outputFormat, 'stream-json');
     assert.equal(payload.args.resumeSessionId, 'claude-session-existing');
-    assert.equal(payload.args.model, 'claude-sonnet-4');
+    assert.equal(payload.args.model, undefined);
     assert.equal(payload.args.permissionMode, 'bypassPermissions');
     assert.deepEqual(payload.args.addDirs.sort(), [extraDir, workspace].sort());
     assert.equal(payload.prompt, 'resume please');
     assert.equal(await realpath(payload.cwd), await realpath(workspace));
+    assert.ok(payload.argv.indexOf('--verbose') >= 0);
     assert.ok(payload.argv.indexOf('--resume') >= 0);
   } finally {
     delete process.env.FAKE_CLAUDE_LOG_DIR;
     await cleanupDir(rootDir);
   }
+});
+
+test('claude runner uses project Claude settings before global settings and ignores Codex binding model', async () => {
+  const rootDir = await makeTempDir('claude-runner-settings-model-');
+  const workspace = await createWorkspace(rootDir);
+  const globalSettingsPath = path.join(rootDir, '.claude', 'settings.json');
+  await mkdir(path.dirname(globalSettingsPath), { recursive: true });
+  await writeFile(globalSettingsPath, JSON.stringify({ model: 'claude-global' }, null, 2), 'utf8');
+  await mkdir(path.join(workspace, '.claude'), { recursive: true });
+  await writeFile(path.join(workspace, '.claude', 'settings.json'), JSON.stringify({ model: 'claude-project' }, null, 2), 'utf8');
+
+  const logDir = path.join(rootDir, 'fake-claude-logs');
+  process.env.FAKE_CLAUDE_LOG_DIR = logDir;
+
+  const runner = new ClaudeRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+  binding.codex.model = 'codex-only-model';
+
+  try {
+    const result = await runner.start(
+      binding,
+      { engine: 'claude', prompt: 'use settings model', imagePaths: [], extraAddDirs: [] },
+      undefined,
+    ).done;
+
+    assert.equal(result.success, true);
+
+    const logFiles = await readdir(logDir);
+    const payload = JSON.parse(await readFile(path.join(logDir, logFiles.sort().at(-1)!), 'utf8')) as {
+      args: {
+        model?: string;
+      };
+    };
+
+    assert.equal(payload.args.model, 'claude-project');
+  } finally {
+    delete process.env.FAKE_CLAUDE_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
+test('claude runner surfaces permission request events as diagnostics', async () => {
+  const rootDir = await makeTempDir('claude-runner-permission-');
+  const workspace = await createWorkspace(rootDir);
+  const runner = new ClaudeRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+  binding.codex.sandboxMode = 'workspace-write';
+  binding.codex.approvalPolicy = 'on-request';
+  const stderr: string[] = [];
+
+  const result = await runner.start(binding, { engine: 'claude', prompt: '[permission] please run git status', imagePaths: [], extraAddDirs: [] }, undefined, {
+    onStderr: async (line) => { stderr.push(line); },
+  }).done;
+
+  assert.equal(result.engine, 'claude');
+  assert.equal(result.success, false);
+  assert.equal(result.claudePermissionRequests?.length, 1);
+  assert.equal(result.claudePermissionRequests?.[0]?.toolPattern, 'Bash(fake:*)');
+  assert.ok(result.stderr.some((line) => /Claude permission required/.test(line)));
+  assert.ok(stderr.some((line) => /Claude permission required/.test(line)));
+  await cleanupDir(rootDir);
 });
 
 test('claude runner reports stream-json failures with stderr diagnostics', async () => {

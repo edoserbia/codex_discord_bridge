@@ -143,6 +143,12 @@ export interface CommandRecord {
   exitCode: number | null;
 }
 
+export interface ClaudePermissionRequest {
+  id: string;
+  toolPattern: string;
+  description?: string | undefined;
+}
+
 export interface GeneratedFileRecord {
   absolutePath: string;
   workspaceRelativePath: string;
@@ -265,6 +271,7 @@ export interface CodexRunResult {
   stderr: string[];
   commands: CommandRecord[];
   generatedFiles?: GeneratedFileRecord[] | undefined;
+  claudePermissionRequests?: ClaudePermissionRequest[] | undefined;
 }
 
 export type AppServerPlanStatus = 'pending' | 'in_progress' | 'completed';
