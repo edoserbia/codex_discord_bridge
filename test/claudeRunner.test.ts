@@ -252,6 +252,7 @@ test('claude runner streams cumulative text and Bash command progress', async ()
       output: 'On branch main',
       exitCode: 0,
     });
+    assert.equal(result.agentMessages.length, 2);
     assert.equal(result.success, true);
     assert.match(result.agentMessages.at(-1) ?? '', /Claude final: \[stream-progress\] inspect repository/);
   } finally {

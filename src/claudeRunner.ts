@@ -62,6 +62,7 @@ export class ClaudeRunner implements CodexExecutionDriver {
     const toolCalls = new Map<string, ClaudeToolCallState>();
     const toolIdsByBlockIndex = new Map<number, string>();
     let assistantTextBuffer = '';
+    let assistantMessageIndex: number | undefined;
     let claudeSessionId = existingSessionId;
     let turnCompleted = false;
     let stdoutChain = Promise.resolve();
@@ -119,6 +120,8 @@ export class ClaudeRunner implements CodexExecutionDriver {
           },
           startAssistantMessage: () => {
             assistantTextBuffer = '';
+            assistantMessageIndex = undefined;
+            toolIdsByBlockIndex.clear();
           },
           appendAssistantText: async (message, mode) => {
             if (mode === 'delta') {
@@ -140,10 +143,16 @@ export class ClaudeRunner implements CodexExecutionDriver {
             if (!nextMessage) {
               return;
             }
-            if (agentMessages.at(-1) !== nextMessage) {
+            const previousMessage = assistantMessageIndex === undefined
+              ? undefined
+              : agentMessages[assistantMessageIndex];
+            if (assistantMessageIndex === undefined) {
               agentMessages.push(nextMessage);
-              await hooks.onAgentMessage?.(nextMessage);
-            } else if (mode === 'delta') {
+              assistantMessageIndex = agentMessages.length - 1;
+            } else {
+              agentMessages[assistantMessageIndex] = nextMessage;
+            }
+            if (previousMessage !== nextMessage) {
               await hooks.onAgentMessage?.(nextMessage);
             }
           },
