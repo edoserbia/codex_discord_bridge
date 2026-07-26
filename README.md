@@ -115,14 +115,16 @@ Claude 引擎通过本机 Claude CLI 执行，默认命令为：
 CLAUDE_COMMAND=claude
 ```
 
-Bridge 会使用 Claude CLI 的 stream-json 输出，并为 Claude 单独保存 `claudeSessionId`。当你从 Codex 切到 Claude，或从 Claude 切回 Codex，Bridge 会把当前 Discord 会话最近的 transcript 摘要注入到新引擎，让任务能延续上下文；但两边并不是同一个原生 session。
+Bridge 会使用 Claude CLI 的 stream-json 输出和官方 `--include-partial-messages`，把回复草稿、Bash 命令和工具结果实时刷新到 Discord 进度卡，并为 Claude 单独保存 `claudeSessionId`。当你从 Codex 切到 Claude，或从 Claude 切回 Codex，Bridge 会把当前 Discord 会话最近的 transcript 摘要注入到新引擎，让任务能延续上下文；但两边并不是同一个原生 session。
 
 权限和模型参数按 Claude CLI 配置文件映射：
 
 - `--engine claude` 让普通消息默认走 Claude
 - `!claude <请求>` 只让当前这一条走 Claude
-- `!claude-model set <模型>` 会写全局 Claude 配置，默认路径是 `/Users/mac/.claude/settings.json`
-- `!claude-model project set <模型>` 会写当前绑定项目目录里的 `.claude/settings.json`
+- `!model ...` 默认按当前绑定引擎读写模型；Claude 项目中的 `!model project status` 会显示 Claude 模型
+- `!model codex ...` 和 `!model claude ...` 可以显式管理两套独立的全局/项目模型
+- `!claude-model ...` 保留为 Claude 模型命令的兼容别名
+- Claude 全局模型默认写入 `/Users/mac/.claude/settings.json`，项目模型写入绑定目录里的 `.claude/settings.json`
 - 项目 `.claude/settings.json` 的 `model` 优先于全局 Claude settings
 - 当绑定使用 `--sandbox danger-full-access --approval never` 时，Claude CLI 会使用 bypass permissions 模式
 - 如果 Claude CLI 仍返回工具权限请求，Bridge 会在 Discord 中给出 `!approve <请求ID>` / `!deny <请求ID>`；批准后只写当前项目的 `.claude/settings.json`，并在无附件请求下自动重试原任务
@@ -393,11 +395,11 @@ Bridge 会中断当前步骤，在当前引擎会话里先处理新增引导，�
 | `!bind <project> <path> [...]` | 把当前主频道绑定到本地目录 |
 | `!claude <内容>` | 当前这一条请求使用 Claude |
 | `!codex <内容>` | 当前这一条请求使用 Codex |
-| `!claude-model status` | 查看 Claude 全局模型配置 |
-| `!claude-model set <model>` | 修改 Claude 全局模型，写入全局 settings JSON |
-| `!claude-model project status` | 查看当前项目 Claude 模型覆盖和生效来源 |
-| `!claude-model project set <model>` | 修改当前项目 Claude 模型，写入项目 `.claude/settings.json` |
-| `!claude-model project clear` | 清除当前项目 Claude 模型覆盖 |
+| `!model status/set <model>` | 查看或修改当前绑定引擎的全局模型 |
+| `!model project status/set <model>/clear` | 查看或修改当前绑定引擎的项目模型 |
+| `!model codex ...` | 显式查看或修改 Codex 全局/项目模型 |
+| `!model claude ...` | 显式查看或修改 Claude 全局/项目模型 |
+| `!claude-model ...` | Claude 模型命令的兼容别名 |
 | `!approve <请求ID>` | 批准 Claude CLI 申请的工具权限 |
 | `!deny <请求ID>` | 拒绝 Claude CLI 申请的工具权限 |
 | `!status` | 查看当前会话状态、Resume ID 和本机续聊命令 |

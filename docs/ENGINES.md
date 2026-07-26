@@ -59,17 +59,29 @@ Use a command prefix for a single request:
 
 This does not change the channel binding. The next plain message returns to the binding default engine.
 
-## Claude Model Selection
+## Engine-aware Model Selection
 
-Claude model switching is implemented through JSON settings files, not Claude CLI interactive model commands.
+The generic command follows the current binding engine:
 
 ```text
-!claude-model status
-!claude-model set claude-opus-4-6
-!claude-model project status
-!claude-model project set claude-sonnet-4-6
-!claude-model project clear
+!model status
+!model set <model>
+!model project status
+!model project set <model>
+!model project clear
 ```
+
+Use an explicit selector to manage either engine from any bound context:
+
+```text
+!model codex status
+!model codex set gpt-5.5
+!model claude status
+!model claude set claude-opus-4-6
+!model claude project set claude-sonnet-4-6
+```
+
+`!claude-model ...` remains a compatibility alias. Claude model switching uses JSON settings files, not Claude CLI interactive model commands.
 
 Resolution order for every Claude run:
 
@@ -78,6 +90,8 @@ Resolution order for every Claude run:
 3. Claude CLI default behavior
 
 Changing a model does not reset the Bridge conversation or the native Claude session id. A running turn keeps the model it already started with; the next Claude turn reads the latest JSON settings.
+
+Claude live progress uses official Claude CLI `stream-json` plus `--include-partial-messages`. The Discord progress card updates with cumulative reply drafts, Bash commands, and tool results before the final result arrives.
 
 ## Claude Permissions
 

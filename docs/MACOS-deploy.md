@@ -673,17 +673,20 @@ Discord bot connected as <bot-name>#<discriminator>
 
 Bridge 会分别保留 Codex thread 和 Claude session。跨引擎时，会把最近 transcript 摘要交给新引擎，所以不会因为切换引擎而丢掉 Discord 会话上下文。
 
-### 3. 切换 Claude 模型
+### 3. 按引擎切换模型
 
-Claude 模型切换通过 settings JSON 文件完成，不调用 Claude CLI 的交互式模型切换命令。
+`!model` 默认跟随当前频道绑定的引擎，也可以显式指定 Codex 或 Claude：
 
 ```text
-!claude-model status
-!claude-model set claude-opus-4-6
-!claude-model project status
-!claude-model project set claude-sonnet-4-6
-!claude-model project clear
+!model status
+!model project status
+!model codex set gpt-5.5
+!model claude set claude-opus-4-6
+!model claude project set claude-sonnet-4-6
+!model claude project clear
 ```
+
+`!claude-model ...` 继续作为兼容别名。Claude 模型切换通过 settings JSON 文件完成，不调用 Claude CLI 的交互式模型切换命令。
 
 生效顺序：
 
@@ -692,6 +695,8 @@ Claude 模型切换通过 settings JSON 文件完成，不调用 Claude CLI 的�
 - Claude CLI 自己的默认值
 
 项目级设置只影响当前绑定目录。全局设置会影响没有项目覆盖的 Claude 项目。
+
+Claude 执行使用官方 stream-json partial messages；Discord 会在任务完成前持续刷新回复草稿、Bash 命令和工具结果。
 
 ### 4. Discord 中确认 Claude 权限
 
