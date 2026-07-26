@@ -47,6 +47,37 @@ test('bridge can bind a channel to Claude as the default engine', { concurrency:
   }
 });
 
+test('bridge refreshes Claude draft and command progress before the final result', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-claude-live-progress-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, store, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeCodexCommand,
+    claudeCommand: fakeClaudeCommand,
+  });
+  const rootChannel = new FakeChannel('channel-claude-live-progress', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}" --engine claude`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[stream-progress] inspect repository'));
+
+    await waitFor(() => rootChannel.sent.some((message) => /Codex Discord Bridge 实时进度/.test(message.content)), 5_000);
+    const progressMessage = rootChannel.sent.find((message) => /Codex Discord Bridge 实时进度/.test(message.content));
+    assert.ok(progressMessage);
+
+    await waitFor(() => /Claude 正在检查仓库/.test(progressMessage!.content)
+      && /当前命令：`git status`/.test(progressMessage!.content), 5_000);
+    assert.equal(findSent(rootChannel, /Claude final: \[stream-progress\] inspect repository/), false);
+
+    await waitFor(() => findSent(rootChannel, /Claude final: \[stream-progress\] inspect repository/), 5_000);
+    assert.ok(store.getSession(rootChannel.id)?.claudeSessionId);
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge can override a Codex binding with a single Claude request without losing the Codex session', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-claude-override-');
   const workspace = await createWorkspace(rootDir);

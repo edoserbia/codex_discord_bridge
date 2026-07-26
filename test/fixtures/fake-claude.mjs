@@ -237,7 +237,7 @@ if (prompt.includes('[stream-progress]')) {
       ],
     },
   });
-  await delay(150);
+  await delay(750);
   event({
     type: 'result',
     subtype: 'success',
