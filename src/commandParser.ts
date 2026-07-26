@@ -21,10 +21,10 @@ export type ParsedCommand =
   | { kind: 'guide'; prompt: string }
   | { kind: 'sendfile'; request: string }
   | { kind: 'sendfile'; index: number }
-  | { kind: 'model'; scope: 'global'; action: 'status' }
-  | { kind: 'model'; scope: 'global'; action: 'set'; model: string }
-  | { kind: 'model'; scope: 'project'; action: 'status' | 'clear' }
-  | { kind: 'model'; scope: 'project'; action: 'set'; model: string }
+  | { kind: 'model'; engine?: EngineName; scope: 'global'; action: 'status' }
+  | { kind: 'model'; engine?: EngineName; scope: 'global'; action: 'set'; model: string }
+  | { kind: 'model'; engine?: EngineName; scope: 'project'; action: 'status' | 'clear' }
+  | { kind: 'model'; engine?: EngineName; scope: 'project'; action: 'set'; model: string }
   | { kind: 'claude-model'; scope: 'global'; action: 'status' }
   | { kind: 'claude-model'; scope: 'global'; action: 'set'; model: string }
   | { kind: 'claude-model'; scope: 'project'; action: 'status' | 'clear' }
@@ -122,11 +122,16 @@ function parseModelCommand(body: string): Extract<ParsedCommand, { kind: 'model'
   const tokens = tokenizeCommand(body);
   tokens.shift();
 
-  const scopeOrAction = tokens.shift()?.toLowerCase();
+  const firstToken = tokens.shift()?.toLowerCase();
+  const engine = firstToken === 'codex' || firstToken === 'claude'
+    ? firstToken
+    : undefined;
+  const scopeOrAction = engine ? tokens.shift()?.toLowerCase() : firstToken;
 
   if (!scopeOrAction || scopeOrAction === 'status') {
     return {
       kind: 'model',
+      ...(engine ? { engine } : {}),
       scope: 'global',
       action: 'status',
     };
@@ -135,6 +140,7 @@ function parseModelCommand(body: string): Extract<ParsedCommand, { kind: 'model'
   if (scopeOrAction === 'set') {
     return {
       kind: 'model',
+      ...(engine ? { engine } : {}),
       scope: 'global',
       action: 'set',
       model: readValue(tokens, '!model set'),
@@ -150,6 +156,7 @@ function parseModelCommand(body: string): Extract<ParsedCommand, { kind: 'model'
   if (!action || action === 'status') {
     return {
       kind: 'model',
+      ...(engine ? { engine } : {}),
       scope: 'project',
       action: 'status',
     };
@@ -158,6 +165,7 @@ function parseModelCommand(body: string): Extract<ParsedCommand, { kind: 'model'
   if (action === 'set') {
     return {
       kind: 'model',
+      ...(engine ? { engine } : {}),
       scope: 'project',
       action: 'set',
       model: readValue(tokens, '!model project set'),
@@ -167,6 +175,7 @@ function parseModelCommand(body: string): Extract<ParsedCommand, { kind: 'model'
   if (action === 'clear') {
     return {
       kind: 'model',
+      ...(engine ? { engine } : {}),
       scope: 'project',
       action: 'clear',
     };
