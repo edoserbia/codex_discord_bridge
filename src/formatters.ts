@@ -467,6 +467,7 @@ export function formatStatus(
   isThreadConversation: boolean,
   preferredDriver: 'legacy-exec' | 'app-server' = 'legacy-exec',
   globalModel?: string,
+  modelSummary?: string,
 ): string {
   const driverLabel = formatDriverLabel(runtime.activeRun?.driverMode ?? session.driver ?? preferredDriver, session.fallbackActive);
   const resumeId = session.codexThreadId?.trim();
@@ -493,7 +494,7 @@ export function formatStatus(
     `目录：\`${binding.workspacePath}\``,
     `默认引擎：${defaultEngine}`,
     `执行模式：sandbox=\`${binding.codex.sandboxMode}\` · approval=\`${binding.codex.approvalPolicy}\` · search=${binding.codex.search ? 'on' : 'off'}`,
-    `模型：${formatBindingModelSummary(binding, globalModel)}`,
+    `模型：${modelSummary ?? formatBindingModelSummary(binding, globalModel)}`,
     `驱动：${driverLabel}`,
     `会话类型：${isThreadConversation ? 'Discord 线程会话' : '频道主会话'}`,
     `状态：${formatActiveStatus(runtime)}`,
