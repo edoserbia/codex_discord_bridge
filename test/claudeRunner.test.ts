@@ -203,6 +203,61 @@ test('claude runner surfaces permission request events as diagnostics', async ()
   await cleanupDir(rootDir);
 });
 
+test('claude runner streams cumulative text and Bash command progress', async () => {
+  const rootDir = await makeTempDir('claude-runner-stream-progress-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-claude-logs');
+  process.env.FAKE_CLAUDE_LOG_DIR = logDir;
+
+  const runner = new ClaudeRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+  const activities: string[] = [];
+  const messages: string[] = [];
+  const startedCommands: string[] = [];
+  const completedCommands: Array<{ command: string; output: string; exitCode: number | null }> = [];
+
+  try {
+    const result = await runner.start(
+      binding,
+      { engine: 'claude', prompt: '[stream-progress] inspect repository', imagePaths: [], extraAddDirs: [] },
+      undefined,
+      {
+        onActivity: async (activity) => { activities.push(activity); },
+        onAgentMessage: async (message) => { messages.push(message); },
+        onCommandStarted: async (command) => { startedCommands.push(command); },
+        onCommandCompleted: async (command, output, exitCode) => {
+          completedCommands.push({ command, output, exitCode });
+        },
+      },
+    ).done;
+
+    const logFiles = await readdir(logDir);
+    const payload = JSON.parse(await readFile(path.join(logDir, logFiles.sort().at(-1)!), 'utf8')) as {
+      argv: string[];
+    };
+
+    assert.ok(payload.argv.includes('--include-partial-messages'));
+    assert.ok(activities.some((activity) => /Claude 正在分析请求/.test(activity)));
+    assert.ok(messages.some((message) => /正在检查仓库/.test(message)));
+    assert.ok(startedCommands.includes('git status'));
+    assert.deepEqual(completedCommands.at(-1), {
+      command: 'git status',
+      output: 'On branch main',
+      exitCode: 0,
+    });
+    assert.deepEqual(result.commands.at(-1), {
+      command: 'git status',
+      output: 'On branch main',
+      exitCode: 0,
+    });
+    assert.equal(result.success, true);
+    assert.match(result.agentMessages.at(-1) ?? '', /Claude final: \[stream-progress\] inspect repository/);
+  } finally {
+    delete process.env.FAKE_CLAUDE_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
 test('claude runner reports stream-json failures with stderr diagnostics', async () => {
   const rootDir = await makeTempDir('claude-runner-fail-');
   const workspace = await createWorkspace(rootDir);
