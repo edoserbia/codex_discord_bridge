@@ -239,6 +239,8 @@ test('claude runner streams cumulative text and Bash command progress', async ()
     assert.ok(payload.argv.includes('--include-partial-messages'));
     assert.ok(activities.some((activity) => /Claude 正在分析请求/.test(activity)));
     assert.ok(messages.some((message) => /正在检查仓库/.test(message)));
+    assert.ok(messages.includes('Claude 已检查 仓库，正在整理结果。'));
+    assert.ok(messages.every((message) => !/正在检查仓库Claude 已检查/.test(message)));
     assert.ok(startedCommands.includes('git status'));
     assert.deepEqual(completedCommands.at(-1), {
       command: 'git status',
@@ -254,6 +256,28 @@ test('claude runner streams cumulative text and Bash command progress', async ()
     assert.match(result.agentMessages.at(-1) ?? '', /Claude final: \[stream-progress\] inspect repository/);
   } finally {
     delete process.env.FAKE_CLAUDE_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
+test('claude runner treats is_error terminal results as diagnostics', async () => {
+  const rootDir = await makeTempDir('claude-runner-result-error-');
+  const workspace = await createWorkspace(rootDir);
+  const runner = new ClaudeRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+
+  try {
+    const result = await runner.start(
+      binding,
+      { engine: 'claude', prompt: '[result-is-error] please fail', imagePaths: [], extraAddDirs: [] },
+      undefined,
+    ).done;
+
+    assert.equal(result.success, false);
+    assert.equal(result.turnCompleted, false);
+    assert.ok(result.stderr.some((line) => /fake Claude result failure/.test(line)));
+    assert.ok(result.agentMessages.every((message) => !/fake Claude result failure/.test(message)));
+  } finally {
     await cleanupDir(rootDir);
   }
 });

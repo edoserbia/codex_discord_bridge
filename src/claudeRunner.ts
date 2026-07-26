@@ -24,6 +24,7 @@ interface ClaudeStreamHandlers {
   publishSessionId: (sessionId: string) => Promise<void>;
   appendDiagnostic: (line: string) => Promise<void>;
   appendPermissionRequest: (request: ClaudePermissionRequest) => Promise<void>;
+  startAssistantMessage: () => void;
   appendAssistantText: (message: string, mode: 'delta' | 'snapshot') => Promise<void>;
   onActivity: (activity: string) => Promise<void>;
   onCommandStarted: (command: string) => Promise<void>;
@@ -116,23 +117,35 @@ export class ClaudeRunner implements CodexExecutionDriver {
             const description = request.description ? ` · ${request.description}` : '';
             await emitDiagnosticLine(`Claude permission required [${request.id}]: ${request.toolPattern}${description}`);
           },
+          startAssistantMessage: () => {
+            assistantTextBuffer = '';
+          },
           appendAssistantText: async (message, mode) => {
-            const normalized = message.trim();
-            if (!normalized) {
-              return;
-            }
-
             if (mode === 'delta') {
+              if (!message) {
+                return;
+              }
               assistantTextBuffer += message;
-            } else if (normalized !== assistantTextBuffer.trim()) {
-              assistantTextBuffer = normalized;
+            } else {
+              const normalized = message.trim();
+              if (!normalized) {
+                return;
+              }
+              if (normalized !== assistantTextBuffer.trim()) {
+                assistantTextBuffer = normalized;
+              }
             }
 
             const nextMessage = assistantTextBuffer.trim();
+            if (!nextMessage) {
+              return;
+            }
             if (agentMessages.at(-1) !== nextMessage) {
               agentMessages.push(nextMessage);
+              await hooks.onAgentMessage?.(nextMessage);
+            } else if (mode === 'delta') {
+              await hooks.onAgentMessage?.(nextMessage);
             }
-            await hooks.onAgentMessage?.(nextMessage);
           },
           onActivity: async (activity) => hooks.onActivity?.(activity),
           onCommandStarted: async (command) => hooks.onCommandStarted?.(command),
@@ -297,6 +310,9 @@ export class ClaudeRunner implements CodexExecutionDriver {
 
     if (type === 'user') {
       await handleClaudeContentMessage(event.message ?? event, handlers);
+      if (event.tool_use_result || event.toolUseResult) {
+        await handleClaudeToolResult(event, handlers);
+      }
       return;
     }
 
@@ -314,9 +330,13 @@ export class ClaudeRunner implements CodexExecutionDriver {
     }
 
     if (type === 'result') {
-      const error = extractString(event.error);
-      if (error) {
-        await handlers.appendDiagnostic(`Claude error: ${error}`);
+      const subtype = extractString(event.subtype);
+      const isError = event.is_error === true
+        || event.isError === true
+        || Boolean(subtype && /error|fail|denied|invalid/i.test(subtype));
+      const error = extractString(event.error) ?? (isError ? extractString(event.result) : undefined);
+      if (isError || error) {
+        await handlers.appendDiagnostic(`Claude error: ${error ?? subtype ?? 'unknown failure'}`);
         await handlers.onActivity('Claude 本轮失败');
         return;
       }
@@ -339,6 +359,7 @@ async function handleClaudePartialEvent(
   const type = extractString(event.type);
 
   if (type === 'message_start') {
+    handlers.startAssistantMessage();
     await handlers.onActivity('Claude 正在分析请求');
     return;
   }
@@ -365,8 +386,8 @@ async function handleClaudePartialEvent(
 
     const deltaType = extractString(delta.type);
     if (deltaType === 'text_delta') {
-      const text = extractString(delta.text);
-      if (text) {
+      const text = typeof delta.text === 'string' ? delta.text : undefined;
+      if (text !== undefined && text.length > 0) {
         await handlers.appendAssistantText(text, 'delta');
       }
       return;
@@ -374,8 +395,8 @@ async function handleClaudePartialEvent(
 
     if (deltaType === 'input_json_delta' && index !== undefined) {
       const id = handlers.toolIdsByBlockIndex.get(index);
-      const partialJson = extractString(delta.partial_json);
-      if (id && partialJson) {
+      const partialJson = typeof delta.partial_json === 'string' ? delta.partial_json : undefined;
+      if (id && partialJson !== undefined) {
         const toolCall = handlers.toolCalls.get(id);
         if (toolCall) {
           toolCall.inputJson += partialJson;
@@ -427,6 +448,20 @@ async function handleClaudeContentMessage(
     return;
   }
 
+  const text = content
+    .flatMap((item) => {
+      const block = asRecord(item);
+      const value = block && extractString(block.type) === 'text'
+        ? extractString(block.text)
+        : undefined;
+      return value ? [value] : [];
+    })
+    .join('\n')
+    .trim();
+  if (text) {
+    await handlers.appendAssistantText(text, 'snapshot');
+  }
+
   for (const item of content) {
     const block = asRecord(item);
     if (!block) {
@@ -435,10 +470,6 @@ async function handleClaudeContentMessage(
 
     const type = extractString(block.type);
     if (type === 'text') {
-      const text = extractString(block.text);
-      if (text) {
-        await handlers.appendAssistantText(text, 'snapshot');
-      }
       continue;
     }
 
@@ -495,8 +526,9 @@ function ensureClaudeToolCall(
 ): ClaudeToolCallState {
   const existing = handlers.toolCalls.get(id);
   if (existing) {
-    if (asRecord(input)) {
-      existing.input = { ...existing.input, ...asRecord(input) };
+    const inputRecord = asRecord(input);
+    if (inputRecord) {
+      existing.input = { ...existing.input, ...inputRecord };
     }
     return existing;
   }
@@ -560,7 +592,7 @@ function extractClaudeToolResultBlock(event: Record<string, unknown>): Record<st
   }
 
   const nested = asRecord(event.tool_use_result ?? event.toolUseResult ?? event.result);
-  return nested ?? event;
+  return nested ? { ...event, ...nested } : event;
 }
 
 function extractClaudeToolResultOutput(block: Record<string, unknown>): string {

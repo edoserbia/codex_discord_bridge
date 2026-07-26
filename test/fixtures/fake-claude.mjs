@@ -144,6 +144,18 @@ if (prompt.includes('[fail]')) {
   process.exit(1);
 }
 
+if (prompt.includes('[result-is-error]')) {
+  event({ type: 'system', subtype: 'init', session_id: sessionId });
+  event({
+    type: 'result',
+    subtype: 'error_during_execution',
+    is_error: true,
+    session_id: sessionId,
+    result: 'fake Claude result failure',
+  });
+  process.exit(1);
+}
+
 if (prompt.includes('[permission]') && !await projectAllowsFakeTool()) {
   event({ type: 'system', subtype: 'init', session_id: sessionId });
   event({
@@ -221,19 +233,50 @@ if (prompt.includes('[stream-progress]')) {
   event({
     type: 'user',
     session_id: sessionId,
-    message: {
-      content: [
-        { type: 'tool_result', tool_use_id: 'tool-stream-1', content: 'On branch main', is_error: false },
-      ],
+    tool_use_result: {
+      type: 'tool_result',
+      tool_use_id: 'tool-stream-1',
+      content: 'On branch main',
+      is_error: false,
     },
   });
   await delay(150);
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: { type: 'message_start', message: { id: 'message-stream-2', content: [] } },
+  });
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+  });
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Claude 已检查' } },
+  });
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: ' ' } },
+  });
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: '仓库，正在整理结果。' } },
+  });
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: { type: 'content_block_stop', index: 0 },
+  });
   event({
     type: 'assistant',
     session_id: sessionId,
     message: {
       content: [
-        { type: 'text', text: 'Claude 已检查仓库，正在整理结果。' },
+        { type: 'text', text: 'Claude 已检查 仓库，正在整理结果。' },
       ],
     },
   });
