@@ -10,9 +10,12 @@ export type CodexDriverMode = 'legacy-exec' | 'app-server';
 
 export type ExecutionDriverMode = CodexDriverMode | 'claude-cli';
 
+export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+
 export interface BindingCodexOptions {
   model?: string | undefined;
   profile?: string | undefined;
+  reasoningEffort?: ReasoningEffort | undefined;
   sandboxMode: SandboxMode;
   approvalPolicy: ApprovalPolicy;
   search: boolean;
@@ -29,6 +32,7 @@ export interface ChannelBinding {
   engine?: EngineName | undefined;
   codex: BindingCodexOptions;
   modelScope?: 'global' | 'project' | undefined;
+  reasoningEffortScope?: 'project' | undefined;
   createdAt: string;
   updatedAt: string;
 }

@@ -150,6 +150,10 @@ sudo ./scripts/install-service.sh --mode daemon
 !model codex set gpt-5.5
 !model claude set claude-opus-4-6
 !claude-model status
+!effort status
+!effort set high
+!effort project set xhigh
+!effort project clear
 !approve <Claude权限请求ID>
 !deny <Claude权限请求ID>
 !queue
@@ -184,6 +188,17 @@ sudo ./scripts/install-service.sh --mode daemon
 - Claude 全局配置默认是 `~/.claude/settings.json`，项目配置是当前绑定目录里的 `.claude/settings.json`
 - 当前项目的 `.claude/settings.json` 优先于全局 settings
 - Claude 运行过程会实时刷新回复草稿、Bash 命令和工具结果，不需要等最终回复才看到进度
+
+Codex 推理强度使用独立的 `!effort` 命令，不会受当前绑定的默认引擎影响：
+
+- `!effort status` 查看全局及当前项目的生效推理强度
+- `!effort set <minimal|low|medium|high|xhigh>` 写入 Codex 全局 `config.toml`
+- `!effort clear` 清除 Codex 全局 `config.toml` 设置
+- `!effort project status` 查看当前项目的推理强度覆盖
+- `!effort project set <minimal|low|medium|high|xhigh>` 设置当前项目覆盖
+- `!effort project clear` 清除当前项目覆盖，恢复跟随全局
+
+推理强度优先级依次为项目覆盖、Codex `config.toml`、`DEFAULT_CODEX_REASONING_EFFORT` 环境变量、Codex 默认值。切换不会 reset 当前会话，正在运行的本轮继续使用旧配置，下一轮请求才使用新配置；Claude 不受此设置影响。
 
 如果 Claude CLI 需要工具权限，Bridge 会在 Discord 中返回请求 ID。管理员可以发送 `!approve <请求ID>` 批准，或 `!deny <请求ID>` 拒绝。批准只会写当前项目目录下的 `.claude/settings.json`。
 

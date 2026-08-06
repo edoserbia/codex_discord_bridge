@@ -12,6 +12,7 @@ import type {
   ExecutionDriverMode,
   PlanItem,
   PromptTask,
+  ReasoningEffort,
   TranscriptEvent,
 } from './types.js';
 
@@ -130,6 +131,26 @@ function formatBindingModelSummary(binding: ChannelBinding, globalModel: string 
   }
 
   return '未显式指定（跟随所选引擎默认配置）';
+}
+
+export interface CodexReasoningEffortStatus {
+  effort: ReasoningEffort | undefined;
+  source: 'project' | 'config.toml' | 'environment' | 'codex-default';
+}
+
+function formatReasoningEffortSummary(status: CodexReasoningEffortStatus | undefined): string {
+  if (!status?.effort) {
+    return '未显式指定（跟随 Codex 默认配置）';
+  }
+
+  const source = {
+    project: '项目覆盖',
+    'config.toml': 'config.toml',
+    environment: '环境变量',
+    'codex-default': 'Codex 默认',
+  }[status.source];
+
+  return `\`${status.effort}\`（${source}）`;
 }
 
 function formatTaskSummary(task: PromptTask, maxLength = 90): string {
@@ -259,6 +280,8 @@ export function formatHelp(prefix: string): string {
     `- 显式 Codex 模型：\`${prefix}model codex status\` / \`${prefix}model codex set gpt-5.5\``,
     `- 显式 Claude 模型：\`${prefix}model claude status\` / \`${prefix}model claude set claude-opus-4-6\``,
     `- Claude 兼容别名：\`${prefix}claude-model status\` / \`${prefix}claude-model project set claude-sonnet-4-6\``,
+    `- Codex 全局推理强度：\`${prefix}effort status\` / \`${prefix}effort set <minimal|low|medium|high|xhigh>\` / \`${prefix}effort clear\``,
+    `- Codex 项目推理强度：\`${prefix}effort project status\` / \`${prefix}effort project set <minimal|low|medium|high|xhigh>\` / \`${prefix}effort project clear\``,
     `- Claude 权限确认：\`${prefix}approve <请求ID>\` / \`${prefix}deny <请求ID>\``,
     `- 查看状态：\`${prefix}status\``,
     `- 查看队列：\`${prefix}queue\``,
@@ -276,7 +299,7 @@ export function formatHelp(prefix: string): string {
     '绑定后还会自动创建一个 Autopilot 项目线程；可在主频道或线程里用 `!autopilot` 查看自动迭代用法。',
     '现在会在频道里持续更新 Codex 和 Claude 的实时回复草稿、命令执行和计划状态。',
     'Subagent 支持已默认开启；如果你还希望 Codex 把 AGENTS.md 的层级说明显式透传给子代理，可在绑定时追加 `--config features.child_agents_md=true`。',
-    '模型切换不会自动 reset 当前会话；`!model` 默认跟随当前绑定引擎，也可用 `!model codex ...` / `!model claude ...` 显式指定；`!claude-model` 继续作为兼容别名。',
+    '模型和推理强度切换不会自动 reset 当前会话；`!model` 默认跟随当前绑定引擎，也可用 `!model codex ...` / `!model claude ...` 显式指定；`!claude-model` 继续作为兼容别名。运行中的本轮继续使用旧配置，下一轮开始使用新配置。Codex 推理强度使用 `!effort`，优先级为项目覆盖、config.toml、环境变量回退、Codex 默认；Claude 不受影响。',
     '如果当前任务正在运行，可用 `!guide <内容>` 插入中途引导，bridge 会中断当前步骤，先处理引导，再按同一会话继续原任务。',
     '图片附件会自动透传到 `codex -i`；上传的附件会同步到绑定目录里的 `inbox/` 子目录，普通文件也会保留一份 bridge 本地缓存。',
     '上传和发回文件时会尽量保留原文件名；只有目标位置已存在同名文件时，才会在扩展名前追加一段随机后缀。',
@@ -466,6 +489,7 @@ export function formatStatus(
   preferredDriver: 'legacy-exec' | 'app-server' = 'legacy-exec',
   globalModel?: string,
   modelSummary?: string,
+  reasoningEffort?: CodexReasoningEffortStatus,
 ): string {
   const driverLabel = formatDriverLabel(runtime.activeRun?.driverMode ?? session.driver ?? preferredDriver, session.fallbackActive);
   const resumeId = session.codexThreadId?.trim();
@@ -493,6 +517,7 @@ export function formatStatus(
     `默认引擎：${defaultEngine}`,
     `执行模式：sandbox=\`${binding.codex.sandboxMode}\` · approval=\`${binding.codex.approvalPolicy}\` · search=${binding.codex.search ? 'on' : 'off'}`,
     `模型：${modelSummary ?? formatBindingModelSummary(binding, globalModel)}`,
+    `推理强度：${formatReasoningEffortSummary(reasoningEffort)}`,
     `驱动：${driverLabel}`,
     `会话类型：${isThreadConversation ? 'Discord 线程会话' : '频道主会话'}`,
     `状态：${formatActiveStatus(runtime)}`,
@@ -551,7 +576,7 @@ export function formatStatus(
     lines.push('发送普通消息即可继续和当前项目会话。');
   }
 
-  lines.push(`控制：\`${prefix}status\` · \`${prefix}model status\` · \`${prefix}queue\` · \`${prefix}cancel\` · \`${prefix}reset\` · \`${prefix}unbind\``);
+  lines.push(`控制：\`${prefix}status\` · \`${prefix}model status\` · \`${prefix}effort status\` · \`${prefix}queue\` · \`${prefix}cancel\` · \`${prefix}reset\` · \`${prefix}unbind\``);
   return truncate(lines.join('\n'), 1900);
 }
 

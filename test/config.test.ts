@@ -437,3 +437,38 @@ test('loadConfig rejects non-HTTP Wiscord base URLs', { concurrency: false }, ()
     assert.throws(() => loadConfig(), /WISCORD_BASE_URL.*http.*https/i);
   });
 });
+
+test('loadConfig validates and normalizes DEFAULT_CODEX_REASONING_EFFORT', { concurrency: false }, () => {
+  const previous = {
+    CODEX_TUNNING_DISCORD_BOT_TOKEN: process.env.CODEX_TUNNING_DISCORD_BOT_TOKEN,
+    DEFAULT_CODEX_REASONING_EFFORT: process.env.DEFAULT_CODEX_REASONING_EFFORT,
+  };
+
+  process.env.CODEX_TUNNING_DISCORD_BOT_TOKEN = 'test-token';
+
+  try {
+    const cases = [
+      ['MINIMAL', 'minimal'],
+      ['Low', 'low'],
+      ['medium', 'medium'],
+      ['HIGH', 'high'],
+      [' xhigh ', 'xhigh'],
+    ] as const;
+
+    for (const [configured, expected] of cases) {
+      process.env.DEFAULT_CODEX_REASONING_EFFORT = configured;
+      assert.equal(loadConfig().defaultCodex.reasoningEffort, expected);
+    }
+
+    process.env.DEFAULT_CODEX_REASONING_EFFORT = 'extreme';
+    assert.equal(loadConfig().defaultCodex.reasoningEffort, undefined);
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+});

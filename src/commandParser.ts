@@ -1,4 +1,4 @@
-import type { ApprovalPolicy, EngineName, SandboxMode } from './types.js';
+import type { ApprovalPolicy, EngineName, ReasoningEffort, SandboxMode } from './types.js';
 
 import { parseBooleanWord, parseDurationToMs, tokenizeCommand } from './utils.js';
 
@@ -25,6 +25,10 @@ export type ParsedCommand =
   | { kind: 'model'; engine?: EngineName; scope: 'global'; action: 'set'; model: string }
   | { kind: 'model'; engine?: EngineName; scope: 'project'; action: 'status' | 'clear' }
   | { kind: 'model'; engine?: EngineName; scope: 'project'; action: 'set'; model: string }
+  | { kind: 'effort'; scope: 'global'; action: 'status' | 'clear' }
+  | { kind: 'effort'; scope: 'global'; action: 'set'; effort: ReasoningEffort }
+  | { kind: 'effort'; scope: 'project'; action: 'status' | 'clear' }
+  | { kind: 'effort'; scope: 'project'; action: 'set'; effort: ReasoningEffort }
   | { kind: 'claude-model'; scope: 'global'; action: 'status' }
   | { kind: 'claude-model'; scope: 'global'; action: 'set'; model: string }
   | { kind: 'claude-model'; scope: 'project'; action: 'status' | 'clear' }
@@ -116,6 +120,74 @@ function parseSendFileIndex(value: string): number {
   }
 
   return parsed;
+}
+
+const REASONING_EFFORT_USAGE = '用法：!effort [status|set <minimal|low|medium|high|xhigh>|clear] | !effort project <status|set <minimal|low|medium|high|xhigh>|clear>';
+
+function parseReasoningEffort(value: string): ReasoningEffort {
+  const normalized = value.toLowerCase();
+
+  if (normalized === 'minimal' || normalized === 'low' || normalized === 'medium' || normalized === 'high' || normalized === 'xhigh') {
+    return normalized;
+  }
+
+  throw new Error(`${REASONING_EFFORT_USAGE}。`);
+}
+
+function readReasoningEffort(tokens: string[]): ReasoningEffort {
+  const value = tokens.shift();
+  if (!value) {
+    throw new Error(`${REASONING_EFFORT_USAGE}。`);
+  }
+
+  return parseReasoningEffort(value);
+}
+
+function requireNoTrailingEffortTokens(tokens: string[]): void {
+  if (tokens.length > 0) {
+    throw new Error(`${REASONING_EFFORT_USAGE}。`);
+  }
+}
+
+function parseEffortCommand(body: string): Extract<ParsedCommand, { kind: 'effort' }> {
+  const tokens = tokenizeCommand(body);
+  tokens.shift();
+
+  const scopeOrAction = tokens.shift()?.toLowerCase();
+
+  if (!scopeOrAction || scopeOrAction === 'status') {
+    requireNoTrailingEffortTokens(tokens);
+    return { kind: 'effort', scope: 'global', action: 'status' };
+  }
+  if (scopeOrAction === 'set') {
+    const effort = readReasoningEffort(tokens);
+    requireNoTrailingEffortTokens(tokens);
+    return { kind: 'effort', scope: 'global', action: 'set', effort };
+  }
+  if (scopeOrAction === 'clear') {
+    requireNoTrailingEffortTokens(tokens);
+    return { kind: 'effort', scope: 'global', action: 'clear' };
+  }
+  if (scopeOrAction !== 'project') {
+    throw new Error(`${REASONING_EFFORT_USAGE}。`);
+  }
+
+  const action = tokens.shift()?.toLowerCase();
+  if (!action || action === 'status') {
+    requireNoTrailingEffortTokens(tokens);
+    return { kind: 'effort', scope: 'project', action: 'status' };
+  }
+  if (action === 'set') {
+    const effort = readReasoningEffort(tokens);
+    requireNoTrailingEffortTokens(tokens);
+    return { kind: 'effort', scope: 'project', action: 'set', effort };
+  }
+  if (action === 'clear') {
+    requireNoTrailingEffortTokens(tokens);
+    return { kind: 'effort', scope: 'project', action: 'clear' };
+  }
+
+  throw new Error(`${REASONING_EFFORT_USAGE}。`);
 }
 
 function parseModelCommand(body: string): Extract<ParsedCommand, { kind: 'model' }> {
@@ -445,6 +517,8 @@ export function parseCommand(content: string, prefix: string): ParsedCommand {
       return parseAutopilotCommand(body);
     case 'model':
       return parseModelCommand(body);
+    case 'effort':
+      return parseEffortCommand(body);
     case 'claude-model':
     case 'claudemodel':
       return parseClaudeModelCommand(body);

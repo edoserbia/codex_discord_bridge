@@ -315,7 +315,12 @@ export class CodexRunner implements CodexExecutionDriver {
     existingThreadId: string | undefined,
   ): string[] {
     const globalArgs: string[] = ['-a', binding.codex.approvalPolicy];
-    const configEntries = resolveCodexConfigEntries(binding.codex.extraConfig);
+    const configEntries = resolveCodexConfigEntries(binding.codex.extraConfig)
+      .filter((entry) => !/^model_reasoning_effort\s*=/i.test(entry));
+
+    if (binding.codex.reasoningEffort) {
+      configEntries.push(`model_reasoning_effort=${JSON.stringify(binding.codex.reasoningEffort)}`);
+    }
 
     if (binding.codex.search) {
       globalArgs.push('--search');

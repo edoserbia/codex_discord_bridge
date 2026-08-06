@@ -6,7 +6,14 @@ import path from 'node:path';
 
 import { config as dotenvConfig } from 'dotenv';
 
-import type { AppServerTransport, ApprovalPolicy, BindingCodexOptions, CodexDriverMode, SandboxMode } from './types.js';
+import type {
+  AppServerTransport,
+  ApprovalPolicy,
+  BindingCodexOptions,
+  CodexDriverMode,
+  ReasoningEffort,
+  SandboxMode,
+} from './types.js';
 import { resolveCodexConfigPath } from './codexConfig.js';
 import { resolveClaudeSettingsPath } from './claudeSettings.js';
 
@@ -139,6 +146,21 @@ function parseAppServerTransport(value: string | undefined, fallback: AppServerT
   return fallback;
 }
 
+function parseReasoningEffort(value: string | undefined): ReasoningEffort | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (
+    normalized === 'minimal'
+    || normalized === 'low'
+    || normalized === 'medium'
+    || normalized === 'high'
+    || normalized === 'xhigh'
+  ) {
+    return normalized;
+  }
+
+  return undefined;
+}
+
 function loadWiscordConfig(): WiscordBridgeConfig | undefined {
   const values = {
     appId: process.env.WISCORD_APP_ID?.trim(),
@@ -212,6 +234,7 @@ export function loadConfig(): AppConfig {
     defaultCodex: {
       model: process.env.DEFAULT_CODEX_MODEL?.trim() || undefined,
       profile: process.env.DEFAULT_CODEX_PROFILE?.trim() || undefined,
+      reasoningEffort: parseReasoningEffort(process.env.DEFAULT_CODEX_REASONING_EFFORT),
       sandboxMode: parseSandboxMode(process.env.DEFAULT_CODEX_SANDBOX, 'danger-full-access'),
       approvalPolicy: parseApprovalPolicy(process.env.DEFAULT_CODEX_APPROVAL, 'never'),
       search: parseBoolean(process.env.DEFAULT_CODEX_SEARCH, true),
