@@ -27,6 +27,7 @@ export interface WebConfig {
 }
 
 export interface WiscordBridgeConfig {
+  adminUserIds: Set<string>;
   appId: string;
   appSecret: string;
   baseUrl: string;
@@ -189,6 +190,7 @@ function loadWiscordConfig(): WiscordBridgeConfig | undefined {
   }
 
   return {
+    adminUserIds: new Set(parseList(process.env.WISCORD_ADMIN_USER_IDS)),
     appId: values.appId!,
     appSecret: values.appSecret!,
     baseUrl: parsed.toString().replace(/\/$/, ''),

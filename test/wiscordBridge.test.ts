@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -13,7 +13,7 @@ import { JsonStateStore } from '../src/store.js';
 import type { ChannelBinding, CodexRunInput, CodexRunResult } from '../src/types.js';
 import { WiscordCodexBridge } from '../src/wiscordBridge.js';
 
-test('Wiscord adapter ACKs durably, runs Codex once, heartbeats, and finalizes one complete message', async () => {
+test('Wiscord adapter ACKs durably, refreshes a progress message, and sends a separate final result', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'wiscord-bridge-'));
   const workspace = path.join(root, 'workspace');
   const state = new JsonStateStore(path.join(root, 'state.json'));
@@ -21,12 +21,14 @@ test('Wiscord adapter ACKs durably, runs Codex once, heartbeats, and finalizes o
 
   const timeline: string[] = [];
   const edits: string[] = [];
+  const progressChunks: Array<{ content: string; index: number }> = [];
   const chunks: Array<{ content: string; index: number }> = [];
   const finalizations: string[] = [];
   const sockets = new Set<WebSocket>();
   const finalMarkdown = `# Complete Wiscord result\n\n${'long markdown '.repeat(700)}`;
   let heartbeatCount = 0;
   let runnerStarts = 0;
+  let createdReplies = 0;
 
   const server = createServer(async (request, response) => {
     const body = await readJson(request);
@@ -50,24 +52,35 @@ test('Wiscord adapter ACKs durably, runs Codex once, heartbeats, and finalizes o
     }
     if (request.method === 'POST' && request.url === '/bot/v1/messages') {
       assert.deepEqual(body, { conversationId: 'channel_1' });
+      createdReplies += 1;
       response.statusCode = 201;
-      response.end(JSON.stringify({ messageId: 'msg_bot_1' }));
+      response.end(JSON.stringify({ messageId: createdReplies === 1 ? 'msg_progress' : 'msg_final' }));
       return;
     }
-    if (request.method === 'PATCH' && request.url === '/bot/v1/messages/msg_bot_1') {
+    if (request.method === 'PATCH' && request.url === '/bot/v1/messages/msg_progress') {
       edits.push(String(body.content));
-      response.end(JSON.stringify({ id: 'msg_bot_1' }));
+      response.end(JSON.stringify({ id: 'msg_progress' }));
       return;
     }
-    if (request.method === 'POST' && request.url === '/bot/v1/messages/msg_bot_1/chunks') {
+    if (request.method === 'POST' && request.url === '/bot/v1/messages/msg_progress/chunks') {
+      progressChunks.push({ content: String(body.content), index: Number(body.index) });
+      response.statusCode = 204;
+      response.end();
+      return;
+    }
+    if (request.method === 'POST' && request.url === '/bot/v1/messages/msg_final/chunks') {
       chunks.push({ content: String(body.content), index: Number(body.index) });
       response.statusCode = 204;
       response.end();
       return;
     }
-    if (request.method === 'POST' && request.url === '/bot/v1/messages/msg_bot_1/finalize') {
-      finalizations.push('msg_bot_1');
-      response.end(JSON.stringify({ id: 'msg_bot_1', status: 'complete' }));
+    if (
+      request.method === 'POST'
+      && (request.url === '/bot/v1/messages/msg_progress/finalize' || request.url === '/bot/v1/messages/msg_final/finalize')
+    ) {
+      const messageId = request.url.includes('msg_progress') ? 'msg_progress' : 'msg_final';
+      finalizations.push(messageId);
+      response.end(JSON.stringify({ id: messageId, status: 'complete' }));
       return;
     }
     response.statusCode = 404;
@@ -140,17 +153,226 @@ test('Wiscord adapter ACKs durably, runs Codex once, heartbeats, and finalizes o
       },
     };
     socket.send(JSON.stringify(event));
-    await waitForValue(() => finalizations[0]);
+    await waitForValue(() => finalizations.includes('msg_final') ? true : undefined);
     socket.send(JSON.stringify(event));
     await waitForValue(() => heartbeatCount > 0 ? heartbeatCount : undefined);
 
     assert.equal(runnerStarts, 1);
     assert.ok(timeline.indexOf('ack:evt_1') < timeline.indexOf('runner:start'));
     assert.ok(edits.some((content) => content.includes('Codex is working')));
-    assert.deepEqual(finalizations, ['msg_bot_1']);
+    assert.equal(createdReplies, 2);
+    assert.deepEqual(finalizations, ['msg_progress', 'msg_final']);
+    assert.match(progressChunks.map((chunk) => chunk.content).join(''), /任务已完成/);
     const reconstructed = chunks.sort((left, right) => left.index - right.index).map((chunk) => chunk.content).join('');
     assert.equal(reconstructed, finalMarkdown);
     assert.equal(state.getSession('channel_1')?.codexThreadId, 'codex_thread_1');
+  } finally {
+    await bridge.stop();
+    for (const socket of sockets) socket.terminate();
+    await new Promise<void>((resolve) => gateway.close(() => resolve()));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(root, { force: true, recursive: true });
+  }
+});
+
+test('Wiscord adapter answers !help in a second channel from the installed guild', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'wiscord-bridge-help-'));
+  const workspace = path.join(root, 'workspace');
+  const state = new JsonStateStore(path.join(root, 'state.json'));
+  await state.load();
+
+  const edits: string[] = [];
+  const helpChunks: string[] = [];
+  const sockets = new Set<WebSocket>();
+  let createdReplies = 0;
+
+  const server = createServer(async (request, response) => {
+    const body = await readJson(request);
+    response.setHeader('content-type', 'application/json');
+    if (request.method === 'POST' && request.url === '/bot/v1/auth/token') {
+      response.end(JSON.stringify({ accessToken: 'bot_access' }));
+      return;
+    }
+    assert.equal(request.headers.authorization, 'Bearer bot_access');
+    if (request.method === 'GET' && request.url === '/bot/v1/messages/msg_help') {
+      response.end(JSON.stringify({
+        author: { id: 'user_1', kind: 'user' },
+        content: '!help',
+        conversationId: 'channel_2',
+        guildId: 'guild_1',
+        id: 'msg_help',
+      }));
+      return;
+    }
+    if (request.method === 'POST' && request.url === '/bot/v1/messages') {
+      createdReplies += 1;
+      assert.deepEqual(body, { conversationId: 'channel_2' });
+      response.statusCode = 201;
+      response.end(JSON.stringify({ messageId: 'msg_help_reply' }));
+      return;
+    }
+    if (request.method === 'PATCH' && request.url === '/bot/v1/messages/msg_help_reply') {
+      edits.push(String(body.content));
+      response.end(JSON.stringify({ id: 'msg_help_reply' }));
+      return;
+    }
+    if (request.method === 'POST' && request.url === '/bot/v1/messages/msg_help_reply/chunks') {
+      helpChunks.push(String(body.content));
+      response.statusCode = 204;
+      response.end();
+      return;
+    }
+    if (request.method === 'POST' && request.url === '/bot/v1/messages/msg_help_reply/finalize') {
+      response.end(JSON.stringify({ id: 'msg_help_reply', status: 'complete' }));
+      return;
+    }
+    response.statusCode = 404;
+    response.end(JSON.stringify({ code: 'NOT_FOUND' }));
+  });
+  const gateway = new WebSocketServer({ server, path: '/bot/v1/gateway' });
+  gateway.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+    socket.on('message', (raw) => {
+      const frame = JSON.parse(raw.toString()) as Record<string, unknown>;
+      if (frame.op === 'IDENTIFY') {
+        socket.send(JSON.stringify({ op: 'READY', heartbeatIntervalMs: 25 }));
+      }
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert(address && typeof address === 'object');
+
+  const runner: CodexExecutionDriver = {
+    start(): RunningCodexJob {
+      throw new Error('!help must not start Codex');
+    },
+  };
+  const bridge = new WiscordCodexBridge(
+    buildConfig(root, workspace, `http://127.0.0.1:${address.port}`),
+    state,
+    runner,
+  );
+
+  try {
+    await bridge.start();
+    const socket = await waitForValue(() => [...sockets][0]);
+    socket.send(JSON.stringify({
+      op: 'EVENT',
+      event: {
+        conversationId: 'channel_2',
+        data: { messageId: 'msg_help' },
+        eventId: 'evt_help',
+        guildId: 'guild_1',
+        sequence: 1,
+        type: 'MESSAGE_CREATE',
+        version: 1,
+      },
+    }));
+    await waitForValue(() => createdReplies > 0 ? createdReplies : undefined);
+    await waitForValue(() => helpChunks.some((content) => content.includes('!bind')) ? true : undefined);
+  } finally {
+    await bridge.stop();
+    for (const socket of sockets) socket.terminate();
+    await new Promise<void>((resolve) => gateway.close(() => resolve()));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(root, { force: true, recursive: true });
+  }
+});
+
+test('Wiscord adapter binds a second channel to an allowed workspace', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'wiscord-bridge-bind-'));
+  const workspace = path.join(root, 'workspace');
+  const state = new JsonStateStore(path.join(root, 'state.json'));
+  await state.load();
+
+  const edits: string[] = [];
+  const bindChunks: string[] = [];
+  const sockets = new Set<WebSocket>();
+  let createdReplies = 0;
+  const command = `!bind wiscord ${workspace}`;
+
+  const server = createServer(async (request, response) => {
+    const body = await readJson(request);
+    response.setHeader('content-type', 'application/json');
+    if (request.method === 'POST' && request.url === '/bot/v1/auth/token') {
+      response.end(JSON.stringify({ accessToken: 'bot_access' }));
+      return;
+    }
+    assert.equal(request.headers.authorization, 'Bearer bot_access');
+    if (request.method === 'GET' && request.url === '/bot/v1/messages/msg_bind') {
+      response.end(JSON.stringify({
+        author: { id: 'user_1', kind: 'user' },
+        content: command,
+        conversationId: 'channel_2',
+        guildId: 'guild_1',
+        id: 'msg_bind',
+      }));
+      return;
+    }
+    if (request.method === 'POST' && request.url === '/bot/v1/messages') {
+      createdReplies += 1;
+      assert.deepEqual(body, { conversationId: 'channel_2' });
+      response.statusCode = 201;
+      response.end(JSON.stringify({ messageId: 'msg_bind_reply' }));
+      return;
+    }
+    if (request.method === 'PATCH' && request.url === '/bot/v1/messages/msg_bind_reply') {
+      edits.push(String(body.content));
+      response.end(JSON.stringify({ id: 'msg_bind_reply' }));
+      return;
+    }
+    if (request.method === 'POST' && request.url === '/bot/v1/messages/msg_bind_reply/chunks') {
+      bindChunks.push(String(body.content));
+      response.statusCode = 204;
+      response.end();
+      return;
+    }
+    if (request.method === 'POST' && request.url === '/bot/v1/messages/msg_bind_reply/finalize') {
+      response.end(JSON.stringify({ id: 'msg_bind_reply', status: 'complete' }));
+      return;
+    }
+    response.statusCode = 404;
+    response.end(JSON.stringify({ code: 'NOT_FOUND' }));
+  });
+  const gateway = new WebSocketServer({ server, path: '/bot/v1/gateway' });
+  gateway.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+    socket.on('message', (raw) => {
+      const frame = JSON.parse(raw.toString()) as Record<string, unknown>;
+      if (frame.op === 'IDENTIFY') socket.send(JSON.stringify({ op: 'READY', heartbeatIntervalMs: 25 }));
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert(address && typeof address === 'object');
+  const bridge = new WiscordCodexBridge(
+    buildConfig(root, workspace, `http://127.0.0.1:${address.port}`),
+    state,
+    { start: () => { throw new Error('!bind must not start Codex'); } },
+  );
+
+  try {
+    await bridge.start();
+    const socket = await waitForValue(() => [...sockets][0]);
+    socket.send(JSON.stringify({
+      op: 'EVENT',
+      event: {
+        conversationId: 'channel_2',
+        data: { messageId: 'msg_bind' },
+        eventId: 'evt_bind',
+        guildId: 'guild_1',
+        sequence: 1,
+        type: 'MESSAGE_CREATE',
+        version: 1,
+      },
+    }));
+    await waitForValue(() => createdReplies > 0 ? createdReplies : undefined);
+    await waitForValue(() => state.getBinding('channel_2'));
+    assert.equal(state.getBinding('channel_2')?.workspacePath, await realpath(workspace));
+    await waitForValue(() => bindChunks.some((content) => content.includes('已绑定')) ? true : undefined);
   } finally {
     await bridge.stop();
     for (const socket of sockets) socket.terminate();
@@ -190,6 +412,7 @@ function buildConfig(root: string, workspace: string, baseUrl: string): AppConfi
     discordToken: 'discord-test',
     web: { bind: '127.0.0.1', enabled: false, port: 0 },
     wiscord: {
+      adminUserIds: new Set(['user_1']),
       appId: 'app_test',
       appSecret: 'wsc_test',
       baseUrl,

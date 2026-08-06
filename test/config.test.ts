@@ -373,6 +373,7 @@ const wiscordEnvKeys = [
   'WISCORD_GUILD_ID',
   'WISCORD_PROJECT_NAME',
   'WISCORD_WORKSPACE_PATH',
+  'WISCORD_ADMIN_USER_IDS',
 ] as const;
 
 function withWiscordEnv(
@@ -390,6 +391,7 @@ function withWiscordEnv(
     WISCORD_GUILD_ID: 'guild_test',
     WISCORD_PROJECT_NAME: 'Wiscord test project',
     WISCORD_WORKSPACE_PATH: './fixtures/wiscord-workspace',
+    WISCORD_ADMIN_USER_IDS: 'user_test_1,user_test_2',
     ...overrides,
   };
 
@@ -422,6 +424,7 @@ test('loadConfig parses a complete Wiscord transport configuration', { concurren
       guildId: 'guild_test',
       projectName: 'Wiscord test project',
       workspacePath: path.resolve('./fixtures/wiscord-workspace'),
+      adminUserIds: new Set(['user_test_1', 'user_test_2']),
     });
   });
 });

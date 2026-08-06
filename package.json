@@ -21,6 +21,7 @@
     "smoke:discord": "node --import tsx scripts/smoke-discord.ts",
     "smoke:wiscord": "node --import tsx scripts/smoke-wiscord.ts",
     "start": "node dist/index.js",
+    "start:wiscord": "node dist/wiscordOnly.js",
     "macos:doctor": "./scripts/macos-bridge.sh doctor",
     "macos:configure": "./scripts/macos-bridge.sh configure",
     "macos:setup": "./scripts/macos-bridge.sh setup",

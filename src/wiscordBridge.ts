@@ -4,12 +4,20 @@ import path from 'node:path';
 import WebSocket from 'ws';
 
 import type { AppConfig, WiscordBridgeConfig } from './config.js';
+import { isCommandMessage, parseCommand } from './commandParser.js';
 import type { CodexExecutionDriver, CodexRunHooks } from './codexRunner.js';
 import { extractBridgeFileSendDirective } from './bridgeFileSendProtocol.js';
 import { formatFailureReply } from './formatters.js';
 import { appendBridgeProjectContext } from './projectContext.js';
 import { JsonStateStore } from './store.js';
 import type { ChannelBinding, CodexRunResult } from './types.js';
+import {
+  cloneCodexOptions,
+  isWithinAllowedRoots,
+  normalizeAllowedRoots,
+  resolveDirectoryPath,
+  resolveExistingDirectory,
+} from './utils.js';
 
 interface WiscordGatewayEvent {
   conversationId?: string | undefined;
@@ -229,7 +237,6 @@ export class WiscordCodexBridge {
     if (
       event.type !== 'MESSAGE_CREATE'
       || event.guildId !== this.wiscord.guildId
-      || event.conversationId !== this.wiscord.channelId
     ) {
       return;
     }
@@ -239,17 +246,149 @@ export class WiscordCodexBridge {
     if (
       message.author.kind !== 'user'
       || message.guildId !== this.wiscord.guildId
-      || message.conversationId !== this.wiscord.channelId
       || !message.content.trim()
     ) {
       return;
     }
-    await this.runMessage(message);
+    if (isCommandMessage(message.content, this.config.commandPrefix)) {
+      await this.handleCommand(message);
+      return;
+    }
+    const binding = this.store.getBinding(message.conversationId);
+    if (!binding) {
+      await this.sendText(message.conversationId, `当前频道未绑定项目。先执行 \`${this.config.commandPrefix}help\` 查看命令。`);
+      return;
+    }
+    await this.runMessage(message, binding);
   }
 
-  private async runMessage(message: WiscordMessage): Promise<void> {
-    const binding = this.store.getBinding(this.wiscord.channelId);
-    if (!binding) throw new Error(`Wiscord binding is missing for ${this.wiscord.channelId}`);
+  private async handleCommand(message: WiscordMessage): Promise<void> {
+    try {
+      const command = parseCommand(message.content, this.config.commandPrefix);
+      switch (command.kind) {
+        case 'help':
+          await this.sendText(message.conversationId, formatWiscordHelp(this.config.commandPrefix));
+          return;
+        case 'bind':
+          this.assertAdministrator(message);
+          await this.bindChannel(message, command.projectName, command.workspacePath, command.options.engine);
+          return;
+        case 'unbind': {
+          this.assertAdministrator(message);
+          const removed = await this.store.removeBinding(message.conversationId);
+          await this.sendText(
+            message.conversationId,
+            removed
+              ? `已解除频道与项目 **${removed.projectName}** 的绑定。`
+              : '当前频道没有项目绑定。',
+          );
+          return;
+        }
+        case 'status': {
+          const binding = this.store.getBinding(message.conversationId);
+          const session = this.store.getSession(message.conversationId);
+          await this.sendText(
+            message.conversationId,
+            binding
+              ? [
+                  `项目：**${binding.projectName}**`,
+                  `目录：\`${binding.workspacePath}\``,
+                  `引擎：${binding.engine ?? 'codex'}`,
+                  `Codex thread：${session?.codexThreadId ?? '尚未创建'}`,
+                ].join('\n')
+              : '当前频道未绑定项目。先执行 `!bind <项目名> <工作区目录>`。',
+          );
+          return;
+        }
+        case 'reset': {
+          this.assertAdministrator(message);
+          const binding = this.store.getBinding(message.conversationId);
+          if (!binding) {
+            await this.sendText(message.conversationId, '当前频道未绑定项目。');
+            return;
+          }
+          await this.store.updateSession(message.conversationId, {
+            claudeSessionId: undefined,
+            codexThreadId: undefined,
+            driver: undefined,
+            fallbackActive: undefined,
+            lastEngine: undefined,
+          }, binding.channelId);
+          await this.sendText(message.conversationId, '已重置当前频道的 Codex/Claude 会话。');
+          return;
+        }
+        case 'projects': {
+          const bindings = this.store.listBindings(message.guildId);
+          await this.sendText(
+            message.conversationId,
+            bindings.length === 0
+              ? '当前服务器还没有已绑定项目的频道。'
+              : ['# 已绑定项目', '', ...bindings.map((binding) => `- **${binding.projectName}**：\`${binding.workspacePath}\``)].join('\n'),
+          );
+          return;
+        }
+        default:
+          await this.sendText(message.conversationId, `该 Wiscord 命令尚未实现。执行 \`${this.config.commandPrefix}help\` 查看可用命令。`);
+      }
+    } catch (error) {
+      await this.sendText(
+        message.conversationId,
+        `命令执行失败：${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private assertAdministrator(message: WiscordMessage): void {
+    if (!this.wiscord.adminUserIds.has(message.author.id)) {
+      throw new Error('当前 Wiscord 用户没有管理权限。请在 Bridge 配置中设置 WISCORD_ADMIN_USER_IDS。');
+    }
+  }
+
+  private async bindChannel(
+    message: WiscordMessage,
+    projectName: string,
+    workspacePath: string,
+    engine: ChannelBinding['engine'],
+  ): Promise<void> {
+    const allowedRoots = await normalizeAllowedRoots(this.config.allowedWorkspaceRoots);
+    const targetWorkspace = await resolveDirectoryPath(workspacePath);
+    if (!isWithinAllowedRoots(targetWorkspace, allowedRoots)) {
+      throw new Error(`目录不在允许的工作区根目录下：${targetWorkspace}`);
+    }
+    await fs.mkdir(targetWorkspace, { recursive: true });
+    const resolvedWorkspace = await resolveExistingDirectory(targetWorkspace);
+    const existing = this.store.getBinding(message.conversationId);
+    const now = new Date().toISOString();
+    const binding: ChannelBinding = {
+      channelId: message.conversationId,
+      codex: cloneCodexOptions(this.config.defaultCodex),
+      createdAt: existing?.createdAt ?? now,
+      engine,
+      guildId: message.guildId,
+      projectName,
+      updatedAt: now,
+      workspacePath: resolvedWorkspace,
+    };
+    await this.store.upsertBinding(binding);
+    await this.store.updateSession(message.conversationId, {
+      claudeSessionId: undefined,
+      codexThreadId: undefined,
+      driver: undefined,
+      fallbackActive: undefined,
+      lastEngine: undefined,
+    }, binding.channelId);
+    await this.sendText(
+      message.conversationId,
+      [
+        `已绑定当前频道到项目 **${binding.projectName}**。`,
+        `目录：\`${binding.workspacePath}\``,
+        `引擎：${binding.engine ?? 'codex'}`,
+        '现在可以直接发送任务；Bridge 会持续更新过程，并在完成后发送最终结果。',
+      ].join('\n'),
+    );
+  }
+
+  private async runMessage(message: WiscordMessage, binding: ChannelBinding): Promise<void> {
     const session = await this.store.ensureSession(binding.channelId, message.conversationId);
     const reply = await this.api<{ messageId: string }>('/bot/v1/messages', {
       body: JSON.stringify({ conversationId: message.conversationId }),
@@ -295,14 +434,8 @@ export class WiscordCodexBridge {
     const finalContent = result.success
       ? visibleAssistantMessage(result)
       : formatFailureReply(binding, message.author.id, result);
-    const chunks = splitUtf8(finalContent, MAX_MESSAGE_CHUNK_BYTES);
-    for (const [index, content] of chunks.entries()) {
-      await this.api(`/bot/v1/messages/${encodeURIComponent(reply.messageId)}/chunks`, {
-        body: JSON.stringify({ content, index }),
-        method: 'POST',
-      });
-    }
-    await this.api(`/bot/v1/messages/${encodeURIComponent(reply.messageId)}/finalize`, { method: 'POST' });
+    await this.finalizeText(reply.messageId, '任务已完成，最终结果见下一条消息。');
+    await this.sendText(message.conversationId, finalContent);
   }
 
   private async editMessage(messageId: string, content: string): Promise<void> {
@@ -310,6 +443,25 @@ export class WiscordCodexBridge {
       body: JSON.stringify({ content }),
       method: 'PATCH',
     });
+  }
+
+  private async sendText(conversationId: string, content: string): Promise<void> {
+    const reply = await this.api<{ messageId: string }>('/bot/v1/messages', {
+      body: JSON.stringify({ conversationId }),
+      method: 'POST',
+    });
+    await this.finalizeText(reply.messageId, content);
+  }
+
+  private async finalizeText(messageId: string, content: string): Promise<void> {
+    const chunks = splitUtf8(content, MAX_MESSAGE_CHUNK_BYTES);
+    for (const [index, chunk] of chunks.entries()) {
+      await this.api(`/bot/v1/messages/${encodeURIComponent(messageId)}/chunks`, {
+        body: JSON.stringify({ content: chunk, index }),
+        method: 'POST',
+      });
+    }
+    await this.api(`/bot/v1/messages/${encodeURIComponent(messageId)}/finalize`, { method: 'POST' });
   }
 
   private async exchangeToken(): Promise<string> {
@@ -438,4 +590,16 @@ function splitUtf8(content: string, maxBytes: number): string[] {
   }
   if (current || chunks.length === 0) chunks.push(current);
   return chunks;
+}
+
+function formatWiscordHelp(prefix: string): string {
+  return [
+    '# Wiscord Codex Bridge',
+    '',
+    `- \`${prefix}bind <项目名> <工作区目录>\`：将当前频道绑定到允许的项目目录。`,
+    `- \`${prefix}status\`：查看当前频道绑定和会话状态。`,
+    `- \`${prefix}reset\`：重置当前频道的 Codex 会话。`,
+    `- \`${prefix}unbind\`：解除当前频道绑定。`,
+    '- 绑定后直接发送自然语言任务，Bridge 会持续更新过程，完成后发送最终结果。',
+  ].join('\n');
 }
