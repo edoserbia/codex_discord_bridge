@@ -661,11 +661,11 @@ which bridgectl
 
 然后重新打开一个终端窗口再试。
 
-## Wiscord transport
+## Wiscord 传输
 
-The Bridge can also connect to a self-hosted Wiscord server while retaining its Discord transport. Provision a Wiscord Bot application, install it in the target guild, and copy the one-time App Secret before starting the Bridge.
+Bridge 在保留 Discord 传输的同时，也可以连接自建 Wiscord 服务。启动 Bridge 前，先创建 Wiscord Bot 应用、把它安装到目标服务器，并保存一次性显示的 App Secret。
 
-Add these values to `.env`:
+在 `.env` 中添加：
 
 ```dotenv
 WISCORD_ENABLED=true
@@ -678,9 +678,9 @@ WISCORD_PROJECT_NAME=wiscord_app
 WISCORD_WORKSPACE_PATH=/Users/mac/work/su/wiscord_app
 ```
 
-`WISCORD_BASE_URL` is the HTTP origin; `4580/tcp` carries both REST and WebSocket traffic. The Bridge host needs outbound access to that port and does not need PostgreSQL access. With HTTPS, use an `https://` base URL and the transport automatically becomes WSS.
+`WISCORD_BASE_URL` 是 HTTP Origin；`4580/tcp` 同时承载 REST 和 WebSocket。Bridge 主机需要向该端口发起出站连接，不需要访问 PostgreSQL。使用 HTTPS 时填写 `https://` Base URL，传输会自动使用 WSS。
 
-Validate the integration with:
+使用下面命令验证集成：
 
 ```bash
 npm run check
@@ -688,9 +688,9 @@ npm run build
 npm run smoke:wiscord
 ```
 
-See the Wiscord checkout's [Bridge integration guide](../wiscord_app/docs/bridge/wiscord-integration.md) for provisioning, fixture mode, troubleshooting, and the separate GitLab/GitHub push policy.
+Wiscord 用户登录、Bot 创建、fixture 模式、故障排查和 GitLab/GitHub 分别推送策略见 Wiscord 项目的 [Bridge 集成文档](../wiscord_app/docs/bridge/wiscord-integration.md)。
 
-Repository updates are deliberately separate: Wiscord is pushed to `origin` at `git@mytokens.live:edoserbia/wiscord_app.git`; Bridge commits are pushed to both `github` (`git@github.com:edoserbia/codex_discord_bridge.git`) and `gitlab` (`git@mytokens.live:edoserbia/codex-discord-bridge.git`).
+仓库更新必须分开进行：Wiscord 推送到 `origin`（`git@mytokens.live:edoserbia/wiscord_app.git`）；Bridge 的提交同时推送到 `github`（`git@github.com:edoserbia/codex_discord_bridge.git`）和 `gitlab`（`git@mytokens.live:edoserbia/codex-discord-bridge.git`）。
 
 ## License
 
