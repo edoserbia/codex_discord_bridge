@@ -362,3 +362,78 @@ test('loadConfig exposes configurable retry limits and 429 backoff settings', { 
     await cleanupDir(rootDir);
   }
 });
+
+const wiscordEnvKeys = [
+  'CODEX_TUNNING_DISCORD_BOT_TOKEN',
+  'WISCORD_ENABLED',
+  'WISCORD_APP_ID',
+  'WISCORD_APP_SECRET',
+  'WISCORD_BASE_URL',
+  'WISCORD_CHANNEL_ID',
+  'WISCORD_GUILD_ID',
+  'WISCORD_PROJECT_NAME',
+  'WISCORD_WORKSPACE_PATH',
+] as const;
+
+function withWiscordEnv(
+  overrides: Partial<Record<(typeof wiscordEnvKeys)[number], string | undefined>>,
+  callback: () => void,
+): void {
+  const previous = Object.fromEntries(wiscordEnvKeys.map((key) => [key, process.env[key]]));
+  const values: Record<(typeof wiscordEnvKeys)[number], string | undefined> = {
+    CODEX_TUNNING_DISCORD_BOT_TOKEN: 'discord-test-token',
+    WISCORD_ENABLED: 'true',
+    WISCORD_APP_ID: 'app_test',
+    WISCORD_APP_SECRET: 'wiscord-test-secret',
+    WISCORD_BASE_URL: 'https://wiscord.example.test/',
+    WISCORD_CHANNEL_ID: 'channel_test',
+    WISCORD_GUILD_ID: 'guild_test',
+    WISCORD_PROJECT_NAME: 'Wiscord test project',
+    WISCORD_WORKSPACE_PATH: './fixtures/wiscord-workspace',
+    ...overrides,
+  };
+
+  for (const key of wiscordEnvKeys) {
+    const value = values[key];
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+
+  try {
+    callback();
+  } finally {
+    for (const key of wiscordEnvKeys) {
+      const value = previous[key];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
+test('loadConfig parses a complete Wiscord transport configuration', { concurrency: false }, () => {
+  withWiscordEnv({}, () => {
+    const config = loadConfig();
+
+    assert.deepEqual(config.wiscord, {
+      appId: 'app_test',
+      appSecret: 'wiscord-test-secret',
+      baseUrl: 'https://wiscord.example.test',
+      channelId: 'channel_test',
+      guildId: 'guild_test',
+      projectName: 'Wiscord test project',
+      workspacePath: path.resolve('./fixtures/wiscord-workspace'),
+    });
+  });
+});
+
+test('loadConfig rejects an enabled Wiscord transport with missing fields', { concurrency: false }, () => {
+  withWiscordEnv({ WISCORD_CHANNEL_ID: undefined }, () => {
+    assert.throws(() => loadConfig(), /Wiscord.*channelId/);
+  });
+});
+
+test('loadConfig rejects non-HTTP Wiscord base URLs', { concurrency: false }, () => {
+  withWiscordEnv({ WISCORD_BASE_URL: 'ws://wiscord.example.test' }, () => {
+    assert.throws(() => loadConfig(), /WISCORD_BASE_URL.*http.*https/i);
+  });
+});

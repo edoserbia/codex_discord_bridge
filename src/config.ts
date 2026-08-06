@@ -19,6 +19,16 @@ export interface WebConfig {
   authToken?: string | undefined;
 }
 
+export interface WiscordBridgeConfig {
+  appId: string;
+  appSecret: string;
+  baseUrl: string;
+  channelId: string;
+  guildId: string;
+  projectName: string;
+  workspacePath: string;
+}
+
 export interface AppConfig {
   discordToken: string;
   commandPrefix: string;
@@ -41,6 +51,7 @@ export interface AppConfig {
   adminUserIds: Set<string>;
   defaultCodex: BindingCodexOptions;
   web: WebConfig;
+  wiscord?: WiscordBridgeConfig | undefined;
 }
 
 function loadExternalSecretEnv(): void {
@@ -128,6 +139,44 @@ function parseAppServerTransport(value: string | undefined, fallback: AppServerT
   return fallback;
 }
 
+function loadWiscordConfig(): WiscordBridgeConfig | undefined {
+  const values = {
+    appId: process.env.WISCORD_APP_ID?.trim(),
+    appSecret: process.env.WISCORD_APP_SECRET?.trim(),
+    baseUrl: process.env.WISCORD_BASE_URL?.trim(),
+    channelId: process.env.WISCORD_CHANNEL_ID?.trim(),
+    guildId: process.env.WISCORD_GUILD_ID?.trim(),
+    projectName: process.env.WISCORD_PROJECT_NAME?.trim(),
+    workspacePath: process.env.WISCORD_WORKSPACE_PATH?.trim(),
+  };
+  const enabled = parseBoolean(
+    process.env.WISCORD_ENABLED,
+    Boolean(values.appId || values.appSecret || values.baseUrl || values.channelId || values.guildId || values.workspacePath),
+  );
+  if (!enabled) return undefined;
+
+  const missing = Object.entries(values)
+    .filter(([key, value]) => key !== 'projectName' && !value)
+    .map(([key]) => key);
+  if (missing.length > 0) {
+    throw new Error(`Wiscord 已启用，但缺少配置：${missing.join(', ')}`);
+  }
+  const parsed = new URL(values.baseUrl!);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('WISCORD_BASE_URL 必须使用 http 或 https。');
+  }
+
+  return {
+    appId: values.appId!,
+    appSecret: values.appSecret!,
+    baseUrl: parsed.toString().replace(/\/$/, ''),
+    channelId: values.channelId!,
+    guildId: values.guildId!,
+    projectName: values.projectName || 'Wiscord',
+    workspacePath: path.resolve(values.workspacePath!),
+  };
+}
+
 export function loadConfig(): AppConfig {
   loadExternalSecretEnv();
 
@@ -139,6 +188,7 @@ export function loadConfig(): AppConfig {
     throw new Error('缺少环境变量 CODEX_TUNNING_DISCORD_BOT_TOKEN。');
   }
 
+  const wiscord = loadWiscordConfig();
   return {
     discordToken,
     commandPrefix: process.env.COMMAND_PREFIX?.trim() || '!',
@@ -175,5 +225,6 @@ export function loadConfig(): AppConfig {
       port: parseInteger(process.env.WEB_PORT, 3769),
       authToken: process.env.WEB_AUTH_TOKEN?.trim() || undefined,
     },
+    ...(wiscord ? { wiscord } : {}),
   };
 }

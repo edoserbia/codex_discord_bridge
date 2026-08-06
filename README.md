@@ -655,6 +655,37 @@ which bridgectl
 
 然后重新打开一个终端窗口再试。
 
+## Wiscord transport
+
+The Bridge can also connect to a self-hosted Wiscord server while retaining its Discord transport. Provision a Wiscord Bot application, install it in the target guild, and copy the one-time App Secret before starting the Bridge.
+
+Add these values to `.env`:
+
+```dotenv
+WISCORD_ENABLED=true
+WISCORD_APP_ID=app_01...
+WISCORD_APP_SECRET=wiscord_app_secret_...
+WISCORD_BASE_URL=http://124.220.147.199:4580
+WISCORD_GUILD_ID=guild_01...
+WISCORD_CHANNEL_ID=channel_01...
+WISCORD_PROJECT_NAME=wiscord_app
+WISCORD_WORKSPACE_PATH=/Users/mac/work/su/wiscord_app
+```
+
+`WISCORD_BASE_URL` is the HTTP origin; `4580/tcp` carries both REST and WebSocket traffic. The Bridge host needs outbound access to that port and does not need PostgreSQL access. With HTTPS, use an `https://` base URL and the transport automatically becomes WSS.
+
+Validate the integration with:
+
+```bash
+npm run check
+npm run build
+npm run smoke:wiscord
+```
+
+See the Wiscord checkout's [Bridge integration guide](../wiscord_app/docs/bridge/wiscord-integration.md) for provisioning, fixture mode, troubleshooting, and the separate GitLab/GitHub push policy.
+
+Repository updates are deliberately separate: Wiscord is pushed to `origin` at `git@mytokens.live:edoserbia/wiscord_app.git`; Bridge commits are pushed to both `github` (`git@github.com:edoserbia/codex_discord_bridge.git`) and `gitlab` (`git@mytokens.live:edoserbia/codex-discord-bridge.git`).
+
 ## License
 
 本项目采用 **PolyForm Noncommercial 1.0.0**：

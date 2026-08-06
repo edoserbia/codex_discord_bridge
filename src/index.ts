@@ -6,6 +6,7 @@ import { DiscordCodexBridge } from './discordBot.js';
 import { JsonStateStore } from './store.js';
 import { AdminWebServer } from './webServer.js';
 import { describeProcessError, isKnownDiscordWebSocketNetworkError } from './processErrors.js';
+import { WiscordCodexBridge } from './wiscordBridge.js';
 
 process.on('unhandledRejection', (reason) => {
   console.error('[process] unhandledRejection', reason);
@@ -33,9 +34,11 @@ async function main(): Promise<void> {
 
   const runner = createCodexExecutionDriver(config);
   const bridge = new DiscordCodexBridge(config, store, runner);
+  const wiscordBridge = config.wiscord ? new WiscordCodexBridge(config, store, runner) : undefined;
   const webServer = new AdminWebServer(config, bridge);
 
   await bridge.start();
+  await wiscordBridge?.start();
   await webServer.start();
 }
 
