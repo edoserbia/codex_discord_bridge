@@ -213,3 +213,108 @@ test('Claude model commands write global and project settings files and project 
     await cleanupDir(rootDir);
   }
 });
+
+test('generic model commands follow the bound Claude engine', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-model-engine-aware-');
+  const workspace = await createWorkspace(rootDir);
+  const codexConfigPath = path.join(rootDir, '.codex', 'config.toml');
+  const claudeSettingsPath = path.join(rootDir, '.claude', 'settings.json');
+  await mkdir(path.dirname(codexConfigPath), { recursive: true });
+  await writeFile(codexConfigPath, 'model = "gpt-global"\n', 'utf8');
+
+  const { bridge, store, channels } = await createBridgeTestRig({
+    rootDir,
+    claudeCommand: fakeClaudeCommand,
+    codexConfigPath,
+    claudeSettingsPath,
+  });
+  const rootChannel = new FakeChannel('channel-model-engine-aware', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}" --engine claude --model gpt-binding`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '!claude-model set claude-global', { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '!claude-model project set claude-project', { userId: 'admin-user' }));
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!model project status', { userId: 'admin-user' }));
+    await waitFor(() => rootChannel.sent.some((message) => /Claude 项目模型/.test(message.content) && /claude-project/.test(message.content)), 15_000);
+    assert.ok(rootChannel.sent.every((message) => !/Codex 项目模型/.test(message.content) || !/gpt-binding/.test(message.content)));
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!model project set claude-next', { userId: 'admin-user' }));
+    const projectSettingsPath = path.join(workspace, '.claude', 'settings.json');
+    const projectSettings = JSON.parse(await readFile(projectSettingsPath, 'utf8')) as { model?: string };
+    assert.equal(projectSettings.model, 'claude-next');
+    assert.equal(store.getBinding(rootChannel.id)?.codex.model, 'gpt-binding');
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!model set claude-global-next', { userId: 'admin-user' }));
+    const globalSettings = JSON.parse(await readFile(claudeSettingsPath, 'utf8')) as { model?: string };
+    assert.equal(globalSettings.model, 'claude-global-next');
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!model project clear', { userId: 'admin-user' }));
+    const clearedSettings = JSON.parse(await readFile(projectSettingsPath, 'utf8')) as { model?: string };
+    assert.equal(clearedSettings.model, undefined);
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('explicit Codex global model updates do not mutate Claude bindings', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-model-engine-filter-');
+  const codexWorkspace = await createWorkspace(path.join(rootDir, 'codex-workspace'));
+  const claudeWorkspace = await createWorkspace(path.join(rootDir, 'claude-workspace'));
+  const codexConfigPath = path.join(rootDir, '.codex', 'config.toml');
+  await mkdir(path.dirname(codexConfigPath), { recursive: true });
+  await writeFile(codexConfigPath, 'model = "gpt-old"\n', 'utf8');
+
+  const { bridge, store, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeAppServerCommand,
+    claudeCommand: fakeClaudeCommand,
+    driverMode: 'app-server',
+    codexConfigPath,
+  } as any);
+  const codexChannel = new FakeChannel('channel-model-engine-filter-codex', 'guild-1');
+  const claudeChannel = new FakeChannel('channel-model-engine-filter-claude', 'guild-1');
+  channels.set(codexChannel.id, codexChannel);
+  channels.set(claudeChannel.id, claudeChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(codexChannel, `!bind api "${codexWorkspace}" --engine codex`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(claudeChannel, `!bind web "${claudeWorkspace}" --engine claude --model claude-codex-metadata`, { userId: 'admin-user' }));
+
+    await dispatch(bridge, createUserMessage(codexChannel, '!model codex set gpt-next', { userId: 'admin-user' }));
+
+    assert.equal(store.getBinding(codexChannel.id)?.codex.model, 'gpt-next');
+    assert.equal(store.getBinding(claudeChannel.id)?.codex.model, 'claude-codex-metadata');
+    assert.match(await readFile(codexConfigPath, 'utf8'), /^model = "gpt-next"/m);
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('Claude status panel renders the Claude effective model', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-model-status-claude-');
+  const workspace = await createWorkspace(rootDir);
+  const claudeSettingsPath = path.join(rootDir, '.claude', 'settings.json');
+  const { bridge, channels } = await createBridgeTestRig({
+    rootDir,
+    claudeCommand: fakeClaudeCommand,
+    claudeSettingsPath,
+  });
+  const rootChannel = new FakeChannel('channel-model-status-claude', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}" --engine claude`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '!claude-model set claude-status-model', { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '!status', { userId: 'admin-user' }));
+
+    await waitFor(() => rootChannel.sent.some((message) => /Codex Discord Bridge 状态面板/.test(message.content)
+      && /模型：.*claude-status-model/.test(message.content)), 15_000);
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});

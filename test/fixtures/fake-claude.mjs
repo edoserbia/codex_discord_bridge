@@ -9,6 +9,7 @@ function parseArgs(argv) {
   let resumeSessionId;
   let inputFormat;
   let outputFormat;
+  let includePartialMessages = false;
   let print = false;
   let verbose = false;
 
@@ -34,6 +35,11 @@ function parseArgs(argv) {
     if (arg === '--output-format') {
       outputFormat = argv[index + 1];
       index += 1;
+      continue;
+    }
+
+    if (arg === '--include-partial-messages') {
+      includePartialMessages = true;
       continue;
     }
 
@@ -66,6 +72,7 @@ function parseArgs(argv) {
     verbose,
     inputFormat,
     outputFormat,
+    includePartialMessages,
     resumeSessionId,
     model,
     permissionMode,
@@ -83,6 +90,10 @@ async function readStdin() {
 
 function event(payload) {
   process.stdout.write(`${JSON.stringify(payload)}\n`);
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 const argv = process.argv.slice(2);
@@ -133,6 +144,18 @@ if (prompt.includes('[fail]')) {
   process.exit(1);
 }
 
+if (prompt.includes('[result-is-error]')) {
+  event({ type: 'system', subtype: 'init', session_id: sessionId });
+  event({
+    type: 'result',
+    subtype: 'error_during_execution',
+    is_error: true,
+    session_id: sessionId,
+    result: 'fake Claude result failure',
+  });
+  process.exit(1);
+}
+
 if (prompt.includes('[permission]') && !await projectAllowsFakeTool()) {
   event({ type: 'system', subtype: 'init', session_id: sessionId });
   event({
@@ -143,6 +166,128 @@ if (prompt.includes('[permission]') && !await projectAllowsFakeTool()) {
   });
   event({ type: 'result', subtype: 'error', session_id: sessionId, error: 'permission required' });
   process.exit(1);
+}
+
+if (prompt.includes('[stream-progress]')) {
+  event({ type: 'system', subtype: 'init', session_id: sessionId });
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: { type: 'message_start', message: { id: 'message-stream-1', content: [] } },
+  });
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+  });
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Claude ' } },
+  });
+  await delay(50);
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: '正在检查仓库' } },
+  });
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: { type: 'content_block_stop', index: 0 },
+  });
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: {
+      type: 'content_block_start',
+      index: 1,
+      content_block: { type: 'tool_use', id: 'tool-stream-1', name: 'Bash', input: {} },
+    },
+  });
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: {
+      type: 'content_block_delta',
+      index: 1,
+      delta: { type: 'input_json_delta', partial_json: '{"command":"git status"}' },
+    },
+  });
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: { type: 'content_block_stop', index: 1 },
+  });
+  event({
+    type: 'assistant',
+    session_id: sessionId,
+    message: {
+      content: [
+        { type: 'text', text: 'Claude 正在检查仓库' },
+        { type: 'tool_use', id: 'tool-stream-1', name: 'Bash', input: { command: 'git status' } },
+      ],
+    },
+  });
+  await delay(150);
+  event({
+    type: 'user',
+    session_id: sessionId,
+    tool_use_result: {
+      type: 'tool_result',
+      tool_use_id: 'tool-stream-1',
+      content: 'On branch main',
+      is_error: false,
+    },
+  });
+  await delay(150);
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: { type: 'message_start', message: { id: 'message-stream-2', content: [] } },
+  });
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+  });
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Claude 已检查' } },
+  });
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: ' ' } },
+  });
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: '仓库，正在整理结果。' } },
+  });
+  event({
+    type: 'stream_event',
+    session_id: sessionId,
+    event: { type: 'content_block_stop', index: 0 },
+  });
+  event({
+    type: 'assistant',
+    session_id: sessionId,
+    message: {
+      content: [
+        { type: 'text', text: 'Claude 已检查 仓库，正在整理结果。' },
+      ],
+    },
+  });
+  await delay(750);
+  event({
+    type: 'result',
+    subtype: 'success',
+    session_id: sessionId,
+    result: `Claude final: ${prompt}`,
+  });
+  process.exit(0);
 }
 
 event({ type: 'system', subtype: 'init', session_id: sessionId });

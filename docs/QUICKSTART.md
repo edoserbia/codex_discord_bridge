@@ -145,11 +145,11 @@ sudo ./scripts/install-service.sh --mode daemon
 !status
 !claude <请求内容>
 !codex <请求内容>
+!model status
+!model project status
+!model codex set gpt-5.5
+!model claude set claude-opus-4-6
 !claude-model status
-!claude-model set claude-opus-4-6
-!claude-model project status
-!claude-model project set claude-sonnet-4-6
-!claude-model project clear
 !approve <Claude权限请求ID>
 !deny <Claude权限请求ID>
 !queue
@@ -175,12 +175,15 @@ sudo ./scripts/install-service.sh --mode daemon
 
 切换引擎不会清掉另一边上下文。Bridge 会分别保存 Codex thread 和 Claude session，并在跨引擎时把最近 transcript 摘要带给新引擎。
 
-Claude 模型切换使用 settings JSON 文件：
+模型命令会按当前绑定引擎自动路由：
 
-- `!claude-model set <模型>` 写全局 Claude settings，默认是 `~/.claude/settings.json`
-- `!claude-model project set <模型>` 写当前绑定目录里的 `.claude/settings.json`
+- `!model status/set <模型>` 操作当前绑定引擎的全局模型
+- `!model project status/set <模型>/clear` 操作当前绑定引擎的项目模型
+- `!model codex ...` / `!model claude ...` 可以显式指定引擎
+- `!claude-model ...` 仍可用，作为 Claude 兼容别名
+- Claude 全局配置默认是 `~/.claude/settings.json`，项目配置是当前绑定目录里的 `.claude/settings.json`
 - 当前项目的 `.claude/settings.json` 优先于全局 settings
-- `!claude-model project clear` 只清除当前项目的 `model`，恢复跟随全局
+- Claude 运行过程会实时刷新回复草稿、Bash 命令和工具结果，不需要等最终回复才看到进度
 
 如果 Claude CLI 需要工具权限，Bridge 会在 Discord 中返回请求 ID。管理员可以发送 `!approve <请求ID>` 批准，或 `!deny <请求ID>` 拒绝。批准只会写当前项目目录下的 `.claude/settings.json`。
 

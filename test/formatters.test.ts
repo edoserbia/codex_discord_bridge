@@ -16,6 +16,10 @@ test('help text documents workspace inbox mirroring and file-send workflows', ()
   assert.match(text, /!model set gpt-5\.5/);
   assert.match(text, /!model project set gpt-5\.5/);
   assert.match(text, /!model project clear/);
+  assert.match(text, /!model codex set gpt-5\.5/);
+  assert.match(text, /!model claude status/);
+  assert.match(text, /当前绑定引擎/);
+  assert.match(text, /Claude.*实时/);
 });
 
 test('help text uses Codex as the default engine in bind examples', () => {

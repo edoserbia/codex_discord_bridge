@@ -196,6 +196,37 @@ test('parse model status command', () => {
   });
 });
 
+test('parse explicit Codex model status command', () => {
+  const parsed = parseCommand('!model codex status', '!');
+  assert.deepEqual(parsed, {
+    kind: 'model',
+    engine: 'codex',
+    scope: 'global',
+    action: 'status',
+  });
+});
+
+test('parse explicit Claude model set command', () => {
+  const parsed = parseCommand('!model claude set claude-sonnet-4-6', '!');
+  assert.deepEqual(parsed, {
+    kind: 'model',
+    engine: 'claude',
+    scope: 'global',
+    action: 'set',
+    model: 'claude-sonnet-4-6',
+  });
+});
+
+test('parse explicit Claude project model status command', () => {
+  const parsed = parseCommand('!model claude project status', '!');
+  assert.deepEqual(parsed, {
+    kind: 'model',
+    engine: 'claude',
+    scope: 'project',
+    action: 'status',
+  });
+});
+
 test('parse model set command', () => {
   const parsed = parseCommand('!model set gpt-5.5', '!');
   assert.deepEqual(parsed, {

@@ -1894,7 +1894,7 @@ export class DiscordCodexBridge {
       options,
     });
     const autopilotProject = this.store.getAutopilotProject(savedBinding.channelId);
-    const globalModel = await this.getGlobalCodexModel();
+    const modelSummary = await this.getBindingModelSummary(savedBinding);
 
     const executionChanged = hasBindingExecutionChanged(existingBinding, savedBinding);
 
@@ -1904,7 +1904,7 @@ export class DiscordCodexBridge {
         `目录：\`${savedBinding.workspacePath}\``,
         `默认引擎：${savedBinding.engine ?? 'codex'}`,
         `执行模式：sandbox=\`${savedBinding.codex.sandboxMode}\` · approval=\`${savedBinding.codex.approvalPolicy}\` · search=${savedBinding.codex.search ? 'on' : 'off'}`,
-        `模型：${this.formatBindingModelSummary(savedBinding, globalModel)}`,
+        `模型：${modelSummary}`,
         autopilotProject?.threadChannelId
           ? `Autopilot 线程：<#${autopilotProject.threadChannelId}>`
           : 'Autopilot 线程：创建失败或当前频道不支持线程，请检查频道类型与权限。',
@@ -1917,6 +1917,26 @@ export class DiscordCodexBridge {
   }
 
   private async handleModelCommand(
+    message: Message,
+    resolved: ResolvedConversation | undefined,
+    command: Extract<ParsedCommand, { kind: 'model' }>,
+  ): Promise<void> {
+    const engine = command.engine ?? resolved?.binding.engine ?? 'codex';
+
+    if (engine === 'claude') {
+      await this.handleClaudeModelCommand(message, resolved, {
+        kind: 'claude-model',
+        scope: command.scope,
+        action: command.action,
+        ...(command.action === 'set' ? { model: command.model } : {}),
+      } as Extract<ParsedCommand, { kind: 'claude-model' }>);
+      return;
+    }
+
+    await this.handleCodexModelCommand(message, resolved, command);
+  }
+
+  private async handleCodexModelCommand(
     message: Message,
     resolved: ResolvedConversation | undefined,
     command: Extract<ParsedCommand, { kind: 'model' }>,
@@ -1940,7 +1960,7 @@ export class DiscordCodexBridge {
       this.config.defaultCodex.model = nextModel;
 
       const now = new Date().toISOString();
-      const bindings = this.store.listBindings();
+      const bindings = this.store.listBindings().filter((binding) => (binding.engine ?? 'codex') === 'codex');
 
       for (const binding of bindings) {
         await this.store.upsertBinding({
@@ -1959,7 +1979,7 @@ export class DiscordCodexBridge {
         [
           `已切换全局 Codex 模型为 \`${nextModel}\`。`,
           `配置文件：\`${this.getCodexConfigPath()}\``,
-          `已同步绑定项目：${bindings.length}`,
+          `已同步 Codex 绑定项目：${bindings.length}`,
           '运行中的任务不会被打断；下一轮请求开始使用新模型。',
         ].join('\n'),
       );
@@ -2340,6 +2360,21 @@ export class DiscordCodexBridge {
     ].join('\n');
   }
 
+  private async getBindingModelSummary(binding: ChannelBinding): Promise<string> {
+    if ((binding.engine ?? 'codex') === 'claude') {
+      const effective = await readEffectiveClaudeModel(binding.workspacePath, this.getClaudeSettingsPath());
+      const projectModel = await readClaudeProjectModel(binding.workspacePath);
+
+      if (!effective.model) {
+        return '未显式指定（跟随 Claude 默认配置）';
+      }
+
+      return `\`${effective.model}\`（${projectModel ? '项目覆盖' : '跟随全局'}）`;
+    }
+
+    return this.formatBindingModelSummary(binding, await this.getGlobalCodexModel());
+  }
+
   private async refreshStatusPanelsForBindings(bindingChannelIds: string[]): Promise<void> {
     for (const bindingChannelId of bindingChannelIds) {
       const binding = this.store.getBinding(bindingChannelId);
@@ -2373,7 +2408,7 @@ export class DiscordCodexBridge {
 
     const runtime = this.getRuntime(resolved.conversationId);
     const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
-    const globalModel = await this.getGlobalCodexModel();
+    const modelSummary = await this.getBindingModelSummary(resolved.binding);
     await this.refreshStatusPanel(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
     await message.reply(
       formatStatus(
@@ -2383,7 +2418,8 @@ export class DiscordCodexBridge {
         this.config.commandPrefix,
         resolved.isThreadConversation,
         this.config.codexDriverMode ?? 'app-server',
-        globalModel,
+        undefined,
+        modelSummary,
       ),
     );
   }
@@ -5071,7 +5107,7 @@ export class DiscordCodexBridge {
     runtime: ChannelRuntime,
     isThreadConversation: boolean,
   ): Promise<void> {
-    const globalModel = await this.getGlobalCodexModel();
+    const modelSummary = await this.getBindingModelSummary(binding);
     const content = formatStatus(
       binding,
       session,
@@ -5079,7 +5115,8 @@ export class DiscordCodexBridge {
       this.config.commandPrefix,
       isThreadConversation,
       this.config.codexDriverMode ?? 'app-server',
-      globalModel,
+      undefined,
+      modelSummary,
     );
     const statusMessageId = session.statusMessageId;
 
