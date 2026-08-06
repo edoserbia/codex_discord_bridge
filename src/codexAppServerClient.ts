@@ -169,6 +169,7 @@ export class CodexAppServerClient {
       cwd: binding.workspacePath,
       approvalPolicy: binding.codex.approvalPolicy,
       model: binding.codex.model ?? null,
+      ...(binding.codex.reasoningEffort ? { effort: binding.codex.reasoningEffort } : {}),
       sandboxPolicy: buildSandboxPolicy(binding, input),
       input: [
         {

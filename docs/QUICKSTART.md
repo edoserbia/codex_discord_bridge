@@ -150,6 +150,11 @@ sudo ./scripts/install-service.sh --mode daemon
 !claude-model project status
 !claude-model project set claude-sonnet-4-6
 !claude-model project clear
+!effort status
+!effort set high
+!effort project status
+!effort project set low
+!effort project clear
 !approve <Claude权限请求ID>
 !deny <Claude权限请求ID>
 !queue
@@ -174,6 +179,10 @@ sudo ./scripts/install-service.sh --mode daemon
 `!claude` 和 `!codex` 是单次请求覆盖默认引擎，不会修改频道绑定。例如：默认绑定 Claude 后，临时发 `!codex 按刚才的结论改代码`，下一条普通消息仍然回到 Claude。
 
 切换引擎不会清掉另一边上下文。Bridge 会分别保存 Codex thread 和 Claude session，并在跨引擎时把最近 transcript 摘要带给新引擎。
+
+Codex 推理强度使用 `!effort` 命令，支持 `minimal`、`low`、`medium`、`high`、`xhigh`。全局值写入 `~/.codex/config.toml`（或 `CODEX_CONFIG_PATH` 指定的文件）根级 `model_reasoning_effort`；项目覆盖保存在 Bridge 绑定状态，不会写项目 TOML。生效顺序是项目覆盖 > TOML 全局值 > `DEFAULT_CODEX_REASONING_EFFORT` > Codex 默认。切换只影响下一轮，Claude 不受影响。
+
+管理员可以使用 `!effort set <value>` / `!effort clear` 修改全局设置，项目级使用 `!effort project set <value>` / `!effort project clear`；普通成员可以查看 status，但不能修改设置。
 
 Claude 模型切换使用 settings JSON 文件：
 

@@ -199,6 +199,21 @@ bridgectl session resume <Resume ID>
 - 当前版本已兼容较新的 Codex live event 形态；Codex 真实运行中的回复草稿、计划状态和分析摘要应持续刷新，而不是只在结束时出现
 - 当 Discord 进度卡接近长度上限时，bridge 会优先保留最新回复草稿和最新计划状态，避免它们被旧内容截断
 
+### Codex 推理强度
+
+部署后可以通过 Discord 管理 Codex 推理强度，而不需要手动编辑配置：
+
+```text
+!effort status
+!effort set high
+!effort project status
+!effort project set low
+!effort project clear
+!effort clear
+```
+
+允许值是 `minimal`、`low`、`medium`、`high`、`xhigh`。生效顺序为项目覆盖 > `model_reasoning_effort` > `DEFAULT_CODEX_REASONING_EFFORT` > Codex 默认。全局键只位于 `CODEX_CONFIG_PATH`（未设置时为 `~/.codex/config.toml`）的根级；项目覆盖由 `data/state.json` 管理。命令不会中断活动任务，下一轮才使用新值；Claude 引擎不受影响。
+
 ## 非 Git 目录绑定
 
 当前环境变量 `DEFAULT_CODEX_SKIP_GIT_REPO_CHECK` 默认值为 `true`，适合把 bridge 绑定到尚未初始化 Git 的目录。
@@ -362,6 +377,7 @@ bridgectl session resume <Resume ID>
 管理员命令包括：
 
 - `!bind`、`!unbind`
+- `!effort set/clear`、`!effort project set/clear`
 - `!cancel`、`!reset`
 - `!queue insert <序号>`
 - `!queue remove <序号>`

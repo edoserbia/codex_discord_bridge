@@ -234,6 +234,96 @@ test('parse project model clear command', () => {
   });
 });
 
+test('parse bare and explicit global reasoning effort status commands', () => {
+  assert.deepEqual(parseCommand('!effort', '!'), {
+    kind: 'effort',
+    scope: 'global',
+    action: 'status',
+  });
+  assert.deepEqual(parseCommand('!effort status', '!'), {
+    kind: 'effort',
+    scope: 'global',
+    action: 'status',
+  });
+});
+
+test('parse and normalize every supported global reasoning effort value', () => {
+  const inputs = ['MINIMAL', 'Low', 'mEdIuM', 'HIGH', 'XHigh'];
+  const expected = ['minimal', 'low', 'medium', 'high', 'xhigh'];
+
+  for (const [index, input] of inputs.entries()) {
+    assert.deepEqual(parseCommand(`!effort set ${input}`, '!'), {
+      kind: 'effort',
+      scope: 'global',
+      action: 'set',
+      effort: expected[index],
+    });
+  }
+});
+
+test('parse global reasoning effort clear command', () => {
+  assert.deepEqual(parseCommand('!effort clear', '!'), {
+    kind: 'effort',
+    scope: 'global',
+    action: 'clear',
+  });
+});
+
+test('parse implicit and explicit project reasoning effort status commands', () => {
+  assert.deepEqual(parseCommand('!effort project', '!'), {
+    kind: 'effort',
+    scope: 'project',
+    action: 'status',
+  });
+  assert.deepEqual(parseCommand('!effort project status', '!'), {
+    kind: 'effort',
+    scope: 'project',
+    action: 'status',
+  });
+});
+
+test('parse and normalize project reasoning effort set command', () => {
+  assert.deepEqual(parseCommand('!effort project set XHIGH', '!'), {
+    kind: 'effort',
+    scope: 'project',
+    action: 'set',
+    effort: 'xhigh',
+  });
+});
+
+test('parse project reasoning effort clear command', () => {
+  assert.deepEqual(parseCommand('!effort project clear', '!'), {
+    kind: 'effort',
+    scope: 'project',
+    action: 'clear',
+  });
+});
+
+test('reject invalid reasoning effort values and command shapes', () => {
+  const invalidCommands = [
+    '!effort set',
+    '!effort set extreme',
+    '!effort set high extra',
+    '!effort status extra',
+    '!effort clear extra',
+    '!effort invalid',
+    '!effort project set',
+    '!effort project set extreme',
+    '!effort project set high extra',
+    '!effort project status extra',
+    '!effort project clear extra',
+    '!effort project invalid',
+  ];
+
+  for (const command of invalidCommands) {
+    assert.throws(
+      () => parseCommand(command, '!'),
+      /minimal.*low.*medium.*high.*xhigh/,
+      command,
+    );
+  }
+});
+
 test('parse Claude global model set command', () => {
   const parsed = parseCommand('!claude-model set claude-opus-4-8', '!');
   assert.deepEqual(parsed, {

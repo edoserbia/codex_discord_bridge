@@ -180,6 +180,44 @@ test('bridge status defaults to app-server for a fresh app-server session before
   }
 });
 
+test('effort changes do not cancel the active turn and apply on the next resumed turn', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-effort-next-turn-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-codex-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+  const { bridge, store, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-effort-next-turn', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, '[slow] current effort turn'));
+    await waitFor(() => Boolean((bridge as any).getRuntime(rootChannel.id).activeRun), 5_000);
+
+    await dispatch(bridge, createUserMessage(rootChannel, '!effort project set high', { userId: 'admin-user' }));
+    await waitFor(() => findSent(rootChannel, /ok: \[slow\] current effort turn/), 15_000);
+    const firstSession = store.getSession(rootChannel.id);
+    assert.ok(firstSession?.codexThreadId);
+
+    await dispatch(bridge, createUserMessage(rootChannel, 'next effort turn'));
+    await waitFor(() => findSent(rootChannel, /ok: next effort turn/), 15_000);
+    assert.equal(store.getSession(rootChannel.id)?.codexThreadId, firstSession.codexThreadId);
+
+    const payloads = await readCompleteJsonLogs<{
+      prompt: string;
+      args: { configs: string[] };
+    }>(logDir);
+    const currentTurn = payloads.find((payload) => payload.prompt.startsWith('[slow] current effort turn'));
+    const nextTurn = payloads.find((payload) => payload.prompt.startsWith('next effort turn'));
+    assert.equal(currentTurn?.args.configs.some((entry) => entry.startsWith('model_reasoning_effort=')), false);
+    assert.ok(nextTurn?.args.configs.includes('model_reasoning_effort="high"'));
+  } finally {
+    delete process.env.FAKE_CODEX_LOG_DIR;
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('bridge status shows that no resume id exists before the first Codex turn', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-e2e-status-no-resume-');
   const workspace = await createWorkspace(rootDir);

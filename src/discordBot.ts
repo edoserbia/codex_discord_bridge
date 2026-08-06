@@ -61,6 +61,7 @@ import type {
   ExecutionDriverMode,
   LocalSessionSendResult,
   PromptTask,
+  ReasoningEffort,
   RunStatus,
   SessionLookupResult,
   TranscriptEvent,
@@ -69,7 +70,14 @@ import type {
 import { buildPromptWithAttachments, downloadAttachments, extractMessageAttachments, removeAttachmentDir } from './attachments.js';
 import { appendBridgeFileSendInstructions, extractBridgeFileSendDirective } from './bridgeFileSendProtocol.js';
 import { diagnoseCodexFailure, filterDiagnosticStderr, isIgnorableCodexStderrLine } from './codexDiagnostics.js';
-import { loadCodexGlobalModel, resolveCodexConfigPath, writeCodexGlobalModel } from './codexConfig.js';
+import {
+  clearCodexGlobalReasoningEffort,
+  loadCodexGlobalModel,
+  loadCodexGlobalReasoningEffort,
+  resolveCodexConfigPath,
+  writeCodexGlobalModel,
+  writeCodexGlobalReasoningEffort,
+} from './codexConfig.js';
 import {
   allowClaudeProjectTool,
   clearClaudeProjectModel,
@@ -294,6 +302,26 @@ function hasBindingExecutionChanged(previous: ChannelBinding | undefined, next: 
     || previous.workspacePath !== next.workspacePath
     || previous.engine !== next.engine
     || JSON.stringify(previous.codex) !== JSON.stringify(next.codex);
+}
+
+export function resolveEffectiveCodexReasoningEffort(
+  binding: ChannelBinding,
+  globalEffort: ReasoningEffort | undefined,
+  environmentFallback: ReasoningEffort | undefined,
+): {
+  effort: ReasoningEffort | undefined;
+  source: 'project' | 'config.toml' | 'environment' | 'codex-default';
+} {
+  if (binding.reasoningEffortScope === 'project' && binding.codex.reasoningEffort) {
+    return { effort: binding.codex.reasoningEffort, source: 'project' };
+  }
+  if (globalEffort) {
+    return { effort: globalEffort, source: 'config.toml' };
+  }
+  if (environmentFallback) {
+    return { effort: environmentFallback, source: 'environment' };
+  }
+  return { effort: undefined, source: 'codex-default' };
 }
 
 function resolveTaskEngine(task: PromptTask, binding: ChannelBinding): EngineName {
@@ -569,6 +597,7 @@ export class DiscordCodexBridge {
 
     const existingBinding = this.store.getBinding(request.channelId);
     const codexOptions = cloneCodexOptions(this.config.defaultCodex);
+    delete codexOptions.reasoningEffort;
     let modelScope: ChannelBinding['modelScope'];
 
     if (options.model) {
@@ -1792,6 +1821,13 @@ export class DiscordCodexBridge {
         }
         await this.handleModelCommand(message, resolved, command);
         return;
+      case 'effort':
+        if (command.action !== 'status' && !this.isAdmin(message)) {
+          await message.reply('只有管理员才能切换 Codex 推理强度。');
+          return;
+        }
+        await this.handleReasoningEffortCommand(message, resolved, command);
+        return;
       case 'claude-model':
         if (command.action !== 'status' && !this.isAdmin(message)) {
           await message.reply('只有管理员才能切换 Claude 模型。');
@@ -2026,6 +2062,154 @@ export class DiscordCodexBridge {
         `项目：**${clearedBinding.projectName}**`,
         `全局模型：${globalModel ? `\`${globalModel}\`` : '未在配置文件中显式设置'}`,
         '运行中的任务不会被打断；下一轮请求开始使用全局模型。',
+      ].join('\n'),
+    );
+  }
+
+  private formatReasoningEffortSource(source: ReturnType<typeof resolveEffectiveCodexReasoningEffort>['source']): string {
+    return {
+      project: '项目覆盖',
+      'config.toml': 'config.toml',
+      environment: '环境变量',
+      'codex-default': 'Codex 默认',
+    }[source];
+  }
+
+  private formatReasoningEffortValue(
+    status: ReturnType<typeof resolveEffectiveCodexReasoningEffort>,
+  ): string {
+    return status.effort ? `\`${status.effort}\`` : '未显式指定（跟随 Codex 默认配置）';
+  }
+
+  private async handleReasoningEffortCommand(
+    message: Message,
+    resolved: ResolvedConversation | undefined,
+    command: Extract<ParsedCommand, { kind: 'effort' }>,
+  ): Promise<void> {
+    if (command.scope === 'global') {
+      const globalEffort = await loadCodexGlobalReasoningEffort(this.getCodexConfigPath());
+      const fallback = this.config.defaultCodex.reasoningEffort;
+
+      if (command.action === 'status') {
+        const globalStatus = resolveEffectiveCodexReasoningEffort({ codex: {} } as ChannelBinding, globalEffort, fallback);
+        const currentBinding = resolved
+          ? this.store.getBinding(resolved.bindingChannelId) ?? resolved.binding
+          : undefined;
+        const currentStatus = currentBinding
+          ? resolveEffectiveCodexReasoningEffort(currentBinding, globalEffort, fallback)
+          : globalStatus;
+        await message.reply(
+          [
+            '🧠 **Codex 全局推理强度**',
+            `全局设置：${globalEffort ? `\`${globalEffort}\`` : '未在 config.toml 中显式设置'}`,
+            `全局来源：${this.formatReasoningEffortSource(globalStatus.source)}`,
+            `${currentBinding ? '当前项目生效' : '当前生效'}：${this.formatReasoningEffortValue(currentStatus)}`,
+            `生效来源：${this.formatReasoningEffortSource(currentStatus.source)}`,
+            `配置文件：\`${this.getCodexConfigPath()}\``,
+            '说明：全局切换不会 reset 当前会话；运行中的本轮继续使用旧推理强度，下一轮开始使用新配置。',
+          ].join('\n'),
+        );
+        return;
+      }
+
+      if (command.action === 'set') {
+        await writeCodexGlobalReasoningEffort(this.getCodexConfigPath(), command.effort);
+        await this.refreshStatusPanelsForBindings(this.store.listBindings().map((binding) => binding.channelId));
+        await message.reply(
+          [
+            `已将 Codex 全局推理强度设为 \`${command.effort}\`。`,
+            `配置文件：\`${this.getCodexConfigPath()}\``,
+            '现有项目覆盖保持不变；运行中的任务不会被打断，下一轮请求开始使用新配置。',
+          ].join('\n'),
+        );
+        return;
+      }
+
+      await clearCodexGlobalReasoningEffort(this.getCodexConfigPath());
+      await this.refreshStatusPanelsForBindings(this.store.listBindings().map((binding) => binding.channelId));
+      await message.reply(
+        [
+          '已清除 Codex 全局推理强度。',
+          `配置文件：\`${this.getCodexConfigPath()}\``,
+          fallback
+            ? `下一轮将回退到环境变量配置 \`${fallback}\`；现有项目覆盖保持不变。`
+            : '下一轮将回退到 Codex 默认配置；现有项目覆盖保持不变。',
+        ].join('\n'),
+      );
+      return;
+    }
+
+    if (!resolved) {
+      await message.reply('当前频道未绑定项目。先执行 `!bind`。');
+      return;
+    }
+
+    const binding = this.store.getBinding(resolved.bindingChannelId);
+    if (!binding) {
+      await message.reply('当前频道未绑定项目。先执行 `!bind`。');
+      return;
+    }
+
+    const globalEffort = await loadCodexGlobalReasoningEffort(this.getCodexConfigPath());
+    const status = resolveEffectiveCodexReasoningEffort(binding, globalEffort, this.config.defaultCodex.reasoningEffort);
+
+    if (command.action === 'status') {
+      const projectOverride = binding.reasoningEffortScope === 'project' && binding.codex.reasoningEffort
+        ? `\`${binding.codex.reasoningEffort}\`（项目覆盖）`
+        : '跟随全局';
+      await message.reply(
+        [
+          '🧠 **Codex 项目推理强度**',
+          `项目：**${binding.projectName}**`,
+          `项目设置：${projectOverride}`,
+          `全局设置：${globalEffort ? `\`${globalEffort}\`` : '未在 config.toml 中显式设置'}`,
+          `当前生效：${this.formatReasoningEffortValue(status)}`,
+          `来源：${this.formatReasoningEffortSource(status.source)}`,
+          '说明：项目覆盖只影响当前项目；运行中的本轮继续使用旧推理强度，下一轮开始使用新配置。',
+        ].join('\n'),
+      );
+      return;
+    }
+
+    if (command.action === 'set') {
+      const nextBinding: ChannelBinding = {
+        ...binding,
+        codex: {
+          ...binding.codex,
+          reasoningEffort: command.effort,
+        },
+        reasoningEffortScope: 'project',
+        updatedAt: new Date().toISOString(),
+      };
+      await this.store.upsertBinding(nextBinding);
+      await this.refreshStatusPanelsForBindings([nextBinding.channelId]);
+      await message.reply(
+        [
+          `已将当前项目的 Codex 推理强度设为 \`${command.effort}\`。`,
+          `项目：**${nextBinding.projectName}**`,
+          '来源：项目覆盖',
+          '运行中的任务不会被打断；下一轮请求开始使用新配置。',
+        ].join('\n'),
+      );
+      return;
+    }
+
+    const nextCodex = { ...binding.codex };
+    delete nextCodex.reasoningEffort;
+    const clearedBinding: ChannelBinding = {
+      ...binding,
+      codex: nextCodex,
+      reasoningEffortScope: undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.store.upsertBinding(clearedBinding);
+    await this.refreshStatusPanelsForBindings([clearedBinding.channelId]);
+    await message.reply(
+      [
+        '已清除当前项目的推理强度覆盖，恢复跟随全局。',
+        `项目：**${clearedBinding.projectName}**`,
+        `当前生效：${this.formatReasoningEffortValue(resolveEffectiveCodexReasoningEffort(clearedBinding, globalEffort, this.config.defaultCodex.reasoningEffort))}`,
+        '运行中的任务不会被打断；下一轮请求开始使用继承配置。',
       ].join('\n'),
     );
   }
@@ -2374,6 +2558,12 @@ export class DiscordCodexBridge {
     const runtime = this.getRuntime(resolved.conversationId);
     const session = await this.store.ensureSession(resolved.bindingChannelId, resolved.conversationId);
     const globalModel = await this.getGlobalCodexModel();
+    const globalEffort = await loadCodexGlobalReasoningEffort(this.getCodexConfigPath());
+    const reasoningEffort = resolveEffectiveCodexReasoningEffort(
+      resolved.binding,
+      globalEffort,
+      this.config.defaultCodex.reasoningEffort,
+    );
     await this.refreshStatusPanel(resolved.channel, resolved.binding, session, runtime, resolved.isThreadConversation);
     await message.reply(
       formatStatus(
@@ -2384,6 +2574,7 @@ export class DiscordCodexBridge {
         resolved.isThreadConversation,
         this.config.codexDriverMode ?? 'app-server',
         globalModel,
+        reasoningEffort,
       ),
     );
   }
@@ -4154,7 +4345,24 @@ export class DiscordCodexBridge {
           break;
         }
 
-        const job = this.runner.start(binding, runInput, existingThreadId, hooks);
+        let executionBinding = binding;
+        if (attemptEngine === 'codex') {
+          const globalEffort = await loadCodexGlobalReasoningEffort(this.getCodexConfigPath());
+          const { effort } = resolveEffectiveCodexReasoningEffort(
+            binding,
+            globalEffort,
+            this.config.defaultCodex.reasoningEffort,
+          );
+          const codex = { ...binding.codex };
+          if (effort) {
+            codex.reasoningEffort = effort;
+          } else {
+            delete codex.reasoningEffort;
+          }
+          executionBinding = { ...binding, codex };
+        }
+
+        const job = this.runner.start(executionBinding, runInput, existingThreadId, hooks);
         pendingJob.setJob(job);
         const startedInFallback = attemptEngine === 'codex' && preferredDriverMode === 'app-server' && job.driverMode === 'legacy-exec';
         nextRun.driverMode = job.driverMode;
@@ -5072,6 +5280,12 @@ export class DiscordCodexBridge {
     isThreadConversation: boolean,
   ): Promise<void> {
     const globalModel = await this.getGlobalCodexModel();
+    const globalEffort = await loadCodexGlobalReasoningEffort(this.getCodexConfigPath());
+    const reasoningEffort = resolveEffectiveCodexReasoningEffort(
+      binding,
+      globalEffort,
+      this.config.defaultCodex.reasoningEffort,
+    );
     const content = formatStatus(
       binding,
       session,
@@ -5080,6 +5294,7 @@ export class DiscordCodexBridge {
       isThreadConversation,
       this.config.codexDriverMode ?? 'app-server',
       globalModel,
+      reasoningEffort,
     );
     const statusMessageId = session.statusMessageId;
 

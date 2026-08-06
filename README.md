@@ -107,6 +107,23 @@ destructive_enabled = true
 
 在 `codex-cli 0.116.0` 上，这组旧键会让 `codex app-server` 报权限配置不兼容，并导致 bridge 回退到 `legacy-exec`。
 
+## Codex 推理强度
+
+Bridge 支持在 Discord 中查看和调整 Codex 的 reasoning effort。允许的值为 `minimal`、`low`、`medium`、`high` 和 `xhigh`，命令边界不区分大小写，保存时统一为小写：
+
+```text
+!effort status
+!effort set <minimal|low|medium|high|xhigh>
+!effort clear
+!effort project status
+!effort project set <minimal|low|medium|high|xhigh>
+!effort project clear
+```
+
+生效优先级为：项目覆盖 > `model_reasoning_effort` > `DEFAULT_CODEX_REASONING_EFFORT` > Codex 默认。项目覆盖保存在 Bridge 的 `data/state.json` 绑定状态中；全局值只写配置文件根级的 `model_reasoning_effort`，不会修改项目目录里的 `.codex/config.toml`。清除全局值会保留其他 TOML 内容、注释和 section。
+
+推理强度命令不会 reset 或取消正在运行的会话；运行中的本轮继续使用旧值，命令完成后的下一轮读取新值。app-server 在每个 `turn/start` 传入 `effort`，legacy-exec 在新建和 resume 调用中传入 `-c model_reasoning_effort="<value>"`。没有可解析的值时 Bridge 会省略该参数，让 Codex 使用自身默认。Claude CLI 不读取也不传递这个设置。
+
 ## Claude CLI 兼容性
 
 Claude 引擎通过本机 Claude CLI 执行，默认命令为：
@@ -398,6 +415,12 @@ Bridge 会中断当前步骤，在当前引擎会话里先处理新增引导，�
 | `!claude-model project status` | 查看当前项目 Claude 模型覆盖和生效来源 |
 | `!claude-model project set <model>` | 修改当前项目 Claude 模型，写入项目 `.claude/settings.json` |
 | `!claude-model project clear` | 清除当前项目 Claude 模型覆盖 |
+| `!effort status` | 查看 Codex 全局推理强度、来源和当前生效值 |
+| `!effort set <minimal\|low\|medium\|high\|xhigh>` | 修改 Codex 全局推理强度（管理员） |
+| `!effort clear` | 清除全局推理强度并恢复环境变量或 Codex 默认（管理员） |
+| `!effort project status` | 查看当前项目覆盖、继承来源和生效值 |
+| `!effort project set <minimal\|low\|medium\|high\|xhigh>` | 修改当前项目的 Codex 推理强度覆盖（管理员） |
+| `!effort project clear` | 清除当前项目覆盖，恢复继承（管理员） |
 | `!approve <请求ID>` | 批准 Claude CLI 申请的工具权限 |
 | `!deny <请求ID>` | 拒绝 Claude CLI 申请的工具权限 |
 | `!status` | 查看当前会话状态、Resume ID 和本机续聊命令 |
@@ -537,6 +560,7 @@ sudo ./scripts/uninstall-service.sh --mode daemon
 | `DEFAULT_CODEX_APPROVAL` | 默认 approval 策略 |
 | `DEFAULT_CODEX_SEARCH` | 默认是否开启搜索 |
 | `DEFAULT_CODEX_SKIP_GIT_REPO_CHECK` | 默认是否跳过 Git 仓库检查，默认 `true` |
+| `DEFAULT_CODEX_REASONING_EFFORT` | 没有项目覆盖和 TOML 全局值时的环境回退：`minimal` / `low` / `medium` / `high` / `xhigh` |
 | `CODEX_COMMAND` | Codex CLI 命令，默认 `codex` |
 | `CODEX_APP_SERVER_TURN_TIMEOUT_MS` | app-server 已提交轮次后无任何事件的卡死保护，默认 `600000`；设为 `0` 可禁用 |
 | `CLAUDE_COMMAND` | Claude CLI 命令，默认 `claude` |

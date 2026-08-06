@@ -393,6 +393,41 @@ test('runner orders global and exec arguments for real Codex CLI compatibility',
   }
 });
 
+test('runner forwards reasoning effort on new and resumed runs and omits it when unresolved', async () => {
+  const rootDir = await makeTempDir('codex-runner-effort-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'fake-codex-logs');
+  process.env.FAKE_CODEX_LOG_DIR = logDir;
+
+  const runner = new CodexRunner(makeConfig(rootDir));
+  const binding = makeBinding(workspace);
+
+  try {
+    binding.codex.reasoningEffort = 'high';
+    await runner.start(binding, { prompt: 'new effort run', imagePaths: [], extraAddDirs: [] }, undefined).done;
+
+    binding.codex.reasoningEffort = 'xhigh';
+    await runner.start(binding, { prompt: 'resumed effort run', imagePaths: [], extraAddDirs: [] }, 'thread-existing').done;
+
+    delete binding.codex.reasoningEffort;
+    await runner.start(binding, { prompt: 'default effort run', imagePaths: [], extraAddDirs: [] }, undefined).done;
+
+    const logFiles = await readdir(logDir);
+    const payloads = await Promise.all(logFiles.map(async (fileName) => JSON.parse(await readFile(path.join(logDir, fileName), 'utf8')) as {
+      prompt: string;
+      args: { configs: string[] };
+    }));
+    const byPrompt = new Map(payloads.map((payload) => [payload.prompt, payload.args.configs]));
+
+    assert.ok(byPrompt.get('new effort run')?.includes('model_reasoning_effort="high"'));
+    assert.ok(byPrompt.get('resumed effort run')?.includes('model_reasoning_effort="xhigh"'));
+    assert.equal(byPrompt.get('default effort run')?.some((entry) => entry.startsWith('model_reasoning_effort=')), false);
+  } finally {
+    delete process.env.FAKE_CODEX_LOG_DIR;
+    await cleanupDir(rootDir);
+  }
+});
+
 test('runner strips nested codex desktop env vars before spawning child codex', async () => {
   const rootDir = await makeTempDir('codex-runner-env-');
   const workspace = await createWorkspace(rootDir);

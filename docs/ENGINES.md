@@ -48,6 +48,28 @@ Use `--engine` when binding a Discord text channel:
 
 If `--engine` is omitted, the binding defaults to Codex.
 
+## Codex Reasoning Effort
+
+Codex accepts five reasoning effort values: `minimal`, `low`, `medium`, `high`, and `xhigh`. Discord administrators can manage the global value or a project override:
+
+```text
+!effort status
+!effort set <minimal|low|medium|high|xhigh>
+!effort clear
+!effort project status
+!effort project set <minimal|low|medium|high|xhigh>
+!effort project clear
+```
+
+The effective value is resolved for every Codex turn in this order:
+
+1. Project override in Bridge binding state (`reasoningEffortScope: "project"`)
+2. Root-level `model_reasoning_effort` in `CODEX_CONFIG_PATH` or `~/.codex/config.toml`
+3. `DEFAULT_CODEX_REASONING_EFFORT`
+4. Codex's own default
+
+Global edits preserve unrelated TOML content and project overrides. Project edits do not touch project-local Codex configuration. A change never interrupts an active turn; it applies to the next turn. The app-server driver sends `effort` on `turn/start`, while legacy-exec sends `-c model_reasoning_effort="<value>"` for both new and resumed runs. Claude CLI does not read this Codex-only setting.
+
 ## Per-Request Override
 
 Use a command prefix for a single request:

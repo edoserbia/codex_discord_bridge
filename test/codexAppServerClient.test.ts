@@ -450,6 +450,56 @@ test('app-server client forwards per-thread config and writable roots to the off
   }
 });
 
+test('app-server client sends reasoning effort on new and resumed turns and omits it when unresolved', async () => {
+  const rootDir = await makeTempDir('codex-app-server-client-effort-');
+  const workspace = await createWorkspace(rootDir);
+  const logDir = path.join(rootDir, 'logs');
+  const binding = makeBinding(workspace);
+  binding.codex.reasoningEffort = 'high';
+  const client = new CodexAppServerClient(makeConfig(rootDir));
+  process.env.FAKE_CODEX_APP_SERVER_LOG_DIR = logDir;
+
+  try {
+    const newThreadId = await client.ensureThread(binding, undefined);
+    await (await client.startTurn(binding, newThreadId, {
+      prompt: 'new turn effort',
+      imagePaths: [],
+      extraAddDirs: [],
+    })).done;
+
+    binding.codex.reasoningEffort = 'xhigh';
+    const resumedThreadId = await client.ensureThread(binding, 'thread-existing');
+    await (await client.startTurn(binding, resumedThreadId, {
+      prompt: 'resumed turn effort',
+      imagePaths: [],
+      extraAddDirs: [],
+    })).done;
+
+    delete binding.codex.reasoningEffort;
+    await (await client.startTurn(binding, resumedThreadId, {
+      prompt: 'default turn effort',
+      imagePaths: [],
+      extraAddDirs: [],
+    })).done;
+
+    const files = await readdir(logDir);
+    const payloads = await Promise.all(files.map(async (fileName) => JSON.parse(await readFile(path.join(logDir, fileName), 'utf8')) as {
+      method: string;
+      params: Record<string, any>;
+    }));
+    const turnStarts = payloads.filter((payload) => payload.method === 'turn/start');
+    const byPrompt = new Map(turnStarts.map((payload) => [payload.params.input?.[0]?.text, payload.params]));
+
+    assert.equal(byPrompt.get('new turn effort')?.effort, 'high');
+    assert.equal(byPrompt.get('resumed turn effort')?.effort, 'xhigh');
+    assert.equal(Object.hasOwn(byPrompt.get('default turn effort') ?? {}, 'effort'), false);
+  } finally {
+    delete process.env.FAKE_CODEX_APP_SERVER_LOG_DIR;
+    await client.stop();
+    await cleanupDir(rootDir);
+  }
+});
+
 test('app-server client forwards local full-access mode and search using the same binding options', async () => {
   const rootDir = await makeTempDir('codex-app-server-client-danger-full-access-');
   const workspace = await createWorkspace(rootDir);

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { formatHelp, formatProgressMessage, formatSuccessReply } from '../src/formatters.js';
+import { formatHelp, formatProgressMessage, formatStatus, formatSuccessReply } from '../src/formatters.js';
 
 test('help text documents workspace inbox mirroring and file-send workflows', () => {
   const text = formatHelp('!');
@@ -16,6 +16,50 @@ test('help text documents workspace inbox mirroring and file-send workflows', ()
   assert.match(text, /!model set gpt-5\.5/);
   assert.match(text, /!model project set gpt-5\.5/);
   assert.match(text, /!model project clear/);
+  assert.match(text, /!effort status/);
+  assert.match(text, /!effort set <minimal\|low\|medium\|high\|xhigh>/);
+  assert.match(text, /!effort project set <minimal\|low\|medium\|high\|xhigh>/);
+  assert.match(text, /!effort project clear/);
+});
+
+test('status text shows the effective reasoning effort and its source', () => {
+  const text = formatStatus(
+    {
+      channelId: 'channel-1',
+      guildId: 'guild-1',
+      projectName: 'api',
+      workspacePath: '/tmp/api',
+      codex: {
+        reasoningEffort: 'high',
+        sandboxMode: 'danger-full-access',
+        approvalPolicy: 'never',
+        search: true,
+        skipGitRepoCheck: true,
+        addDirs: [],
+        extraConfig: [],
+      },
+      reasoningEffortScope: 'project',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+    {
+      conversationId: 'channel-1',
+      bindingChannelId: 'channel-1',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+    {
+      conversationId: 'channel-1',
+      queue: [],
+    },
+    '!',
+    false,
+    'app-server',
+    undefined,
+    { effort: 'high', source: 'project' },
+  );
+
+  assert.match(text, /推理强度：`high`（项目覆盖）/);
+  assert.match(text, /!effort status/);
 });
 
 test('help text uses Codex as the default engine in bind examples', () => {

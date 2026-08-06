@@ -9,6 +9,7 @@
 - 补充 README 与 `docs/` 文档，统一说明当前 bridge 的文件收发、`!web`、管理员判定、`--skip-git-check`、`app-server` / `legacy-exec` 切换、任务自动恢复，以及 GitLab 远端使用方式。
 - 新增 `docs/GIT.md` 作为当前 Git / GitLab 主文档，旧 `docs/GITEE.md` 改为兼容提示入口。
 - 修复 macOS 服务化运行时 Discord REST / Gateway 代理不一致的问题：为 Node fetch/undici 和 Discord Gateway WebSocket 同时注入本地 HTTP CONNECT 代理，避免本机网络直连 Discord 时出现 TLS 证书错配或连接重置。
+- 新增 Codex reasoning effort 管理：支持 `!effort` 全局/项目命令、TOML 根级 `model_reasoning_effort`、`DEFAULT_CODEX_REASONING_EFFORT` 回退，以及 app-server / legacy-exec 的逐回合传递；运行中的任务不被打断，Claude 不受影响。
 
 ### 版本差异表
 

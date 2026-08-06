@@ -6,6 +6,8 @@ import path from 'node:path';
 import { FakeChannel, createUserMessage } from './helpers/fakeDiscord.js';
 import { createBridgeTestRig } from './helpers/bridgeSetup.js';
 import { cleanupDir, createWorkspace, makeTempDir, waitFor } from './helpers/testUtils.js';
+import { resolveEffectiveCodexReasoningEffort } from '../src/discordBot.js';
+import type { ChannelBinding } from '../src/types.js';
 
 const fakeAppServerCommand = path.resolve('test/fixtures/fake-codex-app-server.mjs');
 const fakeClaudeCommand = path.resolve('test/fixtures/fake-claude.mjs');
@@ -31,6 +33,164 @@ async function readAppServerRequests(logDir: string): Promise<Array<{ method: st
 
   return requests;
 }
+
+test('reasoning effort resolves project, TOML, environment, then Codex default precedence', () => {
+  const binding = {
+    codex: {},
+  } as ChannelBinding;
+
+  assert.deepEqual(resolveEffectiveCodexReasoningEffort(binding, 'high', 'medium'), {
+    effort: 'high',
+    source: 'config.toml',
+  });
+  assert.deepEqual(resolveEffectiveCodexReasoningEffort(binding, undefined, 'medium'), {
+    effort: 'medium',
+    source: 'environment',
+  });
+  assert.deepEqual(resolveEffectiveCodexReasoningEffort(binding, undefined, undefined), {
+    effort: undefined,
+    source: 'codex-default',
+  });
+
+  binding.codex.reasoningEffort = 'low';
+  binding.reasoningEffortScope = 'project';
+  assert.deepEqual(resolveEffectiveCodexReasoningEffort(binding, 'high', 'medium'), {
+    effort: 'low',
+    source: 'project',
+  });
+});
+
+test('binding creation does not persist the environment reasoning effort fallback as a project override', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-effort-binding-');
+  const workspace = await createWorkspace(rootDir);
+  const { bridge, config, store, channels } = await createBridgeTestRig({ rootDir });
+  const rootChannel = new FakeChannel('channel-effort-binding', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+  config.defaultCodex.reasoningEffort = 'medium';
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+
+    const binding = store.getBinding(rootChannel.id);
+    assert.equal(binding?.codex.reasoningEffort, undefined);
+    assert.equal(binding?.reasoningEffortScope, undefined);
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('reasoning effort is resolved again at the execution boundary for every Codex turn', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-effort-resolution-');
+  const workspace = await createWorkspace(rootDir);
+  const codexConfigPath = path.join(rootDir, '.codex', 'config.toml');
+  await mkdir(path.dirname(codexConfigPath), { recursive: true });
+  await writeFile(codexConfigPath, 'model_reasoning_effort = "high"\n', 'utf8');
+
+  const { bridge, config, store, runner, channels } = await createBridgeTestRig({
+    rootDir,
+    codexCommand: fakeAppServerCommand,
+    driverMode: 'app-server',
+    codexConfigPath,
+  });
+  const rootChannel = new FakeChannel('channel-effort-resolution', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+  config.defaultCodex.reasoningEffort = 'medium';
+  const observedEfforts: Array<string | undefined> = [];
+  const originalStart = runner.start.bind(runner);
+  runner.start = (binding, input, existingThreadId, hooks) => {
+    observedEfforts.push(binding.codex.reasoningEffort);
+    return originalStart(binding, input, existingThreadId, hooks);
+  };
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, `!bind api "${workspace}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(rootChannel, 'first effort prompt'));
+    await waitFor(() => rootChannel.sent.some((message) => /app-server ok: first effort prompt/.test(message.content)), 15_000);
+    assert.equal(observedEfforts.at(-1), 'high');
+
+    const binding = store.getBinding(rootChannel.id);
+    assert.ok(binding);
+    await store.upsertBinding({
+      ...binding,
+      codex: {
+        ...binding.codex,
+        reasoningEffort: 'low',
+      },
+      reasoningEffortScope: 'project',
+    });
+
+    await dispatch(bridge, createUserMessage(rootChannel, 'second effort prompt'));
+    await waitFor(() => rootChannel.sent.some((message) => /app-server ok: second effort prompt/.test(message.content)), 15_000);
+    assert.equal(observedEfforts.at(-1), 'low');
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
+test('reasoning effort commands preserve project overrides and report inheritance sources', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-effort-commands-');
+  const workspaceA = await createWorkspace(path.join(rootDir, 'workspace-a'));
+  const workspaceB = await createWorkspace(path.join(rootDir, 'workspace-b'));
+  const codexConfigPath = path.join(rootDir, '.codex', 'config.toml');
+  await mkdir(path.dirname(codexConfigPath), { recursive: true });
+  await writeFile(codexConfigPath, 'model = "gpt-global"\n\n[profiles.default]\napproval_policy = "never"\n', 'utf8');
+
+  const { bridge, config, store, channels } = await createBridgeTestRig({ rootDir, codexConfigPath });
+  config.defaultCodex.reasoningEffort = 'medium';
+  const firstChannel = new FakeChannel('channel-effort-command-a', 'guild-1');
+  const secondChannel = new FakeChannel('channel-effort-command-b', 'guild-1');
+  channels.set(firstChannel.id, firstChannel);
+  channels.set(secondChannel.id, secondChannel);
+
+  try {
+    await dispatch(bridge, createUserMessage(firstChannel, `!bind api "${workspaceA}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(secondChannel, `!bind web "${workspaceB}"`, { userId: 'admin-user' }));
+    await dispatch(bridge, createUserMessage(secondChannel, '!effort project set low', { userId: 'admin-user' }));
+    await waitFor(() => secondChannel.sent.some((message) => /项目.*推理强度.*`low`/.test(message.content)), 15_000);
+
+    await dispatch(bridge, createUserMessage(firstChannel, '!effort set high', { userId: 'regular-user', admin: false }));
+    assert.ok(firstChannel.sent.some((message) => /只有管理员.*推理强度/.test(message.content)));
+
+    await dispatch(bridge, createUserMessage(firstChannel, '!effort set high', { userId: 'admin-user' }));
+    await waitFor(() => firstChannel.sent.some((message) => /全局推理强度.*`high`/.test(message.content)), 15_000);
+    assert.equal(store.getBinding(secondChannel.id)?.codex.reasoningEffort, 'low');
+    assert.equal(store.getBinding(secondChannel.id)?.reasoningEffortScope, 'project');
+
+    const configured = await readFile(codexConfigPath, 'utf8');
+    assert.match(configured, /^model_reasoning_effort = "high"/m);
+    assert.match(configured, /\[profiles\.default\]/);
+
+    await dispatch(bridge, createUserMessage(secondChannel, '!effort status', { userId: 'regular-user', admin: false }));
+    await waitFor(() => secondChannel.sent.some((message) => /Codex 全局推理强度/.test(message.content)
+      && /当前项目生效：`low`/.test(message.content)
+      && /生效来源：项目覆盖/.test(message.content)), 15_000);
+
+    await dispatch(bridge, createUserMessage(firstChannel, '!effort status', { userId: 'regular-user' }));
+    await waitFor(() => firstChannel.sent.some((message) => /Codex 全局推理强度/.test(message.content) && /来源：config\.toml/.test(message.content)), 15_000);
+
+    await dispatch(bridge, createUserMessage(firstChannel, '!effort clear', { userId: 'admin-user' }));
+    await waitFor(() => firstChannel.sent.some((message) => /已清除 Codex 全局推理强度/.test(message.content)), 15_000);
+    const cleared = await readFile(codexConfigPath, 'utf8');
+    assert.doesNotMatch(cleared, /^model_reasoning_effort\s*=/m);
+    assert.match(cleared, /^model = "gpt-global"/m);
+    assert.match(cleared, /\[profiles\.default\]/);
+    assert.equal(store.getBinding(secondChannel.id)?.codex.reasoningEffort, 'low');
+
+    await dispatch(bridge, createUserMessage(firstChannel, '!effort project status', { userId: 'regular-user' }));
+    await waitFor(() => firstChannel.sent.some((message) => /Codex 项目推理强度/.test(message.content) && /当前生效：`medium`/.test(message.content)), 15_000);
+    assert.ok(firstChannel.sent.some((message) => /项目设置：跟随全局/.test(message.content) && /来源：环境变量/.test(message.content)));
+
+    await dispatch(bridge, createUserMessage(secondChannel, '!effort project clear', { userId: 'admin-user' }));
+    await waitFor(() => secondChannel.sent.some((message) => /已清除当前项目的推理强度覆盖/.test(message.content)), 15_000);
+    assert.equal(store.getBinding(secondChannel.id)?.codex.reasoningEffort, undefined);
+    assert.equal(store.getBinding(secondChannel.id)?.reasoningEffortScope, undefined);
+  } finally {
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
 
 test('project model switch applies on the next turn without resetting the session', { concurrency: false }, async () => {
   const rootDir = await makeTempDir('codex-bridge-model-project-');
