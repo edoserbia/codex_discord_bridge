@@ -7,6 +7,8 @@ import type { AppConfig, WiscordBridgeConfig } from './config.js';
 import { isCommandMessage, parseCommand, type ParsedCommand } from './commandParser.js';
 import type { CodexExecutionDriver, CodexRunHooks, RunningCodexJob } from './codexRunner.js';
 import { extractBridgeFileSendDirective } from './bridgeFileSendProtocol.js';
+import { buildPromptWithAttachments } from './attachments.js';
+import { allocateInboxFilePath, allocateUniqueFilePath } from './fileTransfer.js';
 import {
   clearCodexGlobalReasoningEffort,
   loadCodexGlobalModel,
@@ -54,6 +56,12 @@ interface WiscordGatewayFrame {
 }
 
 interface WiscordMessage {
+  attachments?: Array<{
+    contentType: string;
+    id: string;
+    originalFilename: string;
+    sizeBytes: number;
+  }>;
   author: { id: string; kind: string };
   content: string;
   conversationId: string;
@@ -682,6 +690,8 @@ export class WiscordCodexBridge {
       return progressChain;
     };
     const runtime = createWiscordRuntime(runMessage, runBinding, this.config.codexDriverMode ?? 'app-server');
+    const downloaded = await this.downloadAttachments(runMessage, runBinding);
+    runtime.activeRun!.task.attachments = downloaded.attachments;
     const activeRun = runtime.activeRun!;
     const refreshProgress = () => updateProgress(formatProgressMessage(
       runBinding,
@@ -777,7 +787,10 @@ export class WiscordCodexBridge {
           ...(options.engine ? { engine: options.engine } : {}),
           imagePaths: [],
           extraAddDirs: [],
-          prompt: appendBridgeProjectContext(runMessage.content, runBinding),
+          prompt: appendBridgeProjectContext(
+            buildPromptWithAttachments(runMessage.content, downloaded.attachments, downloaded.attachmentDir),
+            runBinding,
+          ),
         },
         session.codexThreadId,
         hooks,
@@ -852,6 +865,34 @@ export class WiscordCodexBridge {
     });
   }
 
+  private async downloadAttachments(
+    message: WiscordMessage,
+    binding: ChannelBinding,
+  ): Promise<{ attachmentDir?: string; attachments: PromptTask['attachments'] }> {
+    if (!message.attachments?.length) return { attachments: [] };
+    const attachmentDir = path.join(this.config.dataDir, 'attachments', message.conversationId, message.id);
+    await fs.mkdir(attachmentDir, { recursive: true });
+    const attachments: PromptTask['attachments'] = [];
+    for (const attachment of message.attachments) {
+      const fileName = path.basename(attachment.originalFilename).replace(/[\x00-\x1f\x7f]/g, '') || 'attachment';
+      const localPath = await allocateUniqueFilePath(attachmentDir, fileName);
+      const response = await this.apiResponse(`/bot/v1/attachments/${encodeURIComponent(attachment.id)}`, { method: 'GET' });
+      await fs.writeFile(localPath, Buffer.from(await response.arrayBuffer()));
+      const workspaceLocalPath = await allocateInboxFilePath(binding.workspacePath, path.basename(localPath));
+      await fs.copyFile(localPath, workspaceLocalPath);
+      attachments.push({
+        contentType: attachment.contentType,
+        isImage: attachment.contentType.startsWith('image/'),
+        localPath,
+        name: path.basename(localPath),
+        size: attachment.sizeBytes,
+        sourceUrl: `wiscord:${attachment.id}`,
+        workspaceLocalPath,
+      });
+    }
+    return { attachmentDir, attachments };
+  }
+
   private async sendText(conversationId: string, content: string): Promise<void> {
     const reply = await this.api<{ messageId: string }>('/bot/v1/messages', {
       body: JSON.stringify({ conversationId }),
@@ -886,6 +927,23 @@ export class WiscordCodexBridge {
       if (!(error instanceof WiscordHttpError) || error.status !== 401) throw error;
       this.accessToken = await this.exchangeToken();
       return this.request<T>(route, init, true);
+    }
+  }
+
+  private async apiResponse(route: string, init: RequestInit): Promise<Response> {
+    const request = async () => {
+      const headers = new Headers(init.headers);
+      headers.set('authorization', `Bearer ${this.accessToken}`);
+      const response = await fetch(`${this.wiscord.baseUrl}${route}`, { ...init, headers });
+      if (!response.ok) throw new WiscordHttpError(response.status, (await response.text()).slice(0, 500));
+      return response;
+    };
+    try {
+      return await request();
+    } catch (error) {
+      if (!(error instanceof WiscordHttpError) || error.status !== 401) throw error;
+      this.accessToken = await this.exchangeToken();
+      return request();
     }
   }
 
