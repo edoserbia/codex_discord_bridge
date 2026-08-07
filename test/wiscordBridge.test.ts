@@ -13,7 +13,7 @@ import { JsonStateStore } from '../src/store.js';
 import type { ChannelBinding, CodexRunInput, CodexRunResult } from '../src/types.js';
 import { WiscordCodexBridge } from '../src/wiscordBridge.js';
 
-test('Wiscord adapter ACKs durably, refreshes a progress message, and sends a separate final result', async () => {
+test('Wiscord adapter preserves the Discord live-progress format and freezes the completed status before the final result', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'wiscord-bridge-'));
   const workspace = path.join(root, 'workspace');
   const state = new JsonStateStore(path.join(root, 'state.json'));
@@ -43,7 +43,7 @@ test('Wiscord adapter ACKs durably, refreshes a progress message, and sends a se
     if (request.method === 'GET' && request.url === '/bot/v1/messages/msg_user') {
       response.end(JSON.stringify({
         author: { id: 'user_1', kind: 'user' },
-        content: 'run the integration',
+        content: '!codex run the integration',
         conversationId: 'channel_1',
         guildId: 'guild_1',
         id: 'msg_user',
@@ -112,10 +112,26 @@ test('Wiscord adapter ACKs durably, refreshes a progress message, and sends a se
       runnerStarts += 1;
       timeline.push('runner:start');
       assert.match(input.prompt, /run the integration/);
+      assert.equal(input.engine, 'codex');
       assert.equal(existingThreadId, undefined);
       const done = (async (): Promise<CodexRunResult> => {
         await hooks.onThreadStarted?.('codex_thread_1');
         await hooks.onActivity?.('Codex is working');
+        await hooks.onReasoning?.('The Bridge should retain every event category.');
+        await hooks.onTodoListChanged?.([
+          { id: 'inspect', text: 'Inspect the existing Bridge output', completed: true },
+          { id: 'adapt', text: 'Adapt the Wiscord transport', completed: false },
+        ]);
+        await hooks.onCollabToolChanged?.({
+          agentsStates: { 'agent-1': { nickname: 'reviewer', status: 'running' } },
+          id: 'call-1',
+          receiverThreadIds: ['agent-1'],
+          senderThreadId: 'codex_thread_1',
+          status: 'in_progress',
+          tool: 'spawn_agent',
+        });
+        await hooks.onCommandStarted?.('pnpm test');
+        await hooks.onCommandCompleted?.('pnpm test', 'all tests passed', 0);
         await hooks.onAgentMessage?.(finalMarkdown);
         return {
           agentMessages: [finalMarkdown],
@@ -160,11 +176,22 @@ test('Wiscord adapter ACKs durably, refreshes a progress message, and sends a se
     assert.equal(runnerStarts, 1);
     assert.ok(timeline.indexOf('ack:evt_1') < timeline.indexOf('runner:start'));
     assert.ok(edits.some((content) => content.includes('Codex is working')));
+    assert.ok(edits.some((content) => content.includes('Codex Discord Bridge 实时进度')));
+    assert.ok(edits.some((content) => content.includes('计划：')));
+    assert.ok(edits.some((content) => content.includes('子代理：')));
+    assert.ok(edits.some((content) => content.includes('分析摘要：最新')));
+    assert.ok(edits.some((content) => content.includes('当前命令：`pnpm test`')));
+    assert.ok(edits.some((content) => content.includes('最新输出预览：')));
     assert.equal(createdReplies, 2);
     assert.deepEqual(finalizations, ['msg_progress', 'msg_final']);
-    assert.match(progressChunks.map((chunk) => chunk.content).join(''), /任务已完成/);
+    const completedProgress = progressChunks.map((chunk) => chunk.content).join('');
+    assert.match(completedProgress, /Codex Discord Bridge 实时进度/);
+    assert.match(completedProgress, /状态：已完成/);
+    assert.match(completedProgress, /最近更新：/);
     const reconstructed = chunks.sort((left, right) => left.index - right.index).map((chunk) => chunk.content).join('');
-    assert.equal(reconstructed, finalMarkdown);
+    assert.match(reconstructed, /最终总结/);
+    assert.match(reconstructed, /Wiscord Test/);
+    assert.match(reconstructed, /Complete Wiscord result/);
     assert.equal(state.getSession('channel_1')?.codexThreadId, 'codex_thread_1');
   } finally {
     await bridge.stop();
@@ -272,6 +299,12 @@ test('Wiscord adapter answers !help in a second channel from the installed guild
     }));
     await waitForValue(() => createdReplies > 0 ? createdReplies : undefined);
     await waitForValue(() => helpChunks.some((content) => content.includes('!bind')) ? true : undefined);
+    const help = helpChunks.join('');
+    assert.match(help, /Codex Discord Bridge 帮助/);
+    assert.match(help, /!model status/);
+    assert.match(help, /!effort status/);
+    assert.match(help, /!queue/);
+    assert.match(help, /!guide/);
   } finally {
     await bridge.stop();
     for (const socket of sockets) socket.terminate();

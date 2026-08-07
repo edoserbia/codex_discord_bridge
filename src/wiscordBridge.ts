@@ -7,10 +7,10 @@ import type { AppConfig, WiscordBridgeConfig } from './config.js';
 import { isCommandMessage, parseCommand } from './commandParser.js';
 import type { CodexExecutionDriver, CodexRunHooks } from './codexRunner.js';
 import { extractBridgeFileSendDirective } from './bridgeFileSendProtocol.js';
-import { formatFailureReply } from './formatters.js';
+import { formatFailureReply, formatHelp, formatProgressMessage, formatSuccessReply } from './formatters.js';
 import { appendBridgeProjectContext } from './projectContext.js';
 import { JsonStateStore } from './store.js';
-import type { ChannelBinding, CodexRunResult } from './types.js';
+import type { ActiveRunState, ChannelBinding, ChannelRuntime, CodexRunResult, PromptTask } from './types.js';
 import {
   cloneCodexOptions,
   isWithinAllowedRoots,
@@ -207,6 +207,7 @@ export class WiscordCodexBridge {
   }
 
   private async acceptEvent(event: WiscordGatewayEvent): Promise<void> {
+    if (this.stopped) return;
     await this.checkpoint.record(event);
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify({
@@ -267,7 +268,7 @@ export class WiscordCodexBridge {
       const command = parseCommand(message.content, this.config.commandPrefix);
       switch (command.kind) {
         case 'help':
-          await this.sendText(message.conversationId, formatWiscordHelp(this.config.commandPrefix));
+          await this.sendText(message.conversationId, formatHelp(this.config.commandPrefix));
           return;
         case 'bind':
           this.assertAdministrator(message);
@@ -325,6 +326,15 @@ export class WiscordCodexBridge {
               ? '当前服务器还没有已绑定项目的频道。'
               : ['# 已绑定项目', '', ...bindings.map((binding) => `- **${binding.projectName}**：\`${binding.workspacePath}\``)].join('\n'),
           );
+          return;
+        }
+        case 'prompt': {
+          const binding = this.store.getBinding(message.conversationId);
+          if (!binding) {
+            await this.sendText(message.conversationId, '当前频道未绑定项目。先执行 `!bind <项目名> <工作区目录>`。');
+            return;
+          }
+          await this.runMessage(message, binding, { engine: command.engine, prompt: command.prompt });
           return;
         }
         default:
@@ -388,40 +398,137 @@ export class WiscordCodexBridge {
     );
   }
 
-  private async runMessage(message: WiscordMessage, binding: ChannelBinding): Promise<void> {
+  private async runMessage(
+    message: WiscordMessage,
+    binding: ChannelBinding,
+    options: { engine?: ChannelBinding['engine']; prompt?: string } = {},
+  ): Promise<void> {
+    const runBinding = options.engine ? { ...binding, engine: options.engine } : binding;
+    const runMessage = options.prompt ? { ...message, content: options.prompt } : message;
     const session = await this.store.ensureSession(binding.channelId, message.conversationId);
     const reply = await this.api<{ messageId: string }>('/bot/v1/messages', {
       body: JSON.stringify({ conversationId: message.conversationId }),
       method: 'POST',
     });
-    await this.editMessage(reply.messageId, '已收到请求，正在启动 Codex…');
-
     let progressChain = Promise.resolve();
     const updateProgress = (content: string) => {
       progressChain = progressChain.then(() => this.editMessage(reply.messageId, content));
       return progressChain;
     };
+    const runtime = createWiscordRuntime(runMessage, runBinding, this.config.codexDriverMode ?? 'app-server');
+    const activeRun = runtime.activeRun!;
+    const refreshProgress = () => updateProgress(formatProgressMessage(
+      runBinding,
+      runtime,
+      this.config.commandPrefix,
+      this.config.codexDriverMode ?? 'app-server',
+    ));
+    const touch = (activity?: string) => {
+      activeRun.updatedAt = new Date().toISOString();
+      if (activity) activeRun.latestActivity = activity;
+    };
+    const pushTimeline = (entry: string) => {
+      activeRun.timeline = [...activeRun.timeline, entry].slice(-20);
+    };
+
+    await refreshProgress();
     const hooks: CodexRunHooks = {
-      onActivity: async (activity) => updateProgress(`正在处理\n\n${activity}`),
-      onAgentMessage: async (content) => updateProgress(content),
+      onActivity: async (activity) => {
+        touch(activity);
+        activeRun.status = activeRun.status === 'cancelled' ? 'cancelled' : 'running';
+        pushTimeline(`🔄 ${activity}`);
+        await refreshProgress();
+      },
+      onReasoning: async (reasoning) => {
+        touch('正在分析请求');
+        activeRun.reasoningSummaries = [...activeRun.reasoningSummaries, reasoning].slice(-6);
+        pushTimeline(`🔄 正在分析请求`);
+        await refreshProgress();
+      },
+      onTodoListChanged: async (items) => {
+        touch(`计划进度 ${items.filter((item) => item.completed).length}/${items.length}`);
+        activeRun.planItems = items;
+        pushTimeline(`📋 ${activeRun.latestActivity}`);
+        await refreshProgress();
+      },
+      onCollabToolChanged: async (item) => {
+        touch('子代理状态已更新');
+        const existing = activeRun.collabToolCalls.findIndex((candidate) => candidate.id === item.id);
+        if (existing >= 0) {
+          activeRun.collabToolCalls[existing] = item;
+        } else {
+          activeRun.collabToolCalls = [...activeRun.collabToolCalls, item].slice(-12);
+        }
+        pushTimeline('🤝 子代理状态已更新');
+        await refreshProgress();
+      },
+      onAgentMessage: async (content) => {
+        touch('正在生成回答');
+        activeRun.agentMessages = [...activeRun.agentMessages, content].slice(-6);
+        pushTimeline('🔄 正在生成回答');
+        await refreshProgress();
+      },
+      onCommandStarted: async (command) => {
+        touch('正在执行命令');
+        activeRun.currentCommand = command;
+        activeRun.status = 'running';
+        pushTimeline(`▶️ ${command}`);
+        await refreshProgress();
+      },
+      onCommandCompleted: async (command, output, exitCode) => {
+        touch(exitCode === 0 ? '命令执行完成' : '命令执行失败');
+        activeRun.currentCommand = command;
+        activeRun.lastCommandOutput = output;
+        pushTimeline(`${exitCode === 0 ? '✅' : '❌'} ${command} (${exitCode ?? 'null'})`);
+        await refreshProgress();
+      },
+      onStderr: async (line) => {
+        touch(line);
+        activeRun.stderr = [...activeRun.stderr, line].slice(-20);
+        pushTimeline(`⚠️ ${line}`);
+        await refreshProgress();
+      },
       onThreadStarted: async (threadId) => {
+        touch();
+        activeRun.codexThreadId = threadId;
+        activeRun.status = 'running';
+        pushTimeline(`🧵 Codex 会话已建立：${threadId.slice(0, 8)}`);
         await this.store.updateSession(message.conversationId, {
           codexThreadId: threadId,
-          lastEngine: 'codex',
+          lastEngine: runBinding.engine ?? 'codex',
         }, binding.channelId);
+        await refreshProgress();
       },
     };
     const job = this.runner.start(
-      binding,
-      {
+        runBinding,
+        {
+        ...(options.engine ? { engine: options.engine } : {}),
         imagePaths: [],
         extraAddDirs: [],
-        prompt: appendBridgeProjectContext(message.content, binding),
+        prompt: appendBridgeProjectContext(runMessage.content, runBinding),
       },
       session.codexThreadId,
       hooks,
     );
     const result = await job.done;
+    touch(result.success ? '本轮已完成' : '本轮失败');
+    activeRun.status = result.success ? 'completed' : 'failed';
+    activeRun.exitCode = result.exitCode;
+    activeRun.signal = result.signal;
+    activeRun.codexThreadId = result.codexThreadId ?? activeRun.codexThreadId;
+    activeRun.claudeSessionId = result.claudeSessionId ?? activeRun.claudeSessionId;
+    activeRun.agentMessages = result.agentMessages.length > 0 ? result.agentMessages.slice(-6) : activeRun.agentMessages;
+    activeRun.planItems = result.planItems.length > 0 ? result.planItems : activeRun.planItems;
+    activeRun.reasoningSummaries = result.reasoning.length > 0 ? result.reasoning.slice(-6) : activeRun.reasoningSummaries;
+    activeRun.stderr = result.stderr.length > 0 ? result.stderr.slice(-20) : activeRun.stderr;
+    if (result.commands.length > 0) {
+      const lastCommand = result.commands.at(-1)!;
+      activeRun.currentCommand = lastCommand.command;
+      activeRun.lastCommandOutput = lastCommand.output;
+    }
+    pushTimeline(result.success ? '✅ 本轮已完成' : '❌ 本轮失败');
+    await refreshProgress();
     await progressChain;
     await this.store.updateSession(message.conversationId, {
       codexThreadId: result.codexThreadId ?? session.codexThreadId,
@@ -432,9 +539,14 @@ export class WiscordCodexBridge {
     }, binding.channelId);
 
     const finalContent = result.success
-      ? visibleAssistantMessage(result)
-      : formatFailureReply(binding, message.author.id, result);
-    await this.finalizeText(reply.messageId, '任务已完成，最终结果见下一条消息。');
+      ? formatSuccessReply(runBinding, message.author.id, result, { finalMessage: visibleAssistantMessage(result) })
+      : formatFailureReply(runBinding, message.author.id, result);
+    await this.finalizeText(reply.messageId, formatProgressMessage(
+      runBinding,
+      runtime,
+      this.config.commandPrefix,
+      this.config.codexDriverMode ?? 'app-server',
+    ));
     await this.sendText(message.conversationId, finalContent);
   }
 
@@ -568,6 +680,48 @@ function visibleAssistantMessage(result: CodexRunResult): string {
   return raw.trim() ? raw : '本轮已完成，但 Codex 没有返回文本消息。';
 }
 
+function createWiscordRuntime(
+  message: WiscordMessage,
+  binding: ChannelBinding,
+  driverMode: 'legacy-exec' | 'app-server',
+): ChannelRuntime {
+  const now = new Date().toISOString();
+  const task: PromptTask = {
+    attachments: [],
+    bindingChannelId: binding.channelId,
+    conversationId: message.conversationId,
+    effectivePrompt: message.content,
+    engine: binding.engine,
+    enqueuedAt: now,
+    extraAddDirs: [],
+    id: message.id,
+    messageId: message.id,
+    origin: 'user',
+    prompt: message.content,
+    requestedBy: message.author.id,
+    requestedById: message.author.id,
+    rootEffectivePrompt: message.content,
+    rootPrompt: message.content,
+  };
+  const activeRun: ActiveRunState = {
+    agentMessages: [],
+    collabToolCalls: [],
+    driverMode: binding.engine === 'claude' ? 'claude-cli' : driverMode,
+    latestActivity: '已收到请求，正在启动 Codex',
+    planItems: [],
+    reasoningSummaries: [],
+    startedAt: now,
+    status: 'starting',
+    stderr: [],
+    task,
+    timeline: ['🔄 已收到请求，正在启动 Codex'],
+    updatedAt: now,
+    usedResume: false,
+  };
+
+  return { activeRun, conversationId: message.conversationId, queue: [] };
+}
+
 function toGatewayUrl(baseUrl: string): string {
   const url = new URL('/bot/v1/gateway', `${baseUrl}/`);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -590,16 +744,4 @@ function splitUtf8(content: string, maxBytes: number): string[] {
   }
   if (current || chunks.length === 0) chunks.push(current);
   return chunks;
-}
-
-function formatWiscordHelp(prefix: string): string {
-  return [
-    '# Wiscord Codex Bridge',
-    '',
-    `- \`${prefix}bind <项目名> <工作区目录>\`：将当前频道绑定到允许的项目目录。`,
-    `- \`${prefix}status\`：查看当前频道绑定和会话状态。`,
-    `- \`${prefix}reset\`：重置当前频道的 Codex 会话。`,
-    `- \`${prefix}unbind\`：解除当前频道绑定。`,
-    '- 绑定后直接发送自然语言任务，Bridge 会持续更新过程，完成后发送最终结果。',
-  ].join('\n');
 }
