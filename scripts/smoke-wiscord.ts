@@ -204,16 +204,31 @@ async function run(): Promise<void> {
     assert(Boolean(botMessageId), 'progress update did not include a Bot message ID');
     checks.push('Gateway ACK, message fetch, and progress PATCH');
 
-    const completed = await gateway.waitFor(
+    const completedProgress = await gateway.waitFor(
       (frame) => frame.op === 'EVENT'
         && frame.event?.type === 'MESSAGE_UPDATE'
         && frame.event.data.id === botMessageId
         && frame.event.data.status === 'complete'
-        && frame.event.data.content === finalMarkdown,
-      'complete long Markdown response',
+        && typeof frame.event.data.content === 'string'
+        && frame.event.data.content.includes('Codex Discord Bridge 实时进度')
+        && frame.event.data.content.includes('状态：已完成'),
+      'completed Discord-format progress panel',
       30_000,
     );
-    assert(Boolean(completed.event), 'final message event was not received');
+    assert(Boolean(completedProgress.event), 'completed progress event was not received');
+    const completedFinal = await gateway.waitFor(
+      (frame) => frame.op === 'EVENT'
+        && frame.event?.type === 'MESSAGE_UPDATE'
+        && frame.event.data.id !== botMessageId
+        && frame.event.data.status === 'complete'
+        && typeof frame.event.data.content === 'string'
+        && frame.event.data.content.includes('最终总结')
+        && frame.event.data.content.includes(finalMarkdown),
+      'one complete Discord-format final summary',
+      30_000,
+    );
+    const finalMessageId = String(completedFinal.event?.data.id ?? '');
+    assert(Boolean(finalMessageId), 'final summary did not include a Bot message ID');
     if (!fixtureFile) {
       await bridge.stop();
       bridge = undefined;
@@ -224,10 +239,15 @@ async function run(): Promise<void> {
     const history = await client.request<{ items: MessageView[] }>(
       `/api/v1/conversations/${channel.id}/messages`,
     );
-    const finalMessages = history.items.filter((message) => message.id === botMessageId);
+    const progressMessages = history.items.filter((message) => message.id === botMessageId);
+    assert(progressMessages.length === 1, 'Bridge progress response did not retain one message ID');
+    assert(progressMessages[0]?.author.kind === 'bot', 'progress response is not authored by the Bot');
+    assert(progressMessages[0]?.content.includes('状态：已完成'), 'progress response did not preserve the completed status');
+    assert(progressMessages[0]?.status === 'complete', 'progress Bot message is not complete');
+    const finalMessages = history.items.filter((message) => message.id === finalMessageId);
     assert(finalMessages.length === 1, 'Bridge final response did not retain one message ID');
     assert(finalMessages[0]?.author.kind === 'bot', 'final response is not authored by the Bot');
-    assert(finalMessages[0]?.content === finalMarkdown, 'final Markdown was not preserved byte-for-byte');
+    assert(finalMessages[0]?.content.includes(finalMarkdown), 'final Markdown was not preserved in the summary');
     assert(finalMessages[0]?.status === 'complete', 'final Bot message is not complete');
 
     const botAuth = await client.request<{ accessToken: string }>('/bot/v1/auth/token', {
@@ -235,7 +255,7 @@ async function run(): Promise<void> {
       method: 'POST',
     }, false);
     const chunkStatus = await client.request<{ indexes: number[] }>(
-      `/bot/v1/messages/${botMessageId}/chunks/status`,
+      `/bot/v1/messages/${finalMessageId}/chunks/status`,
       { headers: { authorization: `Bearer ${botAuth.accessToken}` } },
       false,
     );
@@ -257,7 +277,7 @@ async function run(): Promise<void> {
       checks: checks.map((name) => ({ name, status: 'passed' })),
       resources: {
         botApplicationId: bot.id,
-        botMessageId,
+        botMessageId: finalMessageId,
         channelId: channel.id,
         guildId: guild.id,
         userId: registered.user.id,
