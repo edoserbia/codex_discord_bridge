@@ -31,9 +31,10 @@ import {
   writeClaudeGlobalModel,
   writeClaudeProjectModel,
 } from './claudeSettings.js';
-import { formatFailureReply, formatHelp, formatProgressMessage, formatSuccessReply } from './formatters.js';
+import { formatFailureReply, formatHelp, formatProgressMessage, formatSuccessReply, formatWebAccessLinks } from './formatters.js';
 import { appendBridgeProjectContext } from './projectContext.js';
 import { JsonStateStore } from './store.js';
+import { buildWebAccessUrls } from './webAccess.js';
 import type { ActiveRunState, ChannelBinding, ChannelRuntime, CodexRunResult, PromptTask } from './types.js';
 import {
   cloneCodexOptions,
@@ -387,6 +388,15 @@ export class WiscordCodexBridge {
             bindings.length === 0
               ? '当前服务器还没有已绑定项目的频道。'
               : ['# 已绑定项目', '', ...bindings.map((binding) => `- **${binding.projectName}**：\`${binding.workspacePath}\``)].join('\n'),
+          );
+          return;
+        }
+        case 'web': {
+          await this.sendText(
+            message.conversationId,
+            this.config.web.enabled
+              ? formatWebAccessLinks(buildWebAccessUrls(this.config.web))
+              : '当前 Web 面板未启用。',
           );
           return;
         }
