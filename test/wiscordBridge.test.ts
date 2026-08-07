@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -655,6 +655,269 @@ test('Wiscord handles Autopilot help and Claude permission commands without ente
   }
 });
 
+test('Wiscord Autopilot off cancels its running task', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'wiscord-bridge-autopilot-stop-'));
+  const workspace = path.join(root, 'workspace');
+  const state = new JsonStateStore(path.join(root, 'state.json'));
+  await state.load();
+  const messages = new Map([
+    ['msg_server_on', '!autopilot server on'],
+    ['msg_project_on', '!autopilot project on'],
+    ['msg_run', '!autopilot project run'],
+    ['msg_project_off', '!autopilot project off'],
+  ]);
+  const sockets = new Set<WebSocket>();
+  let replyNumber = 0;
+  let runnerStarted = false;
+  let cancelled = false;
+  let releaseRun: (() => void) | undefined;
+  const server = createServer(async (request, response) => {
+    const body = await readJson(request);
+    response.setHeader('content-type', 'application/json');
+    if (request.method === 'POST' && request.url === '/bot/v1/auth/token') {
+      response.end(JSON.stringify({ accessToken: 'bot_access' }));
+      return;
+    }
+    assert.equal(request.headers.authorization, 'Bearer bot_access');
+    const messageMatch = request.url?.match(/^\/bot\/v1\/messages\/(msg_[^/]+)$/);
+    if (request.method === 'GET' && messageMatch) {
+      response.end(JSON.stringify({
+        author: { id: 'user_1', kind: 'user' },
+        content: messages.get(messageMatch[1]!),
+        conversationId: 'channel_1',
+        guildId: 'guild_1',
+        id: messageMatch[1],
+      }));
+      return;
+    }
+    if (request.method === 'POST' && request.url === '/bot/v1/messages') {
+      replyNumber += 1;
+      response.statusCode = 201;
+      response.end(JSON.stringify({ messageId: `reply_${replyNumber}` }));
+      return;
+    }
+    if (request.method === 'PATCH' && /^\/bot\/v1\/messages\/reply_\d+$/.test(request.url ?? '')) {
+      response.end(JSON.stringify({}));
+      return;
+    }
+    if (request.method === 'POST' && /^\/bot\/v1\/messages\/reply_\d+\/chunks$/.test(request.url ?? '')) {
+      assert.equal(typeof body.content, 'string');
+      response.statusCode = 204;
+      response.end();
+      return;
+    }
+    if (request.method === 'POST' && /^\/bot\/v1\/messages\/reply_\d+\/finalize$/.test(request.url ?? '')) {
+      response.end(JSON.stringify({ status: 'complete' }));
+      return;
+    }
+    response.statusCode = 404;
+    response.end(JSON.stringify({ code: 'NOT_FOUND' }));
+  });
+  const gateway = new WebSocketServer({ server, path: '/bot/v1/gateway' });
+  gateway.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+    socket.on('message', (raw) => {
+      if ((JSON.parse(raw.toString()) as { op?: string }).op === 'IDENTIFY') {
+        socket.send(JSON.stringify({ op: 'READY', heartbeatIntervalMs: 25 }));
+      }
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert(address && typeof address === 'object');
+  const runner: CodexExecutionDriver = {
+    start(): RunningCodexJob {
+      runnerStarted = true;
+      const done = new Promise<CodexRunResult>((resolve) => {
+        releaseRun = () => resolve({
+          agentMessages: ['Autopilot stopped'], commands: [], exitCode: 0, planItems: [], reasoning: [],
+          signal: 'SIGINT', stderr: [], success: true, turnCompleted: true, usedResume: false,
+        });
+      });
+      return {
+        cancel() {
+          cancelled = true;
+          releaseRun?.();
+        },
+        done,
+        driverMode: 'app-server',
+        pid: undefined,
+      };
+    },
+  };
+  const bridge = new WiscordCodexBridge(buildConfig(root, workspace, `http://127.0.0.1:${address.port}`), state, runner);
+
+  try {
+    await bridge.start();
+    const socket = await waitForValue(() => [...sockets][0]);
+    const send = (messageId: string, sequence: number) => socket.send(JSON.stringify({
+      op: 'EVENT',
+      event: {
+        conversationId: 'channel_1', data: { messageId }, eventId: `evt_${messageId}`,
+        guildId: 'guild_1', sequence, type: 'MESSAGE_CREATE', version: 1,
+      },
+    }));
+    send('msg_server_on', 1);
+    await waitForValue(() => state.getAutopilotService('guild_1')?.enabled ? true : undefined);
+    send('msg_project_on', 2);
+    await waitForValue(() => state.getAutopilotProject('channel_1')?.enabled ? true : undefined);
+    send('msg_run', 3);
+    await waitForValue(() => runnerStarted ? true : undefined);
+    send('msg_project_off', 4);
+    await waitForValue(() => cancelled ? true : undefined);
+    await waitForValue(() => state.getAutopilotProject('channel_1')?.status === 'paused' ? true : undefined);
+  } finally {
+    releaseRun?.();
+    await bridge.stop();
+    for (const socket of sockets) socket.terminate();
+    await new Promise<void>((resolve) => gateway.close(() => resolve()));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(root, { force: true, recursive: true });
+  }
+});
+
+test('Wiscord receives message attachments into the workspace inbox and returns !sendfile as a Bot attachment', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'wiscord-bridge-files-'));
+  const workspace = path.join(root, 'workspace');
+  const state = new JsonStateStore(path.join(root, 'state.json'));
+  await state.load();
+  await mkdir(workspace, { recursive: true });
+  await writeFile(path.join(workspace, 'result.txt'), 'outgoing report', 'utf8');
+  const messages = new Map([
+    ['msg_incoming', 'inspect the uploaded input'],
+    ['msg_sendfile', '!sendfile result.txt'],
+  ]);
+  const sockets = new Set<WebSocket>();
+  const uploadedBodies: Buffer[] = [];
+  const boundAttachments: Array<{ attachmentId: string; messageId: string }> = [];
+  let replyNumber = 0;
+  let runnerStarted = false;
+  const server = createServer(async (request, response) => {
+    response.setHeader('content-type', 'application/json');
+    if (request.method === 'POST' && request.url === '/bot/v1/auth/token') {
+      await readJson(request);
+      response.end(JSON.stringify({ accessToken: 'bot_access' }));
+      return;
+    }
+    assert.equal(request.headers.authorization, 'Bearer bot_access');
+    const messageMatch = request.url?.match(/^\/bot\/v1\/messages\/(msg_[^/]+)$/);
+    if (request.method === 'GET' && messageMatch) {
+      const messageId = messageMatch[1]!;
+      response.end(JSON.stringify({
+        attachments: messageId === 'msg_incoming'
+          ? [{ contentType: 'text/plain', id: 'att_input', originalFilename: 'input.txt', sizeBytes: 14 }]
+          : [],
+        author: { id: 'user_1', kind: 'user' },
+        content: messages.get(messageId),
+        conversationId: 'channel_1',
+        guildId: 'guild_1',
+        id: messageId,
+      }));
+      return;
+    }
+    if (request.method === 'GET' && request.url === '/bot/v1/attachments/att_input') {
+      response.setHeader('content-type', 'text/plain');
+      response.end('incoming input');
+      return;
+    }
+    if (request.method === 'POST' && request.url === '/bot/v1/messages') {
+      await readJson(request);
+      replyNumber += 1;
+      response.statusCode = 201;
+      response.end(JSON.stringify({ messageId: `reply_${replyNumber}` }));
+      return;
+    }
+    const botAttachmentMatch = request.url?.match(/^\/bot\/v1\/conversations\/([^/]+)\/attachments$/);
+    if (request.method === 'POST' && botAttachmentMatch) {
+      assert.equal(botAttachmentMatch[1], 'channel_1');
+      uploadedBodies.push(await readRaw(request));
+      response.statusCode = 201;
+      response.end(JSON.stringify({ id: 'att_output' }));
+      return;
+    }
+    const bindMatch = request.url?.match(/^\/bot\/v1\/messages\/(reply_\d+)\/attachments$/);
+    if (request.method === 'POST' && bindMatch) {
+      const body = await readJson(request);
+      boundAttachments.push({ attachmentId: String(body.attachmentId), messageId: bindMatch[1]! });
+      response.statusCode = 201;
+      response.end(JSON.stringify({}));
+      return;
+    }
+    if (request.method === 'PATCH' && /^\/bot\/v1\/messages\/reply_\d+$/.test(request.url ?? '')) {
+      await readJson(request);
+      response.end(JSON.stringify({}));
+      return;
+    }
+    if (request.method === 'POST' && /^\/bot\/v1\/messages\/reply_\d+\/chunks$/.test(request.url ?? '')) {
+      await readJson(request);
+      response.statusCode = 204;
+      response.end();
+      return;
+    }
+    if (request.method === 'POST' && /^\/bot\/v1\/messages\/reply_\d+\/finalize$/.test(request.url ?? '')) {
+      await readJson(request);
+      response.end(JSON.stringify({ status: 'complete' }));
+      return;
+    }
+    response.statusCode = 404;
+    response.end(JSON.stringify({ code: 'NOT_FOUND' }));
+  });
+  const gateway = new WebSocketServer({ server, path: '/bot/v1/gateway' });
+  gateway.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+    socket.on('message', (raw) => {
+      if ((JSON.parse(raw.toString()) as { op?: string }).op === 'IDENTIFY') {
+        socket.send(JSON.stringify({ op: 'READY', heartbeatIntervalMs: 25 }));
+      }
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert(address && typeof address === 'object');
+  const runner: CodexExecutionDriver = {
+    start(_binding, input): RunningCodexJob {
+      runnerStarted = true;
+      assert.match(input.prompt, /input\.txt/);
+      assert.match(input.prompt, /workspace copy: .*inbox\/input\.txt/);
+      const done = Promise.resolve({
+        agentMessages: ['attachment inspected'], commands: [], exitCode: 0, planItems: [], reasoning: [],
+        signal: null, stderr: [], success: true, turnCompleted: true, usedResume: false,
+      } satisfies CodexRunResult);
+      return { cancel() {}, done, driverMode: 'app-server', pid: undefined };
+    },
+  };
+  const bridge = new WiscordCodexBridge(buildConfig(root, workspace, `http://127.0.0.1:${address.port}`), state, runner);
+
+  try {
+    await bridge.start();
+    const socket = await waitForValue(() => [...sockets][0]);
+    const send = (messageId: string, sequence: number) => socket.send(JSON.stringify({
+      op: 'EVENT',
+      event: {
+        conversationId: 'channel_1', data: { messageId }, eventId: `evt_${messageId}`,
+        guildId: 'guild_1', sequence, type: 'MESSAGE_CREATE', version: 1,
+      },
+    }));
+    send('msg_incoming', 1);
+    await waitForValue(() => runnerStarted ? true : undefined);
+    assert.equal(await readFile(path.join(workspace, 'inbox', 'input.txt'), 'utf8'), 'incoming input');
+    send('msg_sendfile', 2);
+    await waitForValue(() => boundAttachments.length === 1 ? true : undefined);
+    assert.deepEqual(boundAttachments, [{ attachmentId: 'att_output', messageId: 'reply_3' }]);
+    assert.equal(uploadedBodies.length, 1);
+    assert.match(uploadedBodies[0]!.toString('utf8'), /outgoing report/);
+    assert.match(uploadedBodies[0]!.toString('utf8'), /filename="result\.txt"/);
+  } finally {
+    await bridge.stop();
+    for (const socket of sockets) socket.terminate();
+    await new Promise<void>((resolve) => gateway.close(() => resolve()));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(root, { force: true, recursive: true });
+  }
+});
+
 test('Wiscord registers a Claude permission request and retries it after approval', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'wiscord-bridge-claude-permission-'));
   const workspace = path.join(root, 'workspace');
@@ -800,10 +1063,14 @@ function buildConfig(root: string, workspace: string, baseUrl: string): AppConfi
 }
 
 async function readJson(request: import('node:http').IncomingMessage): Promise<Record<string, unknown>> {
+  const raw = (await readRaw(request)).toString('utf8');
+  return raw ? JSON.parse(raw) as Record<string, unknown> : {};
+}
+
+async function readRaw(request: import('node:http').IncomingMessage): Promise<Buffer> {
   const chunks: Buffer[] = [];
   for await (const chunk of request) chunks.push(Buffer.from(chunk));
-  const raw = Buffer.concat(chunks).toString('utf8');
-  return raw ? JSON.parse(raw) as Record<string, unknown> : {};
+  return Buffer.concat(chunks);
 }
 
 async function waitForValue<T>(read: () => T | undefined, timeoutMs = 5_000): Promise<T> {

@@ -113,15 +113,21 @@ interface WiscordActiveRun {
   job?: RunningCodexJob | undefined;
   runtime: ChannelRuntime;
   refreshProgress: () => Promise<void>;
-  cancellationReason?: 'guide' | 'cancel' | undefined;
+  cancellationReason?: 'autopilot' | 'guide' | 'cancel' | undefined;
 }
 
 interface QueuedWiscordRun {
   binding: ChannelBinding;
   message: WiscordMessage;
-  options: { engine?: ChannelBinding['engine']; prompt?: string };
+  options: WiscordRunOptions;
   reject: (reason?: unknown) => void;
   resolve: () => void;
+}
+
+interface WiscordRunOptions {
+  engine?: ChannelBinding['engine'];
+  origin?: PromptTask['origin'];
+  prompt?: string;
 }
 
 interface PendingWiscordClaudePermission {
@@ -606,7 +612,7 @@ export class WiscordCodexBridge {
   private enqueueRun(
     message: WiscordMessage,
     binding: ChannelBinding,
-    options: { engine?: ChannelBinding['engine']; prompt?: string } = {},
+    options: WiscordRunOptions = {},
   ): Promise<void> {
     const conversationId = message.conversationId;
     const queued = new Promise<void>((resolve, reject) => {
@@ -914,6 +920,9 @@ export class WiscordCodexBridge {
           lastActivityAt: new Date().toISOString(),
           lastActivityText: enabled ? '已开启项目级 Autopilot' : '已暂停项目级 Autopilot',
         });
+        if (!enabled) {
+          await this.stopAutopilotWorkForBinding(binding, '已按项目级暂停命令停止当前 Autopilot 运行');
+        }
         await this.sendText(message.conversationId, formatAutopilotProjectAck(command.action, binding, next));
         return;
       }
@@ -996,7 +1005,39 @@ export class WiscordCodexBridge {
         lastActivityText: enabled ? '已开启服务级 Autopilot' : '已暂停服务级 Autopilot',
       });
     }
+    if (!enabled) {
+      await this.stopAutopilotWorkAcrossBindings(guildId, '已按服务级暂停命令停止当前 Autopilot 运行');
+    }
     return formatAutopilotServiceAck(command.action);
+  }
+
+  private async stopAutopilotWorkAcrossBindings(guildId: string, reason: string): Promise<void> {
+    for (const binding of this.store.listBindings(guildId)) {
+      await this.stopAutopilotWorkForBinding(binding, reason);
+    }
+  }
+
+  private async stopAutopilotWorkForBinding(binding: ChannelBinding, reason: string): Promise<void> {
+    const queue = this.queuedRuns.get(binding.channelId);
+    if (queue?.length) {
+      const retained = queue.filter((entry) => entry.options.origin !== 'autopilot');
+      if (retained.length !== queue.length) {
+        this.queuedRuns.set(binding.channelId, retained);
+        for (const entry of queue) {
+          if (entry.options.origin === 'autopilot') entry.resolve();
+        }
+      }
+    }
+    const active = this.activeRuns.get(binding.channelId);
+    const activeRun = active?.runtime.activeRun;
+    if (!active || activeRun?.task.origin !== 'autopilot') return;
+    active.cancellationReason = 'autopilot';
+    activeRun.status = 'cancelled';
+    activeRun.latestActivity = reason;
+    activeRun.updatedAt = new Date().toISOString();
+    activeRun.timeline = [...activeRun.timeline, `⏹️ ${reason}`].slice(-20);
+    await active.refreshProgress();
+    active.job?.cancel();
   }
 
   private async ensureAutopilotService(guildId: string): Promise<AutopilotServiceState> {
@@ -1112,7 +1153,7 @@ export class WiscordCodexBridge {
       guildId: binding.guildId,
       id: `autopilot:${randomUUID()}`,
     };
-    void this.enqueueRun(message, binding, { prompt: message.content })
+    void this.enqueueRun(message, binding, { origin: 'autopilot', prompt: message.content })
       .then(() => this.completeAutopilotRun(binding, true))
       .catch(() => this.completeAutopilotRun(binding, false));
   }
@@ -1189,7 +1230,7 @@ export class WiscordCodexBridge {
   private async runMessage(
     message: WiscordMessage,
     binding: ChannelBinding,
-    options: { engine?: ChannelBinding['engine']; prompt?: string } = {},
+    options: WiscordRunOptions = {},
   ): Promise<void> {
     const runBinding = options.engine ? { ...binding, engine: options.engine } : binding;
     const runMessage = options.prompt ? { ...message, content: options.prompt } : message;
@@ -1203,7 +1244,12 @@ export class WiscordCodexBridge {
       progressChain = progressChain.then(() => this.editMessage(reply.messageId, content));
       return progressChain;
     };
-    const runtime = createWiscordRuntime(runMessage, runBinding, this.config.codexDriverMode ?? 'app-server');
+    const runtime = createWiscordRuntime(
+      runMessage,
+      runBinding,
+      this.config.codexDriverMode ?? 'app-server',
+      options.origin ?? 'user',
+    );
     const downloaded = await this.downloadAttachments(runMessage, runBinding);
     runtime.activeRun!.task.attachments = downloaded.attachments;
     const activeRun = runtime.activeRun!;
@@ -1630,6 +1676,7 @@ function createWiscordRuntime(
   message: WiscordMessage,
   binding: ChannelBinding,
   driverMode: 'legacy-exec' | 'app-server',
+  origin: PromptTask['origin'],
 ): ChannelRuntime {
   const now = new Date().toISOString();
   const task: PromptTask = {
@@ -1642,7 +1689,7 @@ function createWiscordRuntime(
     extraAddDirs: [],
     id: message.id,
     messageId: message.id,
-    origin: 'user',
+    origin,
     prompt: message.content,
     requestedBy: message.author.id,
     requestedById: message.author.id,
