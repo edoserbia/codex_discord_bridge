@@ -8,7 +8,14 @@ import { isCommandMessage, parseCommand, type ParsedCommand } from './commandPar
 import type { CodexExecutionDriver, CodexRunHooks, RunningCodexJob } from './codexRunner.js';
 import { extractBridgeFileSendDirective } from './bridgeFileSendProtocol.js';
 import { buildPromptWithAttachments } from './attachments.js';
-import { allocateInboxFilePath, allocateUniqueFilePath } from './fileTransfer.js';
+import {
+  allocateInboxFilePath,
+  allocateUniqueFilePath,
+  detectNaturalLanguageFileRequest,
+  formatFileCandidates,
+  resolveFileRequest,
+  type FileTransferCandidate,
+} from './fileTransfer.js';
 import {
   clearCodexGlobalReasoningEffort,
   loadCodexGlobalModel,
@@ -99,6 +106,7 @@ export class WiscordCodexBridge {
   private readonly taskQueues = new Map<string, Promise<void>>();
   private readonly taskQueueGenerations = new Map<string, number>();
   private readonly activeRuns = new Map<string, WiscordActiveRun>();
+  private readonly pendingFileSelections = new Map<string, FileTransferCandidate[]>();
   private readonly scheduledEventIds = new Set<string>();
 
   constructor(
@@ -293,6 +301,16 @@ export class WiscordCodexBridge {
       await this.handleCommand(message);
       return;
     }
+    const fileRequest = detectNaturalLanguageFileRequest(message.content);
+    if (fileRequest) {
+      const binding = this.store.getBinding(message.conversationId);
+      if (!binding) {
+        await this.sendText(message.conversationId, '当前频道未绑定项目。先执行 `!bind`。');
+        return;
+      }
+      await this.handleSendFileRequest(message, binding, fileRequest);
+      return;
+    }
     const binding = this.store.getBinding(message.conversationId);
     if (!binding) {
       await this.sendText(message.conversationId, `当前频道未绑定项目。先执行 \`${this.config.commandPrefix}help\` 查看命令。`);
@@ -372,6 +390,26 @@ export class WiscordCodexBridge {
           );
           return;
         }
+        case 'sendfile': {
+          const binding = this.store.getBinding(message.conversationId);
+          if (!binding) {
+            await this.sendText(message.conversationId, '当前频道未绑定项目。先执行 `!bind`。');
+            return;
+          }
+          if ('index' in command) {
+            const candidates = this.pendingFileSelections.get(message.conversationId);
+            const candidate = candidates?.[command.index - 1];
+            if (!candidate) {
+              await this.sendText(message.conversationId, '当前没有对应的文件候选。先使用 `!sendfile <文件名>` 或发送自然语言请求。');
+              return;
+            }
+            this.pendingFileSelections.delete(message.conversationId);
+            await this.sendFile(message.conversationId, candidate.absolutePath, `已发送第 ${command.index} 个文件：${candidate.name}`);
+            return;
+          }
+          await this.handleSendFileRequest(message, binding, command.request);
+          return;
+        }
         case 'prompt': {
           const binding = this.store.getBinding(message.conversationId);
           if (!binding) {
@@ -440,6 +478,29 @@ export class WiscordCodexBridge {
         '现在可以直接发送任务；Bridge 会持续更新过程，并在完成后发送最终结果。',
       ].join('\n'),
     );
+  }
+
+  private async handleSendFileRequest(
+    message: WiscordMessage,
+    binding: ChannelBinding,
+    request: string,
+  ): Promise<void> {
+    const resolved = await resolveFileRequest({
+      allowAbsolutePath: this.wiscord.adminUserIds.has(message.author.id),
+      request,
+      workspacePath: binding.workspacePath,
+    });
+    if (resolved.kind === 'single') {
+      this.pendingFileSelections.delete(message.conversationId);
+      await this.sendFile(message.conversationId, resolved.file.absolutePath, `已发送文件：${resolved.file.name}`);
+      return;
+    }
+    if (resolved.kind === 'candidates') {
+      this.pendingFileSelections.set(message.conversationId, resolved.candidates);
+      await this.sendText(message.conversationId, formatFileCandidates(resolved.candidates, { commandPrefix: this.config.commandPrefix }));
+      return;
+    }
+    await this.sendText(message.conversationId, resolved.message);
   }
 
   private enqueueRun(
@@ -922,6 +983,25 @@ export class WiscordCodexBridge {
     await this.finalizeText(reply.messageId, content);
   }
 
+  private async sendFile(conversationId: string, filePath: string, caption: string): Promise<void> {
+    const data = await fs.readFile(filePath);
+    const reply = await this.api<{ messageId: string }>('/bot/v1/messages', {
+      body: JSON.stringify({ conversationId }),
+      method: 'POST',
+    });
+    const form = new FormData();
+    form.append('file', new Blob([data]), path.basename(filePath));
+    const attachment = await this.apiMultipart<{ id: string }>(
+      `/bot/v1/conversations/${encodeURIComponent(conversationId)}/attachments`,
+      form,
+    );
+    await this.api(`/bot/v1/messages/${encodeURIComponent(reply.messageId)}/attachments`, {
+      body: JSON.stringify({ attachmentId: attachment.id }),
+      method: 'POST',
+    });
+    await this.finalizeText(reply.messageId, caption);
+  }
+
   private async finalizeText(messageId: string, content: string): Promise<void> {
     const chunks = splitUtf8(content, MAX_MESSAGE_CHUNK_BYTES);
     for (const [index, chunk] of chunks.entries()) {
@@ -958,6 +1038,25 @@ export class WiscordCodexBridge {
       const response = await fetch(`${this.wiscord.baseUrl}${route}`, { ...init, headers });
       if (!response.ok) throw new WiscordHttpError(response.status, (await response.text()).slice(0, 500));
       return response;
+    };
+    try {
+      return await request();
+    } catch (error) {
+      if (!(error instanceof WiscordHttpError) || error.status !== 401) throw error;
+      this.accessToken = await this.exchangeToken();
+      return request();
+    }
+  }
+
+  private async apiMultipart<T>(route: string, body: FormData): Promise<T> {
+    const request = async () => {
+      const response = await fetch(`${this.wiscord.baseUrl}${route}`, {
+        body,
+        headers: { authorization: `Bearer ${this.accessToken}` },
+        method: 'POST',
+      });
+      if (!response.ok) throw new WiscordHttpError(response.status, (await response.text()).slice(0, 500));
+      return await response.json() as T;
     };
     try {
       return await request();
