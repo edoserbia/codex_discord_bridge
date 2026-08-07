@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { mkdtemp, realpath, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -542,6 +542,212 @@ test('Wiscord adapter binds a second channel to an allowed workspace', async () 
     await waitForValue(() => state.getBinding('channel_2'));
     assert.equal(state.getBinding('channel_2')?.workspacePath, await realpath(workspace));
     await waitForValue(() => bindChunks.some((content) => content.includes('已绑定')) ? true : undefined);
+  } finally {
+    await bridge.stop();
+    for (const socket of sockets) socket.terminate();
+    await new Promise<void>((resolve) => gateway.close(() => resolve()));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(root, { force: true, recursive: true });
+  }
+});
+
+test('Wiscord handles Autopilot help and Claude permission commands without entering the task queue', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'wiscord-bridge-special-commands-'));
+  const workspace = path.join(root, 'workspace');
+  const state = new JsonStateStore(path.join(root, 'state.json'));
+  await state.load();
+  const messages = new Map([
+    ['msg_autopilot', '!autopilot'],
+    ['msg_autopilot_on', '!autopilot server on'],
+    ['msg_autopilot_project_on', '!autopilot project on'],
+    ['msg_autopilot_status', '!autopilot project status'],
+    ['msg_permission', '!approve missing-request'],
+  ]);
+  const replies: string[] = [];
+  const sockets = new Set<WebSocket>();
+  let replyNumber = 0;
+  const server = createServer(async (request, response) => {
+    const body = await readJson(request);
+    response.setHeader('content-type', 'application/json');
+    if (request.method === 'POST' && request.url === '/bot/v1/auth/token') {
+      response.end(JSON.stringify({ accessToken: 'bot_access' }));
+      return;
+    }
+    assert.equal(request.headers.authorization, 'Bearer bot_access');
+    const messageMatch = request.url?.match(/^\/bot\/v1\/messages\/(msg_[^/]+)$/);
+    if (request.method === 'GET' && messageMatch) {
+      const content = messages.get(messageMatch[1]!);
+      response.end(JSON.stringify({
+        author: { id: 'user_1', kind: 'user' },
+        content,
+        conversationId: 'channel_1',
+        guildId: 'guild_1',
+        id: messageMatch[1],
+      }));
+      return;
+    }
+    if (request.method === 'POST' && request.url === '/bot/v1/messages') {
+      replyNumber += 1;
+      response.statusCode = 201;
+      response.end(JSON.stringify({ messageId: `reply_${replyNumber}` }));
+      return;
+    }
+    const chunks = request.url?.match(/^\/bot\/v1\/messages\/reply_\d+\/chunks$/);
+    if (request.method === 'POST' && chunks) {
+      replies.push(String(body.content));
+      response.statusCode = 204;
+      response.end();
+      return;
+    }
+    if (request.method === 'POST' && /^\/bot\/v1\/messages\/reply_\d+\/finalize$/.test(request.url ?? '')) {
+      response.end(JSON.stringify({ status: 'complete' }));
+      return;
+    }
+    response.statusCode = 404;
+    response.end(JSON.stringify({ code: 'NOT_FOUND' }));
+  });
+  const gateway = new WebSocketServer({ server, path: '/bot/v1/gateway' });
+  gateway.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+    socket.on('message', (raw) => {
+      if ((JSON.parse(raw.toString()) as { op?: string }).op === 'IDENTIFY') {
+        socket.send(JSON.stringify({ op: 'READY', heartbeatIntervalMs: 25 }));
+      }
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert(address && typeof address === 'object');
+  const bridge = new WiscordCodexBridge(
+    buildConfig(root, workspace, `http://127.0.0.1:${address.port}`),
+    state,
+    { start: () => { throw new Error('special commands must not start Codex'); } },
+  );
+
+  try {
+    await bridge.start();
+    const socket = await waitForValue(() => [...sockets][0]);
+    const send = (messageId: string, sequence: number) => socket.send(JSON.stringify({
+      op: 'EVENT',
+      event: {
+        conversationId: 'channel_1', data: { messageId }, eventId: `evt_${messageId}`,
+        guildId: 'guild_1', sequence, type: 'MESSAGE_CREATE', version: 1,
+      },
+    }));
+    send('msg_autopilot', 1);
+    await waitForValue(() => replies.some((reply) => reply.includes('Autopilot 使用说明')) ? true : undefined);
+    send('msg_autopilot_on', 2);
+    await waitForValue(() => state.getAutopilotService('guild_1')?.enabled ? true : undefined);
+    send('msg_autopilot_project_on', 3);
+    await waitForValue(() => state.getAutopilotProject('channel_1')?.enabled ? true : undefined);
+    send('msg_autopilot_status', 4);
+    await waitForValue(() => replies.some((reply) => reply.includes('Autopilot 项目状态')) ? true : undefined);
+    send('msg_permission', 5);
+    await waitForValue(() => replies.some((reply) => reply.includes('找不到待处理的 Claude 权限请求')) ? true : undefined);
+    assert.equal(replies.some((reply) => reply.includes('尚未实现')), false);
+  } finally {
+    await bridge.stop();
+    for (const socket of sockets) socket.terminate();
+    await new Promise<void>((resolve) => gateway.close(() => resolve()));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(root, { force: true, recursive: true });
+  }
+});
+
+test('Wiscord registers a Claude permission request and retries it after approval', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'wiscord-bridge-claude-permission-'));
+  const workspace = path.join(root, 'workspace');
+  const state = new JsonStateStore(path.join(root, 'state.json'));
+  await state.load();
+  const messages = new Map([
+    ['msg_claude', '!claude inspect the protected file'],
+    ['msg_approve', '!approve permission-read'],
+  ]);
+  const replies: string[] = [];
+  const sockets = new Set<WebSocket>();
+  let replyNumber = 0;
+  let starts = 0;
+  const server = createServer(async (request, response) => {
+    const body = await readJson(request);
+    response.setHeader('content-type', 'application/json');
+    if (request.method === 'POST' && request.url === '/bot/v1/auth/token') {
+      response.end(JSON.stringify({ accessToken: 'bot_access' }));
+      return;
+    }
+    assert.equal(request.headers.authorization, 'Bearer bot_access');
+    const messageMatch = request.url?.match(/^\/bot\/v1\/messages\/(msg_[^/]+)$/);
+    if (request.method === 'GET' && messageMatch) {
+      response.end(JSON.stringify({
+        author: { id: 'user_1', kind: 'user' }, content: messages.get(messageMatch[1]!),
+        conversationId: 'channel_1', guildId: 'guild_1', id: messageMatch[1],
+      }));
+      return;
+    }
+    if (request.method === 'POST' && request.url === '/bot/v1/messages') {
+      replyNumber += 1;
+      response.statusCode = 201;
+      response.end(JSON.stringify({ messageId: `reply_${replyNumber}` }));
+      return;
+    }
+    if (request.method === 'PATCH' && /^\/bot\/v1\/messages\/reply_\d+$/.test(request.url ?? '')) {
+      response.end(JSON.stringify({}));
+      return;
+    }
+    if (request.method === 'POST' && /^\/bot\/v1\/messages\/reply_\d+\/chunks$/.test(request.url ?? '')) {
+      replies.push(String(body.content));
+      response.statusCode = 204;
+      response.end();
+      return;
+    }
+    if (request.method === 'POST' && /^\/bot\/v1\/messages\/reply_\d+\/finalize$/.test(request.url ?? '')) {
+      response.end(JSON.stringify({ status: 'complete' }));
+      return;
+    }
+    response.statusCode = 404;
+    response.end(JSON.stringify({ code: 'NOT_FOUND' }));
+  });
+  const gateway = new WebSocketServer({ server, path: '/bot/v1/gateway' });
+  gateway.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+    socket.on('message', (raw) => {
+      if ((JSON.parse(raw.toString()) as { op?: string }).op === 'IDENTIFY') {
+        socket.send(JSON.stringify({ op: 'READY', heartbeatIntervalMs: 25 }));
+      }
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert(address && typeof address === 'object');
+  const runner: CodexExecutionDriver = {
+    start(_binding, input): RunningCodexJob {
+      starts += 1;
+      assert.equal(input.engine, 'claude');
+      const first = starts === 1;
+      const done: Promise<CodexRunResult> = Promise.resolve(first ? {
+        agentMessages: [], claudePermissionRequests: [{ id: 'permission-read', toolPattern: 'Read(/protected/**)' }],
+        commands: [], exitCode: 1, planItems: [], reasoning: [], signal: null, stderr: [], success: false, turnCompleted: true, usedResume: false,
+      } : {
+        agentMessages: ['permission retry completed'], commands: [], exitCode: 0, planItems: [], reasoning: [], signal: null, stderr: [], success: true, turnCompleted: true, usedResume: false,
+      });
+      return { cancel() {}, done, driverMode: 'claude-cli', pid: undefined };
+    },
+  };
+  const bridge = new WiscordCodexBridge(buildConfig(root, workspace, `http://127.0.0.1:${address.port}`), state, runner);
+  try {
+    await bridge.start();
+    const socket = await waitForValue(() => [...sockets][0]);
+    const send = (messageId: string, sequence: number) => socket.send(JSON.stringify({
+      op: 'EVENT', event: { conversationId: 'channel_1', data: { messageId }, eventId: `evt_${messageId}`, guildId: 'guild_1', sequence, type: 'MESSAGE_CREATE', version: 1 },
+    }));
+    send('msg_claude', 1);
+    await waitForValue(() => replies.some((reply) => reply.includes('!approve permission-read')) ? true : undefined);
+    send('msg_approve', 2);
+    await waitForValue(() => starts === 2 ? true : undefined);
+    const settings = JSON.parse(await readFile(path.join(workspace, '.claude', 'settings.json'), 'utf8')) as { permissions?: { allow?: string[] } };
+    assert.deepEqual(settings.permissions?.allow, ['Read(/protected/**)']);
+    assert.ok(replies.some((reply) => reply.includes('已批准 Claude 权限')));
   } finally {
     await bridge.stop();
     for (const socket of sockets) socket.terminate();

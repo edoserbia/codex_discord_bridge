@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
 import WebSocket from 'ws';
@@ -25,20 +26,44 @@ import {
   writeCodexGlobalReasoningEffort,
 } from './codexConfig.js';
 import {
+  DEFAULT_AUTOPILOT_BRIEF,
+  buildAutopilotPrompt,
+  getAutopilotDefaultIntervalMs,
+  getAutopilotTickMs,
+  getAutopilotBoardJsonPath,
+  normalizeAutopilotBoardDocument,
+  normalizeAutopilotParallelism,
+} from './autopilot.js';
+import {
   clearClaudeProjectModel,
+  allowClaudeProjectTool,
   readClaudeGlobalModel,
   readClaudeProjectModel,
   writeClaudeGlobalModel,
   writeClaudeProjectModel,
 } from './claudeSettings.js';
-import { formatFailureReply, formatHelp, formatProgressMessage, formatSuccessReply, formatWebAccessLinks } from './formatters.js';
+import {
+  formatAutopilotHelp,
+  formatAutopilotKickoff,
+  formatAutopilotProjectAck,
+  formatAutopilotProjectStatus,
+  formatAutopilotRunSummary,
+  formatAutopilotServiceAck,
+  formatAutopilotServiceStatus,
+  formatFailureReply,
+  formatHelp,
+  formatProgressMessage,
+  formatSuccessReply,
+  formatWebAccessLinks,
+} from './formatters.js';
 import { appendBridgeProjectContext } from './projectContext.js';
 import { JsonStateStore } from './store.js';
 import { buildWebAccessUrls } from './webAccess.js';
-import type { ActiveRunState, ChannelBinding, ChannelRuntime, CodexRunResult, PromptTask } from './types.js';
+import type { ActiveRunState, AutopilotProjectState, AutopilotServiceState, ChannelBinding, ChannelRuntime, CodexRunResult, PromptTask } from './types.js';
 import {
   cloneCodexOptions,
   formatSecondClockTimestamp,
+  formatDurationMs,
   isWithinAllowedRoots,
   normalizeAllowedRoots,
   resolveDirectoryPath,
@@ -99,6 +124,14 @@ interface QueuedWiscordRun {
   resolve: () => void;
 }
 
+interface PendingWiscordClaudePermission {
+  binding: ChannelBinding;
+  message: WiscordMessage;
+  projectName: string;
+  requestId: string;
+  toolPattern: string;
+}
+
 const MAX_PROCESSED_EVENT_IDS = 2_000;
 const MAX_MESSAGE_CHUNK_BYTES = 240 * 1024;
 
@@ -116,7 +149,11 @@ export class WiscordCodexBridge {
   private readonly queueWorkers = new Map<string, Promise<void>>();
   private readonly activeRuns = new Map<string, WiscordActiveRun>();
   private readonly pendingFileSelections = new Map<string, FileTransferCandidate[]>();
+  private readonly pendingClaudePermissions = new Map<string, PendingWiscordClaudePermission>();
   private readonly scheduledEventIds = new Set<string>();
+  private readonly activeAutopilotRuns = new Set<string>();
+  private autopilotTimer: NodeJS.Timeout | undefined;
+  private autopilotTickInFlight = false;
 
   constructor(
     private readonly config: AppConfig,
@@ -134,6 +171,7 @@ export class WiscordCodexBridge {
     await this.checkpoint.load();
     await this.ensureBinding();
     await this.connect();
+    this.startAutopilotTicker();
     for (const event of this.checkpoint.pendingEvents()) this.scheduleEvent(event);
     console.log(`Wiscord bridge connected to ${this.wiscord.baseUrl} channel=${this.wiscord.channelId}`);
   }
@@ -142,8 +180,10 @@ export class WiscordCodexBridge {
     this.stopped = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    if (this.autopilotTimer) clearInterval(this.autopilotTimer);
     this.reconnectTimer = undefined;
     this.heartbeatTimer = undefined;
+    this.autopilotTimer = undefined;
     const socket = this.socket;
     this.socket = undefined;
     if (socket && socket.readyState < WebSocket.CLOSING) socket.close(1000, 'bridge stopped');
@@ -367,6 +407,18 @@ export class WiscordCodexBridge {
           return;
         case 'claude-model':
           await this.handleClaudeModelCommand(message, command);
+          return;
+        case 'claude-permission':
+          this.assertAdministrator(message);
+          await this.handleClaudePermissionCommand(message, command);
+          return;
+        case 'autopilot':
+          if (command.scope === 'help') {
+            await this.sendText(message.conversationId, formatAutopilotHelp(this.config.commandPrefix));
+            return;
+          }
+          if (command.action !== 'status') this.assertAdministrator(message);
+          await this.handleAutopilotCommand(message, command);
           return;
         case 'effort':
           await this.handleEffortCommand(message, command);
@@ -780,6 +832,320 @@ export class WiscordCodexBridge {
     }
   }
 
+  private async handleClaudePermissionCommand(
+    message: WiscordMessage,
+    command: Extract<ParsedCommand, { kind: 'claude-permission' }>,
+  ): Promise<void> {
+    const requestId = command.requestId.trim();
+    const pending = this.pendingClaudePermissions.get(requestId);
+    if (!pending) {
+      await this.sendText(message.conversationId, `找不到待处理的 Claude 权限请求：\`${requestId}\`。可能已经处理或 Bridge 已重启。`);
+      return;
+    }
+    this.pendingClaudePermissions.delete(requestId);
+    if (command.action === 'deny') {
+      await this.sendText(message.conversationId, [
+        `已拒绝 Claude 权限 \`${requestId}\`。`,
+        `项目：**${pending.projectName}**`,
+        `规则：\`${pending.toolPattern}\``,
+        '原任务不会自动重试。',
+      ].join('\n'));
+      return;
+    }
+    await allowClaudeProjectTool(pending.binding.workspacePath, pending.toolPattern);
+    void this.enqueuePriorityRun(
+      {
+        ...pending.message,
+        id: `permission-retry:${randomUUID()}`,
+      },
+      pending.binding,
+      { engine: 'claude', prompt: pending.message.content },
+    ).catch((error) => console.error('[wiscord] failed to retry Claude permission request', error));
+    await this.sendText(message.conversationId, [
+      `已批准 Claude 权限 \`${requestId}\`。`,
+      `项目：**${pending.projectName}**`,
+      `规则：\`${pending.toolPattern}\``,
+      `配置文件：\`${path.join(pending.binding.workspacePath, '.claude', 'settings.json')}\``,
+      '已把原任务重新加入队列并优先执行。',
+    ].join('\n'));
+  }
+
+  private enqueuePriorityRun(
+    message: WiscordMessage,
+    binding: ChannelBinding,
+    options: { engine?: ChannelBinding['engine']; prompt?: string } = {},
+  ): Promise<void> {
+    const conversationId = message.conversationId;
+    const queued = new Promise<void>((resolve, reject) => {
+      const queue = this.queuedRuns.get(conversationId) ?? [];
+      queue.unshift({ binding, message, options, reject, resolve });
+      this.queuedRuns.set(conversationId, queue);
+    });
+    void this.drainQueue(conversationId);
+    return queued;
+  }
+
+  private async handleAutopilotCommand(
+    message: WiscordMessage,
+    command: Exclude<Extract<ParsedCommand, { kind: 'autopilot' }>, { scope: 'help' }>,
+  ): Promise<void> {
+    if (command.scope === 'server') {
+      await this.sendText(message.conversationId, await this.handleAutopilotServerCommand(message.guildId, command));
+      return;
+    }
+    const binding = this.store.getBinding(message.conversationId);
+    if (!binding) {
+      await this.sendText(message.conversationId, '项目级 Autopilot 命令只能在已绑定项目频道使用。');
+      return;
+    }
+    const project = await this.ensureAutopilotProject(binding);
+    const service = await this.ensureAutopilotService(binding.guildId);
+    switch (command.action) {
+      case 'status':
+        await this.sendText(message.conversationId, this.formatAutopilotProjectStatus(binding, project, service));
+        return;
+      case 'on':
+      case 'off': {
+        const enabled = command.action === 'on';
+        const next = await this.store.upsertAutopilotProject({
+          ...project,
+          enabled,
+          status: enabled && service.enabled ? 'idle' : 'paused',
+          lastActivityAt: new Date().toISOString(),
+          lastActivityText: enabled ? '已开启项目级 Autopilot' : '已暂停项目级 Autopilot',
+        });
+        await this.sendText(message.conversationId, formatAutopilotProjectAck(command.action, binding, next));
+        return;
+      }
+      case 'clear': {
+        const next = (await this.store.clearAutopilotProject(binding.channelId)) ?? project;
+        await this.sendText(message.conversationId, formatAutopilotProjectAck('clear', binding, next));
+        return;
+      }
+      case 'interval': {
+        const next = await this.store.upsertAutopilotProject({
+          ...project,
+          intervalMs: command.intervalMs,
+          lastActivityAt: new Date().toISOString(),
+          lastActivityText: `已更新周期为 ${command.intervalText}`,
+        });
+        await this.sendText(message.conversationId, formatAutopilotProjectAck('interval', binding, next));
+        return;
+      }
+      case 'prompt': {
+        const next = await this.store.upsertAutopilotProject({
+          ...project,
+          brief: command.prompt,
+          briefUpdatedAt: new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          lastActivityText: '已更新项目 Autopilot Prompt',
+        });
+        await this.sendText(message.conversationId, formatAutopilotProjectAck('prompt', binding, next));
+        return;
+      }
+      case 'run': {
+        if (this.activeAutopilotRuns.has(binding.channelId)) {
+          await this.sendText(message.conversationId, '当前项目的 Autopilot 已在运行中。');
+          return;
+        }
+        await this.launchAutopilotRun(binding, project);
+        return;
+      }
+    }
+  }
+
+  private async handleAutopilotServerCommand(
+    guildId: string,
+    command: Extract<Exclude<Extract<ParsedCommand, { kind: 'autopilot' }>, { scope: 'help' }>, { scope: 'server' }>,
+  ): Promise<string> {
+    const bindings = this.store.listBindings(guildId);
+    const service = await this.ensureAutopilotService(guildId);
+    if (command.action === 'status') {
+      const lines = await Promise.all(bindings.map(async (binding) => {
+        const project = await this.ensureAutopilotProject(binding);
+        return {
+          activeAutopilotRuns: this.countActiveAutopilotRuns(guildId),
+          channelId: binding.channelId,
+          intervalText: formatDurationMs(project.intervalMs),
+          nextRunText: this.autopilotNextRunText(project, service),
+          parallelism: service.parallelism,
+          projectEnabled: project.enabled,
+          projectName: binding.projectName,
+          runtimeStatus: this.autopilotRuntimeStatus(project, service),
+          serviceEnabled: service.enabled,
+        };
+      }));
+      return formatAutopilotServiceStatus(lines, new Date().toISOString());
+    }
+    if (command.action === 'concurrency') {
+      await this.store.upsertAutopilotService({ ...service, parallelism: normalizeAutopilotParallelism(command.parallelism), updatedAt: new Date().toISOString() });
+      return formatAutopilotServiceAck('concurrency', command.parallelism);
+    }
+    if (command.action === 'clear') {
+      await this.store.clearAutopilotGuild(guildId);
+      return formatAutopilotServiceAck('clear');
+    }
+    const enabled = command.action === 'on';
+    await this.store.upsertAutopilotService({ ...service, enabled, updatedAt: new Date().toISOString() });
+    for (const binding of bindings) {
+      const project = await this.ensureAutopilotProject(binding);
+      await this.store.upsertAutopilotProject({
+        ...project,
+        status: enabled && project.enabled ? 'idle' : 'paused',
+        lastActivityAt: new Date().toISOString(),
+        lastActivityText: enabled ? '已开启服务级 Autopilot' : '已暂停服务级 Autopilot',
+      });
+    }
+    return formatAutopilotServiceAck(command.action);
+  }
+
+  private async ensureAutopilotService(guildId: string): Promise<AutopilotServiceState> {
+    const existing = this.store.getAutopilotService(guildId);
+    if (existing) return existing;
+    return this.store.upsertAutopilotService({
+      enabled: false,
+      guildId,
+      parallelism: normalizeAutopilotParallelism(undefined),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  private async ensureAutopilotProject(binding: ChannelBinding): Promise<AutopilotProjectState> {
+    const existing = this.store.getAutopilotProject(binding.channelId);
+    if (existing) return existing;
+    const service = await this.ensureAutopilotService(binding.guildId);
+    const now = new Date().toISOString();
+    return this.store.upsertAutopilotProject({
+      bindingChannelId: binding.channelId,
+      board: [],
+      brief: DEFAULT_AUTOPILOT_BRIEF,
+      briefUpdatedAt: now,
+      enabled: false,
+      guildId: binding.guildId,
+      intervalMs: getAutopilotDefaultIntervalMs(),
+      status: service.enabled ? 'idle' : 'paused',
+      workspacePath: binding.workspacePath,
+    });
+  }
+
+  private formatAutopilotProjectStatus(
+    binding: ChannelBinding,
+    project: AutopilotProjectState,
+    service: AutopilotServiceState,
+  ): string {
+    return formatAutopilotProjectStatus(binding, project, service, {
+      activeAutopilotRuns: this.countActiveAutopilotRuns(binding.guildId),
+      generatedAt: new Date().toISOString(),
+      nextRunText: this.autopilotNextRunText(project, service),
+      serviceParallelism: service.parallelism,
+    });
+  }
+
+  private autopilotRuntimeStatus(project: AutopilotProjectState, service: AutopilotServiceState): string {
+    if (project.status === 'running') return '运行中';
+    if (!service.enabled) return '服务已暂停';
+    return project.enabled ? '待命' : '项目已暂停';
+  }
+
+  private autopilotNextRunText(project: AutopilotProjectState, service: AutopilotServiceState): string {
+    if (project.status === 'running') return project.currentRunStartedAt ? `当前运行中（开始于 ${project.currentRunStartedAt}）` : '当前运行中';
+    if (!service.enabled) return '服务级已暂停';
+    if (!project.enabled) return '项目级已暂停';
+    if (!project.lastRunAt) return '立即可运行';
+    const nextRunAtMs = new Date(project.lastRunAt).getTime() + project.intervalMs;
+    return Number.isFinite(nextRunAtMs) && nextRunAtMs > Date.now()
+      ? new Date(nextRunAtMs).toISOString()
+      : '立即可运行';
+  }
+
+  private countActiveAutopilotRuns(guildId: string): number {
+    return [...this.activeAutopilotRuns].filter((channelId) => this.store.getAutopilotProject(channelId)?.guildId === guildId).length;
+  }
+
+  private startAutopilotTicker(): void {
+    if (this.autopilotTimer) return;
+    this.autopilotTimer = setInterval(() => {
+      void this.runAutopilotTick().catch((error) => console.error('[wiscord] autopilot tick failed', error));
+    }, getAutopilotTickMs());
+    this.autopilotTimer.unref?.();
+  }
+
+  private async runAutopilotTick(): Promise<void> {
+    if (this.autopilotTickInFlight) return;
+    this.autopilotTickInFlight = true;
+    try {
+      for (const service of this.store.listAutopilotServices()) {
+        if (!service.enabled) continue;
+        const slots = service.parallelism - this.countActiveAutopilotRuns(service.guildId);
+        if (slots <= 0) continue;
+        const bindings = this.store.listBindings(service.guildId);
+        let launched = 0;
+        for (const binding of bindings) {
+          if (launched >= slots || this.activeAutopilotRuns.has(binding.channelId)) continue;
+          const project = await this.ensureAutopilotProject(binding);
+          if (!project.enabled || this.autopilotNextRunText(project, service) !== '立即可运行') continue;
+          await this.launchAutopilotRun(binding, project);
+          launched += 1;
+        }
+      }
+    } finally {
+      this.autopilotTickInFlight = false;
+    }
+  }
+
+  private async launchAutopilotRun(binding: ChannelBinding, project: AutopilotProjectState): Promise<void> {
+    this.activeAutopilotRuns.add(binding.channelId);
+    const startedAt = new Date().toISOString();
+    const running = await this.store.upsertAutopilotProject({
+      ...project,
+      currentGoal: project.brief,
+      currentRunStartedAt: startedAt,
+      lastActivityAt: startedAt,
+      lastActivityText: '已启动 Autopilot 任务',
+      status: 'running',
+    });
+    await this.sendText(binding.channelId, formatAutopilotKickoff(binding, running));
+    const message: WiscordMessage = {
+      author: { id: 'autopilot', kind: 'bot' },
+      content: buildAutopilotPrompt(binding, running),
+      conversationId: binding.channelId,
+      guildId: binding.guildId,
+      id: `autopilot:${randomUUID()}`,
+    };
+    void this.enqueueRun(message, binding, { prompt: message.content })
+      .then(() => this.completeAutopilotRun(binding, true))
+      .catch(() => this.completeAutopilotRun(binding, false));
+  }
+
+  private async completeAutopilotRun(binding: ChannelBinding, success: boolean): Promise<void> {
+    try {
+      const current = await this.ensureAutopilotProject(binding);
+      let board = current.board;
+      try {
+        const raw = await fs.readFile(getAutopilotBoardJsonPath(binding.workspacePath), 'utf8');
+        board = normalizeAutopilotBoardDocument(JSON.parse(raw)).items;
+      } catch {
+        // The Codex prompt asks the runner to maintain the board; leave prior state intact if it did not.
+      }
+      const service = await this.ensureAutopilotService(binding.guildId);
+      const completed = await this.store.upsertAutopilotProject({
+        ...current,
+        board,
+        currentGoal: undefined,
+        currentRunStartedAt: undefined,
+        lastActivityAt: new Date().toISOString(),
+        lastActivityText: success ? 'Autopilot 本轮已完成' : 'Autopilot 本轮失败',
+        lastResultStatus: success ? 'success' : 'failed',
+        lastRunAt: new Date().toISOString(),
+        lastSummary: success ? '已完成一轮 Autopilot 迭代。' : '本轮执行失败，请查看上方任务输出。',
+        status: service.enabled && current.enabled ? 'idle' : 'paused',
+      });
+      await this.sendText(binding.channelId, formatAutopilotRunSummary(binding, completed));
+    } finally {
+      this.activeAutopilotRuns.delete(binding.channelId);
+    }
+  }
+
   private async handleEffortCommand(
     message: WiscordMessage,
     command: Extract<ParsedCommand, { kind: 'effort' }>,
@@ -979,6 +1345,12 @@ export class WiscordCodexBridge {
       lastRunAt: new Date().toISOString(),
     }, binding.channelId);
 
+    const claudePermissionNotice = this.registerClaudePermissionRequests(
+      runBinding,
+      runMessage,
+      result,
+    );
+
     if (controlledCancellation) {
       await this.finalizeText(reply.messageId, formatProgressMessage(
         runBinding,
@@ -999,11 +1371,46 @@ export class WiscordCodexBridge {
       this.config.codexDriverMode ?? 'app-server',
     ));
     await this.sendText(message.conversationId, finalContent);
+    if (claudePermissionNotice) await this.sendText(message.conversationId, claudePermissionNotice);
     } finally {
       if (this.activeRuns.get(message.conversationId) === activeControl) {
         this.activeRuns.delete(message.conversationId);
       }
     }
+  }
+
+  private registerClaudePermissionRequests(
+    binding: ChannelBinding,
+    message: WiscordMessage,
+    result: CodexRunResult,
+  ): string | undefined {
+    const requests = result.claudePermissionRequests ?? [];
+    if (requests.length === 0) return undefined;
+    const lines = ['Claude 需要权限才能继续执行。', `项目：**${binding.projectName}**`];
+    for (const request of requests) {
+      const requestId = this.allocateClaudePermissionRequestId(request.id);
+      this.pendingClaudePermissions.set(requestId, {
+        binding,
+        message: structuredClone(message),
+        projectName: binding.projectName,
+        requestId,
+        toolPattern: request.toolPattern,
+      });
+      lines.push('', `请求：\`${requestId}\``, `规则：\`${request.toolPattern}\``);
+      if (request.description) lines.push(`说明：${request.description.slice(0, 240)}`);
+      lines.push(`批准：\`${this.config.commandPrefix}approve ${requestId}\``, `拒绝：\`${this.config.commandPrefix}deny ${requestId}\``);
+    }
+    return lines.join('\n');
+  }
+
+  private allocateClaudePermissionRequestId(rawId: string): string {
+    const baseId = rawId.trim() || `claude-${randomUUID().slice(0, 8)}`;
+    if (!this.pendingClaudePermissions.has(baseId)) return baseId;
+    for (let index = 2; index < 100; index += 1) {
+      const candidate = `${baseId}-${index}`;
+      if (!this.pendingClaudePermissions.has(candidate)) return candidate;
+    }
+    return `${baseId}-${randomUUID().slice(0, 8)}`;
   }
 
   private async editMessage(messageId: string, content: string): Promise<void> {
