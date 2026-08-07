@@ -91,6 +91,14 @@ interface WiscordActiveRun {
   cancellationReason?: 'guide' | 'cancel' | undefined;
 }
 
+interface QueuedWiscordRun {
+  binding: ChannelBinding;
+  message: WiscordMessage;
+  options: { engine?: ChannelBinding['engine']; prompt?: string };
+  reject: (reason?: unknown) => void;
+  resolve: () => void;
+}
+
 const MAX_PROCESSED_EVENT_IDS = 2_000;
 const MAX_MESSAGE_CHUNK_BYTES = 240 * 1024;
 
@@ -104,8 +112,8 @@ export class WiscordCodexBridge {
   private stopped = true;
   private gatewayQueue: Promise<void> = Promise.resolve();
   private readonly eventTasks = new Set<Promise<void>>();
-  private readonly taskQueues = new Map<string, Promise<void>>();
-  private readonly taskQueueGenerations = new Map<string, number>();
+  private readonly queuedRuns = new Map<string, QueuedWiscordRun[]>();
+  private readonly queueWorkers = new Map<string, Promise<void>>();
   private readonly activeRuns = new Map<string, WiscordActiveRun>();
   private readonly pendingFileSelections = new Map<string, FileTransferCandidate[]>();
   private readonly scheduledEventIds = new Set<string>();
@@ -141,7 +149,7 @@ export class WiscordCodexBridge {
     if (socket && socket.readyState < WebSocket.CLOSING) socket.close(1000, 'bridge stopped');
     await this.gatewayQueue;
     await Promise.all([...this.eventTasks]);
-    await Promise.all([...this.taskQueues.values()]);
+    await Promise.all([...this.queueWorkers.values()]);
   }
 
   private async ensureBinding(): Promise<void> {
@@ -391,6 +399,36 @@ export class WiscordCodexBridge {
           );
           return;
         }
+        case 'queue': {
+          const queue = this.queuedRuns.get(message.conversationId) ?? [];
+          if (command.action === 'show') {
+            const active = this.activeRuns.get(message.conversationId);
+            await this.sendText(message.conversationId, [
+              '# 任务队列',
+              active ? `当前执行：${active.runtime.activeRun?.task.prompt ?? '任务运行中'}` : '当前执行：无',
+              ...(queue.length
+                ? queue.map((item, index) => `${index + 1}. ${item.options.prompt ?? item.message.content}`)
+                : ['等待队列为空。']),
+            ].join('\n'));
+            return;
+          }
+          this.assertAdministrator(message);
+          const index = command.index - 1;
+          if (index < 0 || index >= queue.length) {
+            await this.sendText(message.conversationId, `队列序号无效。当前等待队列共有 ${queue.length} 条任务。`);
+            return;
+          }
+          if (command.action === 'remove') {
+            const [removed] = queue.splice(index, 1);
+            removed?.resolve();
+            await this.sendText(message.conversationId, `已移除队列第 ${command.index} 条任务。`);
+            return;
+          }
+          const [selected] = queue.splice(index, 1);
+          if (selected) queue.unshift(selected);
+          await this.sendText(message.conversationId, `已将队列第 ${command.index} 条任务插入下一执行位。`);
+          return;
+        }
         case 'web': {
           await this.sendText(
             message.conversationId,
@@ -519,19 +557,37 @@ export class WiscordCodexBridge {
     options: { engine?: ChannelBinding['engine']; prompt?: string } = {},
   ): Promise<void> {
     const conversationId = message.conversationId;
-    const generation = this.taskQueueGenerations.get(conversationId) ?? 0;
-    const previous = this.taskQueues.get(conversationId) ?? Promise.resolve();
-    const queued = previous
-      .catch(() => undefined)
-      .then(async () => {
-        if (generation !== (this.taskQueueGenerations.get(conversationId) ?? 0)) return;
-        await this.runMessage(message, binding, options);
-      });
-    this.taskQueues.set(conversationId, queued);
-    void queued.finally(() => {
-      if (this.taskQueues.get(conversationId) === queued) this.taskQueues.delete(conversationId);
+    const queued = new Promise<void>((resolve, reject) => {
+      const queue = this.queuedRuns.get(conversationId) ?? [];
+      queue.push({ binding, message, options, reject, resolve });
+      this.queuedRuns.set(conversationId, queue);
     });
+    void this.drainQueue(conversationId);
     return queued;
+  }
+
+  private async drainQueue(conversationId: string): Promise<void> {
+    if (this.queueWorkers.has(conversationId)) return;
+    const worker = (async () => {
+      const queue = this.queuedRuns.get(conversationId);
+      while (queue?.length) {
+        const next = queue.shift();
+        if (!next) continue;
+        try {
+          await this.runMessage(next.message, next.binding, next.options);
+          next.resolve();
+        } catch (error) {
+          next.reject(error);
+        }
+      }
+    })();
+    this.queueWorkers.set(conversationId, worker);
+    try {
+      await worker;
+    } finally {
+      this.queueWorkers.delete(conversationId);
+      if ((this.queuedRuns.get(conversationId)?.length ?? 0) > 0) void this.drainQueue(conversationId);
+    }
   }
 
   private async handleStatusCommand(message: WiscordMessage): Promise<void> {
@@ -551,7 +607,7 @@ export class WiscordCodexBridge {
       return;
     }
     const session = this.store.getSession(message.conversationId);
-    const queued = this.taskQueues.has(message.conversationId) ? '有等待任务' : '空闲';
+    const queued = (this.queuedRuns.get(message.conversationId)?.length ?? 0) > 0 ? '有等待任务' : '空闲';
     await this.sendText(message.conversationId, [
       `项目：**${binding.projectName}**`,
       `目录：\`${binding.workspacePath}\``,
@@ -600,10 +656,7 @@ export class WiscordCodexBridge {
       await this.sendText(message.conversationId, '当前会话没有正在运行的任务。');
       return;
     }
-    this.taskQueueGenerations.set(
-      message.conversationId,
-      (this.taskQueueGenerations.get(message.conversationId) ?? 0) + 1,
-    );
+    this.clearQueuedRuns(message.conversationId);
     active.cancellationReason = 'cancel';
     const activeRun = active.runtime.activeRun!;
     activeRun.status = 'cancelled';
@@ -616,10 +669,7 @@ export class WiscordCodexBridge {
   }
 
   private async cancelConversation(conversationId: string, reason: string): Promise<void> {
-    this.taskQueueGenerations.set(
-      conversationId,
-      (this.taskQueueGenerations.get(conversationId) ?? 0) + 1,
-    );
+    this.clearQueuedRuns(conversationId);
     const active = this.activeRuns.get(conversationId);
     if (!active) return;
     active.cancellationReason = 'cancel';
@@ -632,6 +682,12 @@ export class WiscordCodexBridge {
       await active.refreshProgress();
     }
     active.job?.cancel();
+  }
+
+  private clearQueuedRuns(conversationId: string): void {
+    const queue = this.queuedRuns.get(conversationId) ?? [];
+    this.queuedRuns.set(conversationId, []);
+    for (const item of queue) item.resolve();
   }
 
   private getCodexConfigPath(): string {
