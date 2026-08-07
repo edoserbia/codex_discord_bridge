@@ -314,6 +314,7 @@ export class WiscordCodexBridge {
           return;
         case 'unbind': {
           this.assertAdministrator(message);
+          await this.cancelConversation(message.conversationId, '解绑项目');
           const removed = await this.store.removeBinding(message.conversationId);
           await this.sendText(
             message.conversationId,
@@ -350,6 +351,7 @@ export class WiscordCodexBridge {
             await this.sendText(message.conversationId, '当前频道未绑定项目。');
             return;
           }
+          await this.cancelConversation(message.conversationId, '重置会话');
           await this.store.updateSession(message.conversationId, {
             claudeSessionId: undefined,
             codexThreadId: undefined,
@@ -540,6 +542,25 @@ export class WiscordCodexBridge {
     await active.refreshProgress();
     active.job?.cancel();
     await this.sendText(message.conversationId, '已发送取消信号给当前 Codex 任务，并清空等待队列。');
+  }
+
+  private async cancelConversation(conversationId: string, reason: string): Promise<void> {
+    this.taskQueueGenerations.set(
+      conversationId,
+      (this.taskQueueGenerations.get(conversationId) ?? 0) + 1,
+    );
+    const active = this.activeRuns.get(conversationId);
+    if (!active) return;
+    active.cancellationReason = 'cancel';
+    const activeRun = active.runtime.activeRun;
+    if (activeRun) {
+      activeRun.status = 'cancelled';
+      activeRun.latestActivity = `${reason}，已中止当前任务`;
+      activeRun.updatedAt = new Date().toISOString();
+      activeRun.timeline = [...activeRun.timeline, `🛑 ${reason}`].slice(-20);
+      await active.refreshProgress();
+    }
+    active.job?.cancel();
   }
 
   private getCodexConfigPath(): string {
