@@ -53,6 +53,7 @@ import {
   formatFailureReply,
   formatHelp,
   formatProgressMessage,
+  formatStatus,
   formatSuccessReply,
   formatWebAccessLinks,
 } from './formatters.js';
@@ -654,25 +655,35 @@ export class WiscordCodexBridge {
       await this.sendText(message.conversationId, '当前频道未绑定项目。先执行 `!bind <项目名> <工作区目录>`。');
       return;
     }
+    const session = await this.store.ensureSession(binding.channelId, message.conversationId);
     const active = this.activeRuns.get(message.conversationId);
-    if (active) {
-      await this.sendText(message.conversationId, formatProgressMessage(
-        binding,
-        active.runtime,
-        this.config.commandPrefix,
-        this.config.codexDriverMode ?? 'app-server',
-      ));
-      return;
-    }
-    const session = this.store.getSession(message.conversationId);
-    const queued = (this.queuedRuns.get(message.conversationId)?.length ?? 0) > 0 ? '有等待任务' : '空闲';
-    await this.sendText(message.conversationId, [
-      `项目：**${binding.projectName}**`,
-      `目录：\`${binding.workspacePath}\``,
-      `引擎：${binding.engine ?? 'codex'}`,
-      `状态：${queued}`,
-      `Codex thread：${session?.codexThreadId ?? '尚未创建'}`,
-    ].join('\n'));
+    const runtime = active?.runtime ?? {
+      conversationId: message.conversationId,
+      queue: [],
+    };
+    const globalModel = await loadCodexGlobalModel(this.getCodexConfigPath());
+    const globalEffort = await loadCodexGlobalReasoningEffort(this.getCodexConfigPath());
+    const effort = binding.codex.reasoningEffort
+      ?? globalEffort
+      ?? this.config.defaultCodex.reasoningEffort;
+    const source = binding.codex.reasoningEffort
+      ? 'project'
+      : globalEffort
+        ? 'config.toml'
+        : this.config.defaultCodex.reasoningEffort
+          ? 'environment'
+          : 'codex-default';
+    await this.sendText(message.conversationId, formatStatus(
+      binding,
+      session,
+      runtime,
+      this.config.commandPrefix,
+      false,
+      this.config.codexDriverMode ?? 'app-server',
+      globalModel,
+      undefined,
+      { effort, source },
+    ));
   }
 
   private async handleGuideCommand(message: WiscordMessage, prompt: string): Promise<void> {

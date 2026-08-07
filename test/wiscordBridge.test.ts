@@ -322,7 +322,13 @@ test('Wiscord control commands bypass a running task and guide steers the active
     send('msg_task', 1);
     await waitForValue(() => runnerStarted ? true : undefined);
     send('msg_status', 2);
-    await waitForValue(() => [...finalized.values()].some((content) => content.includes('状态：运行中')) ? true : undefined);
+    await waitForValue(() => [...finalized.values()].some((content) => (
+      content.includes('状态：运行中')
+      && content.includes('默认引擎：codex')
+      && content.includes('模型：')
+      && content.includes('推理强度：')
+      && content.includes('驱动：')
+    )) ? true : undefined);
     send('msg_guide', 3);
     await waitForValue(() => guidedPrompts.at(-1));
     assert.equal(guidedPrompts.at(-1), 'only inspect tracked files');
