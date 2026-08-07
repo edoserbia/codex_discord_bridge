@@ -4,9 +4,24 @@ import path from 'node:path';
 import WebSocket from 'ws';
 
 import type { AppConfig, WiscordBridgeConfig } from './config.js';
-import { isCommandMessage, parseCommand } from './commandParser.js';
-import type { CodexExecutionDriver, CodexRunHooks } from './codexRunner.js';
+import { isCommandMessage, parseCommand, type ParsedCommand } from './commandParser.js';
+import type { CodexExecutionDriver, CodexRunHooks, RunningCodexJob } from './codexRunner.js';
 import { extractBridgeFileSendDirective } from './bridgeFileSendProtocol.js';
+import {
+  clearCodexGlobalReasoningEffort,
+  loadCodexGlobalModel,
+  loadCodexGlobalReasoningEffort,
+  resolveCodexConfigPath,
+  writeCodexGlobalModel,
+  writeCodexGlobalReasoningEffort,
+} from './codexConfig.js';
+import {
+  clearClaudeProjectModel,
+  readClaudeGlobalModel,
+  readClaudeProjectModel,
+  writeClaudeGlobalModel,
+  writeClaudeProjectModel,
+} from './claudeSettings.js';
 import { formatFailureReply, formatHelp, formatProgressMessage, formatSuccessReply } from './formatters.js';
 import { appendBridgeProjectContext } from './projectContext.js';
 import { JsonStateStore } from './store.js';
@@ -52,6 +67,14 @@ interface WiscordCheckpoint {
   processedEventIds: string[];
 }
 
+interface WiscordActiveRun {
+  binding: ChannelBinding;
+  job?: RunningCodexJob | undefined;
+  runtime: ChannelRuntime;
+  refreshProgress: () => Promise<void>;
+  cancellationReason?: 'guide' | 'cancel' | undefined;
+}
+
 const MAX_PROCESSED_EVENT_IDS = 2_000;
 const MAX_MESSAGE_CHUNK_BYTES = 240 * 1024;
 
@@ -64,7 +87,10 @@ export class WiscordCodexBridge {
   private reconnectTimer: NodeJS.Timeout | undefined;
   private stopped = true;
   private gatewayQueue: Promise<void> = Promise.resolve();
-  private eventQueue: Promise<void> = Promise.resolve();
+  private readonly eventTasks = new Set<Promise<void>>();
+  private readonly taskQueues = new Map<string, Promise<void>>();
+  private readonly taskQueueGenerations = new Map<string, number>();
+  private readonly activeRuns = new Map<string, WiscordActiveRun>();
   private readonly scheduledEventIds = new Set<string>();
 
   constructor(
@@ -97,7 +123,8 @@ export class WiscordCodexBridge {
     this.socket = undefined;
     if (socket && socket.readyState < WebSocket.CLOSING) socket.close(1000, 'bridge stopped');
     await this.gatewayQueue;
-    await this.eventQueue;
+    await Promise.all([...this.eventTasks]);
+    await Promise.all([...this.taskQueues.values()]);
   }
 
   private async ensureBinding(): Promise<void> {
@@ -223,7 +250,7 @@ export class WiscordCodexBridge {
   private scheduleEvent(event: WiscordGatewayEvent): void {
     if (this.checkpoint.isProcessed(event.eventId) || this.scheduledEventIds.has(event.eventId)) return;
     this.scheduledEventIds.add(event.eventId);
-    this.eventQueue = this.eventQueue.then(async () => {
+    const task = (async () => {
       try {
         await this.processEvent(event);
         await this.checkpoint.complete(event.eventId);
@@ -232,7 +259,9 @@ export class WiscordCodexBridge {
       } finally {
         this.scheduledEventIds.delete(event.eventId);
       }
-    });
+    })();
+    this.eventTasks.add(task);
+    void task.finally(() => this.eventTasks.delete(task));
   }
 
   private async processEvent(event: WiscordGatewayEvent): Promise<void> {
@@ -261,7 +290,7 @@ export class WiscordCodexBridge {
       await this.sendText(message.conversationId, `当前频道未绑定项目。先执行 \`${this.config.commandPrefix}help\` 查看命令。`);
       return;
     }
-    await this.runMessage(message, binding);
+    await this.enqueueRun(message, binding);
   }
 
   private async handleCommand(message: WiscordMessage): Promise<void> {
@@ -287,21 +316,25 @@ export class WiscordCodexBridge {
           return;
         }
         case 'status': {
-          const binding = this.store.getBinding(message.conversationId);
-          const session = this.store.getSession(message.conversationId);
-          await this.sendText(
-            message.conversationId,
-            binding
-              ? [
-                  `项目：**${binding.projectName}**`,
-                  `目录：\`${binding.workspacePath}\``,
-                  `引擎：${binding.engine ?? 'codex'}`,
-                  `Codex thread：${session?.codexThreadId ?? '尚未创建'}`,
-                ].join('\n')
-              : '当前频道未绑定项目。先执行 `!bind <项目名> <工作区目录>`。',
-          );
+          await this.handleStatusCommand(message);
           return;
         }
+        case 'guide':
+          await this.handleGuideCommand(message, command.prompt);
+          return;
+        case 'cancel':
+          this.assertAdministrator(message);
+          await this.handleCancelCommand(message);
+          return;
+        case 'model':
+          await this.handleModelCommand(message, command);
+          return;
+        case 'claude-model':
+          await this.handleClaudeModelCommand(message, command);
+          return;
+        case 'effort':
+          await this.handleEffortCommand(message, command);
+          return;
         case 'reset': {
           this.assertAdministrator(message);
           const binding = this.store.getBinding(message.conversationId);
@@ -335,7 +368,7 @@ export class WiscordCodexBridge {
             await this.sendText(message.conversationId, '当前频道未绑定项目。先执行 `!bind <项目名> <工作区目录>`。');
             return;
           }
-          await this.runMessage(message, binding, { engine: command.engine, prompt: command.prompt });
+          await this.enqueueRun(message, binding, { engine: command.engine, prompt: command.prompt });
           return;
         }
         default:
@@ -399,6 +432,238 @@ export class WiscordCodexBridge {
     );
   }
 
+  private enqueueRun(
+    message: WiscordMessage,
+    binding: ChannelBinding,
+    options: { engine?: ChannelBinding['engine']; prompt?: string } = {},
+  ): Promise<void> {
+    const conversationId = message.conversationId;
+    const generation = this.taskQueueGenerations.get(conversationId) ?? 0;
+    const previous = this.taskQueues.get(conversationId) ?? Promise.resolve();
+    const queued = previous
+      .catch(() => undefined)
+      .then(async () => {
+        if (generation !== (this.taskQueueGenerations.get(conversationId) ?? 0)) return;
+        await this.runMessage(message, binding, options);
+      });
+    this.taskQueues.set(conversationId, queued);
+    void queued.finally(() => {
+      if (this.taskQueues.get(conversationId) === queued) this.taskQueues.delete(conversationId);
+    });
+    return queued;
+  }
+
+  private async handleStatusCommand(message: WiscordMessage): Promise<void> {
+    const binding = this.store.getBinding(message.conversationId);
+    if (!binding) {
+      await this.sendText(message.conversationId, '当前频道未绑定项目。先执行 `!bind <项目名> <工作区目录>`。');
+      return;
+    }
+    const active = this.activeRuns.get(message.conversationId);
+    if (active) {
+      await this.sendText(message.conversationId, formatProgressMessage(
+        binding,
+        active.runtime,
+        this.config.commandPrefix,
+        this.config.codexDriverMode ?? 'app-server',
+      ));
+      return;
+    }
+    const session = this.store.getSession(message.conversationId);
+    const queued = this.taskQueues.has(message.conversationId) ? '有等待任务' : '空闲';
+    await this.sendText(message.conversationId, [
+      `项目：**${binding.projectName}**`,
+      `目录：\`${binding.workspacePath}\``,
+      `引擎：${binding.engine ?? 'codex'}`,
+      `状态：${queued}`,
+      `Codex thread：${session?.codexThreadId ?? '尚未创建'}`,
+    ].join('\n'));
+  }
+
+  private async handleGuideCommand(message: WiscordMessage, prompt: string): Promise<void> {
+    const active = this.activeRuns.get(message.conversationId);
+    if (!active) {
+      await this.sendText(message.conversationId, '当前没有正在运行的任务。直接发送普通消息即可，或先启动一个任务后再使用 `!guide`。');
+      return;
+    }
+    const activeRun = active.runtime.activeRun!;
+    activeRun.task.guidancePrompt = prompt;
+    activeRun.latestActivity = '收到中途引导，继续当前任务';
+    activeRun.updatedAt = new Date().toISOString();
+    activeRun.timeline = [...activeRun.timeline, `🧭 收到新的引导：${prompt}`].slice(-20);
+    await active.refreshProgress();
+    if (active.job?.steer) {
+      await active.job.steer(prompt);
+      await this.sendText(message.conversationId, '已将你的新消息作为引导项插入当前工作，当前引擎会在本轮继续处理中途引导。');
+      return;
+    }
+
+    active.cancellationReason = 'guide';
+    activeRun.status = 'cancelled';
+    activeRun.latestActivity = '正在中断当前步骤，优先处理中途引导';
+    await active.refreshProgress();
+    const guidedMessage: WiscordMessage = {
+      ...message,
+      content: `当前任务：${activeRun.task.rootPrompt}\n\n中途引导：${prompt}`,
+    };
+    void this.enqueueRun(guidedMessage, active.binding).catch((error) => {
+      console.error('[wiscord] failed to queue guided task', error);
+    });
+    active.job?.cancel();
+    await this.sendText(message.conversationId, '已将你的新消息插入当前工作，正在中断当前步骤并优先处理引导。');
+  }
+
+  private async handleCancelCommand(message: WiscordMessage): Promise<void> {
+    const active = this.activeRuns.get(message.conversationId);
+    if (!active) {
+      await this.sendText(message.conversationId, '当前会话没有正在运行的任务。');
+      return;
+    }
+    this.taskQueueGenerations.set(
+      message.conversationId,
+      (this.taskQueueGenerations.get(message.conversationId) ?? 0) + 1,
+    );
+    active.cancellationReason = 'cancel';
+    const activeRun = active.runtime.activeRun!;
+    activeRun.status = 'cancelled';
+    activeRun.latestActivity = `已由 ${message.author.id} 请求取消`;
+    activeRun.updatedAt = new Date().toISOString();
+    activeRun.timeline = [...activeRun.timeline, '🛑 已发送取消信号'].slice(-20);
+    await active.refreshProgress();
+    active.job?.cancel();
+    await this.sendText(message.conversationId, '已发送取消信号给当前 Codex 任务，并清空等待队列。');
+  }
+
+  private getCodexConfigPath(): string {
+    return resolveCodexConfigPath(this.config.codexConfigPath);
+  }
+
+  private async handleModelCommand(
+    message: WiscordMessage,
+    command: Extract<ParsedCommand, { kind: 'model' }>,
+  ): Promise<void> {
+    const engine = command.engine ?? this.store.getBinding(message.conversationId)?.engine ?? 'codex';
+    if (engine === 'claude') {
+      await this.handleClaudeModelCommand(message, {
+        kind: 'claude-model',
+        scope: command.scope,
+        action: command.action,
+        ...(command.action === 'set' ? { model: command.model } : {}),
+      } as Extract<ParsedCommand, { kind: 'claude-model' }>);
+      return;
+    }
+    if (command.action !== 'status') this.assertAdministrator(message);
+    const configPath = this.getCodexConfigPath();
+    if (command.scope === 'global') {
+      if (command.action === 'status') {
+        const model = await loadCodexGlobalModel(configPath);
+        await this.sendText(message.conversationId, `🧠 **Codex 全局模型**\n全局模型：${model ? `\`${model}\`` : '未显式设置'}\n配置文件：\`${configPath}\``);
+        return;
+      }
+      await writeCodexGlobalModel(configPath, command.model);
+      this.config.defaultCodex.model = command.model;
+      for (const binding of this.store.listBindings()) {
+        if ((binding.engine ?? 'codex') !== 'codex') continue;
+        await this.store.upsertBinding({ ...binding, codex: { ...binding.codex, model: command.model }, modelScope: 'global', updatedAt: new Date().toISOString() });
+      }
+      await this.sendText(message.conversationId, `已切换全局 Codex 模型为 \`${command.model}\`。运行中的任务不受影响，下一轮生效。`);
+      return;
+    }
+    const binding = this.store.getBinding(message.conversationId);
+    if (!binding) {
+      await this.sendText(message.conversationId, '当前频道未绑定项目。先执行 `!bind`。');
+      return;
+    }
+    const globalModel = await loadCodexGlobalModel(configPath);
+    if (command.action === 'status') {
+      await this.sendText(message.conversationId, `🧠 **Codex 项目模型**\n项目：**${binding.projectName}**\n项目模型：${binding.codex.model ? `\`${binding.codex.model}\`` : '跟随全局'}\n全局模型：${globalModel ? `\`${globalModel}\`` : '未显式设置'}\n当前生效：${binding.codex.model ? `\`${binding.codex.model}\`` : globalModel ? `\`${globalModel}\`` : 'Codex 默认配置'}`);
+      return;
+    }
+    const codex = { ...binding.codex };
+    if (command.action === 'set') codex.model = command.model;
+    else delete codex.model;
+    await this.store.upsertBinding({ ...binding, codex, modelScope: command.action === 'set' ? 'project' : undefined, updatedAt: new Date().toISOString() });
+    await this.sendText(message.conversationId, command.action === 'set'
+      ? `已将当前项目切换到 Codex 模型 \`${command.model}\`，下一轮生效。`
+      : '已清除当前项目的 Codex 模型覆盖，下一轮跟随全局。');
+  }
+
+  private async handleClaudeModelCommand(
+    message: WiscordMessage,
+    command: Extract<ParsedCommand, { kind: 'claude-model' }>,
+  ): Promise<void> {
+    if (command.action !== 'status') this.assertAdministrator(message);
+    if (command.scope === 'global') {
+      if (command.action === 'status') {
+        const model = await readClaudeGlobalModel(this.config.claudeSettingsPath);
+        await this.sendText(message.conversationId, `🧠 **Claude 全局模型**\n全局模型：${model ? `\`${model}\`` : '未显式设置'}`);
+        return;
+      }
+      await writeClaudeGlobalModel(this.config.claudeSettingsPath, command.model);
+      await this.sendText(message.conversationId, `已切换全局 Claude 模型为 \`${command.model}\`，下一轮生效。`);
+      return;
+    }
+    const binding = this.store.getBinding(message.conversationId);
+    if (!binding) {
+      await this.sendText(message.conversationId, '当前频道未绑定项目。先执行 `!bind`。');
+      return;
+    }
+    if (command.action === 'status') {
+      const [projectModel, globalModel] = await Promise.all([
+        readClaudeProjectModel(binding.workspacePath), readClaudeGlobalModel(this.config.claudeSettingsPath),
+      ]);
+      await this.sendText(message.conversationId, `🧠 **Claude 项目模型**\n项目：**${binding.projectName}**\n项目模型：${projectModel ? `\`${projectModel}\`` : '跟随全局'}\n全局模型：${globalModel ? `\`${globalModel}\`` : '未显式设置'}`);
+      return;
+    }
+    if (command.action === 'set') {
+      await writeClaudeProjectModel(binding.workspacePath, command.model);
+      await this.sendText(message.conversationId, `已将当前项目切换到 Claude 模型 \`${command.model}\`，下一轮生效。`);
+    } else {
+      await clearClaudeProjectModel(binding.workspacePath);
+      await this.sendText(message.conversationId, '已清除当前项目的 Claude 模型覆盖，下一轮跟随全局。');
+    }
+  }
+
+  private async handleEffortCommand(
+    message: WiscordMessage,
+    command: Extract<ParsedCommand, { kind: 'effort' }>,
+  ): Promise<void> {
+    if (command.action !== 'status') this.assertAdministrator(message);
+    const configPath = this.getCodexConfigPath();
+    if (command.scope === 'global') {
+      if (command.action === 'status') {
+        const effort = await loadCodexGlobalReasoningEffort(configPath);
+        await this.sendText(message.conversationId, `🧠 **Codex 全局推理强度**\n当前设置：${effort ? `\`${effort}\`` : '未显式设置'}\n配置文件：\`${configPath}\``);
+        return;
+      }
+      if (command.action === 'set') {
+        await writeCodexGlobalReasoningEffort(configPath, command.effort);
+        await this.sendText(message.conversationId, `已将 Codex 全局推理强度设为 \`${command.effort}\`，下一轮生效。`);
+      } else {
+        await clearCodexGlobalReasoningEffort(configPath);
+        await this.sendText(message.conversationId, '已清除 Codex 全局推理强度，下一轮使用默认配置。');
+      }
+      return;
+    }
+    const binding = this.store.getBinding(message.conversationId);
+    if (!binding) {
+      await this.sendText(message.conversationId, '当前频道未绑定项目。先执行 `!bind`。');
+      return;
+    }
+    if (command.action === 'status') {
+      const globalEffort = await loadCodexGlobalReasoningEffort(configPath);
+      await this.sendText(message.conversationId, `🧠 **Codex 项目推理强度**\n项目：**${binding.projectName}**\n项目设置：${binding.codex.reasoningEffort ? `\`${binding.codex.reasoningEffort}\`` : '跟随全局'}\n全局设置：${globalEffort ? `\`${globalEffort}\`` : '未显式设置'}`);
+      return;
+    }
+    const codex = { ...binding.codex };
+    if (command.action === 'set') codex.reasoningEffort = command.effort;
+    else delete codex.reasoningEffort;
+    await this.store.upsertBinding({ ...binding, codex, reasoningEffortScope: command.action === 'set' ? 'project' : undefined, updatedAt: new Date().toISOString() });
+    await this.sendText(message.conversationId, command.action === 'set'
+      ? `已将当前项目推理强度设为 \`${command.effort}\`，下一轮生效。`
+      : '已清除当前项目推理强度覆盖，下一轮跟随全局。');
+  }
+
   private async runMessage(
     message: WiscordMessage,
     binding: ChannelBinding,
@@ -433,6 +698,8 @@ export class WiscordCodexBridge {
     };
 
     await refreshProgress();
+    const activeControl: WiscordActiveRun = { binding: runBinding, refreshProgress, runtime };
+    this.activeRuns.set(message.conversationId, activeControl);
     const hooks: CodexRunHooks = {
       onActivity: async (activity) => {
         touch(activity);
@@ -503,20 +770,24 @@ export class WiscordCodexBridge {
         await refreshProgress();
       },
     };
-    const job = this.runner.start(
+    try {
+      const job = this.runner.start(
         runBinding,
         {
-        ...(options.engine ? { engine: options.engine } : {}),
-        imagePaths: [],
-        extraAddDirs: [],
-        prompt: appendBridgeProjectContext(runMessage.content, runBinding),
-      },
-      session.codexThreadId,
-      hooks,
-    );
-    const result = await job.done;
+          ...(options.engine ? { engine: options.engine } : {}),
+          imagePaths: [],
+          extraAddDirs: [],
+          prompt: appendBridgeProjectContext(runMessage.content, runBinding),
+        },
+        session.codexThreadId,
+        hooks,
+      );
+      activeControl.job = job;
+      if (activeControl.cancellationReason) job.cancel();
+      const result = await job.done;
+      const controlledCancellation = activeControl.cancellationReason;
     touch(result.success ? '本轮已完成' : '本轮失败');
-    activeRun.status = result.success ? 'completed' : 'failed';
+    activeRun.status = controlledCancellation ? 'cancelled' : result.success ? 'completed' : 'failed';
     activeRun.exitCode = result.exitCode;
     activeRun.signal = result.signal;
     activeRun.codexThreadId = result.codexThreadId ?? activeRun.codexThreadId;
@@ -530,7 +801,13 @@ export class WiscordCodexBridge {
       activeRun.currentCommand = lastCommand.command;
       activeRun.lastCommandOutput = lastCommand.output;
     }
-    pushTimeline(result.success ? '✅ 本轮已完成' : '❌ 本轮失败');
+    pushTimeline(
+      controlledCancellation === 'guide'
+        ? '🧭 当前步骤已被中途引导打断，准备优先处理引导'
+        : controlledCancellation === 'cancel'
+          ? '🛑 当前任务已取消'
+          : result.success ? '✅ 本轮已完成' : '❌ 本轮失败',
+    );
     await refreshProgress();
     await progressChain;
     await this.store.updateSession(message.conversationId, {
@@ -540,6 +817,16 @@ export class WiscordCodexBridge {
       lastPromptBy: message.author.id,
       lastRunAt: new Date().toISOString(),
     }, binding.channelId);
+
+    if (controlledCancellation) {
+      await this.finalizeText(reply.messageId, formatProgressMessage(
+        runBinding,
+        runtime,
+        this.config.commandPrefix,
+        this.config.codexDriverMode ?? 'app-server',
+      ));
+      return;
+    }
 
     const finalContent = result.success
       ? formatSuccessReply(runBinding, message.author.id, result, { finalMessage: visibleAssistantMessage(result) })
@@ -551,6 +838,11 @@ export class WiscordCodexBridge {
       this.config.codexDriverMode ?? 'app-server',
     ));
     await this.sendText(message.conversationId, finalContent);
+    } finally {
+      if (this.activeRuns.get(message.conversationId) === activeControl) {
+        this.activeRuns.delete(message.conversationId);
+      }
+    }
   }
 
   private async editMessage(messageId: string, content: string): Promise<void> {

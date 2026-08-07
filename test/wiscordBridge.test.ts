@@ -204,6 +204,140 @@ test('Wiscord adapter preserves the Discord live-progress format and freezes the
   }
 });
 
+test('Wiscord control commands bypass a running task and guide steers the active job', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'wiscord-bridge-controls-'));
+  const workspace = path.join(root, 'workspace');
+  const state = new JsonStateStore(path.join(root, 'state.json'));
+  await state.load();
+
+  const messages = new Map([
+    ['msg_task', 'inspect the repository'],
+    ['msg_status', '!status'],
+    ['msg_guide', '!guide only inspect tracked files'],
+    ['msg_cancel', '!cancel'],
+  ]);
+  const finalized = new Map<string, string>();
+  const chunks = new Map<string, Array<{ content: string; index: number }>>();
+  const sockets = new Set<WebSocket>();
+  const guidedPrompts: string[] = [];
+  let replyNumber = 0;
+  let releaseRun: (() => void) | undefined;
+  let runnerStarted = false;
+
+  const server = createServer(async (request, response) => {
+    const body = await readJson(request);
+    response.setHeader('content-type', 'application/json');
+    if (request.method === 'POST' && request.url === '/bot/v1/auth/token') {
+      response.end(JSON.stringify({ accessToken: 'bot_access' }));
+      return;
+    }
+    assert.equal(request.headers.authorization, 'Bearer bot_access');
+    const messageMatch = request.url?.match(/^\/bot\/v1\/messages\/(msg_[^/]+)$/);
+    if (request.method === 'GET' && messageMatch) {
+      const content = messages.get(messageMatch[1]!);
+      if (!content) {
+        response.statusCode = 404;
+        response.end(JSON.stringify({ code: 'NOT_FOUND' }));
+        return;
+      }
+      response.end(JSON.stringify({
+        author: { id: 'user_1', kind: 'user' },
+        content,
+        conversationId: 'channel_1',
+        guildId: 'guild_1',
+        id: messageMatch[1],
+      }));
+      return;
+    }
+    if (request.method === 'POST' && request.url === '/bot/v1/messages') {
+      replyNumber += 1;
+      response.statusCode = 201;
+      response.end(JSON.stringify({ messageId: `reply_${replyNumber}` }));
+      return;
+    }
+    const chunkMatch = request.url?.match(/^\/bot\/v1\/messages\/(reply_\d+)\/chunks$/);
+    if (request.method === 'POST' && chunkMatch) {
+      const id = chunkMatch[1]!;
+      chunks.set(id, [...(chunks.get(id) ?? []), { content: String(body.content), index: Number(body.index) }]);
+      response.statusCode = 204;
+      response.end();
+      return;
+    }
+    const finalizeMatch = request.url?.match(/^\/bot\/v1\/messages\/(reply_\d+)\/finalize$/);
+    if (request.method === 'POST' && finalizeMatch) {
+      const id = finalizeMatch[1]!;
+      finalized.set(id, (chunks.get(id) ?? []).sort((left, right) => left.index - right.index).map((chunk) => chunk.content).join(''));
+      response.end(JSON.stringify({ id, status: 'complete' }));
+      return;
+    }
+    if (request.method === 'PATCH' && request.url === '/bot/v1/messages/reply_1') {
+      response.end(JSON.stringify({ id: 'reply_1' }));
+      return;
+    }
+    response.statusCode = 404;
+    response.end(JSON.stringify({ code: 'NOT_FOUND' }));
+  });
+  const gateway = new WebSocketServer({ server, path: '/bot/v1/gateway' });
+  gateway.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+    socket.on('message', (raw) => {
+      const frame = JSON.parse(raw.toString()) as Record<string, unknown>;
+      if (frame.op === 'IDENTIFY') socket.send(JSON.stringify({ op: 'READY', heartbeatIntervalMs: 25 }));
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert(address && typeof address === 'object');
+
+  const runner: CodexExecutionDriver = {
+    start(_binding, _input, _thread, hooks: CodexRunHooks = {}): RunningCodexJob {
+      runnerStarted = true;
+      const done = (async (): Promise<CodexRunResult> => {
+        await hooks.onThreadStarted?.('control_thread');
+        await hooks.onActivity?.('waiting for control commands');
+        await new Promise<void>((resolve) => { releaseRun = resolve; });
+        return {
+          agentMessages: ['task complete'], commands: [], codexThreadId: 'control_thread', exitCode: 0,
+          planItems: [], reasoning: [], signal: null, stderr: [], success: true, turnCompleted: true, usedResume: false,
+        };
+      })();
+      return {
+        cancel() { releaseRun?.(); },
+        done,
+        driverMode: 'app-server',
+        pid: undefined,
+        steer: async (prompt) => { guidedPrompts.push(prompt); },
+      };
+    },
+  };
+  const bridge = new WiscordCodexBridge(buildConfig(root, workspace, `http://127.0.0.1:${address.port}`), state, runner);
+
+  try {
+    await bridge.start();
+    const socket = await waitForValue(() => [...sockets][0]);
+    const send = (messageId: string, sequence: number) => socket.send(JSON.stringify({
+      op: 'EVENT', event: { data: { messageId }, eventId: `evt_${messageId}`, guildId: 'guild_1', sequence, type: 'MESSAGE_CREATE', version: 1 },
+    }));
+    send('msg_task', 1);
+    await waitForValue(() => runnerStarted ? true : undefined);
+    send('msg_status', 2);
+    await waitForValue(() => [...finalized.values()].some((content) => content.includes('状态：运行中')) ? true : undefined);
+    send('msg_guide', 3);
+    await waitForValue(() => guidedPrompts.at(-1));
+    assert.equal(guidedPrompts.at(-1), 'only inspect tracked files');
+    send('msg_cancel', 4);
+    await waitForValue(() => [...finalized.values()].some((content) => content.includes('已发送取消信号')) ? true : undefined);
+  } finally {
+    releaseRun?.();
+    await bridge.stop();
+    for (const socket of sockets) socket.terminate();
+    await new Promise<void>((resolve) => gateway.close(() => resolve()));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(root, { force: true, recursive: true });
+  }
+});
+
 test('Wiscord adapter answers !help in a second channel from the installed guild', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'wiscord-bridge-help-'));
   const workspace = path.join(root, 'workspace');
