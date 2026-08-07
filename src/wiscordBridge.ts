@@ -13,6 +13,7 @@ import { JsonStateStore } from './store.js';
 import type { ActiveRunState, ChannelBinding, ChannelRuntime, CodexRunResult, PromptTask } from './types.js';
 import {
   cloneCodexOptions,
+  formatSecondClockTimestamp,
   isWithinAllowedRoots,
   normalizeAllowedRoots,
   resolveDirectoryPath,
@@ -471,15 +472,17 @@ export class WiscordCodexBridge {
       onCommandStarted: async (command) => {
         touch('正在执行命令');
         activeRun.currentCommand = command;
+        activeRun.currentCommandStartedAt = activeRun.updatedAt;
         activeRun.status = 'running';
-        pushTimeline(`▶️ ${command}`);
+        pushTimeline(`▶️ ${formatSecondClockTimestamp(activeRun.currentCommandStartedAt)} ${command}`);
         await refreshProgress();
       },
       onCommandCompleted: async (command, output, exitCode) => {
         touch(exitCode === 0 ? '命令执行完成' : '命令执行失败');
         activeRun.currentCommand = command;
         activeRun.lastCommandOutput = output;
-        pushTimeline(`${exitCode === 0 ? '✅' : '❌'} ${command} (${exitCode ?? 'null'})`);
+        activeRun.lastCommandCompletedAt = activeRun.updatedAt;
+        pushTimeline(`${exitCode === 0 ? '✅' : '❌'} ${formatSecondClockTimestamp(activeRun.lastCommandCompletedAt)} ${command} (${exitCode ?? 'null'})`);
         await refreshProgress();
       },
       onStderr: async (line) => {

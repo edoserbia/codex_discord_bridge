@@ -180,8 +180,10 @@ test('Wiscord adapter preserves the Discord live-progress format and freezes the
     assert.ok(edits.some((content) => content.includes('计划：')));
     assert.ok(edits.some((content) => content.includes('子代理：')));
     assert.ok(edits.some((content) => content.includes('分析摘要：最新')));
-    assert.ok(edits.some((content) => content.includes('当前命令：`pnpm test`')));
+    assert.ok(edits.some((content) => content.includes('当前命令：')));
     assert.ok(edits.some((content) => content.includes('最新输出预览：')));
+    assert.ok(edits.some((content) => /当前命令：\[\d{2}:\d{2}:\d{2}\] `pnpm test`/.test(content)));
+    assert.ok(edits.some((content) => /最新输出预览：\[\d{2}:\d{2}:\d{2}\]/.test(content)));
     assert.equal(createdReplies, 2);
     assert.deepEqual(finalizations, ['msg_progress', 'msg_final']);
     const completedProgress = progressChunks.map((chunk) => chunk.content).join('');

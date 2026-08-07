@@ -206,7 +206,9 @@ export interface ActiveRunState {
   updatedAt: string;
   latestActivity: string;
   currentCommand?: string | undefined;
+  currentCommandStartedAt?: string | undefined;
   lastCommandOutput?: string | undefined;
+  lastCommandCompletedAt?: string | undefined;
   agentMessages: string[];
   reasoningSummaries: string[];
   planItems: PlanItem[];

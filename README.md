@@ -680,7 +680,7 @@ WISCORD_WORKSPACE_PATH=/Users/mac/work/su/wiscord_app
 
 `WISCORD_BASE_URL` 是 HTTP Origin；`4580/tcp` 同时承载 REST 和 WebSocket。Bridge 主机需要向该端口发起出站连接，不需要访问 PostgreSQL。使用 HTTPS 时填写 `https://` Base URL，传输会自动使用 WSS。
 
-Wiscord 只负责传输，不定义另一套回复内容：它复用 Discord Bridge 的实时进度 formatter 和最终总结 formatter。同一条 `streaming` 消息会持续显示计划、子代理、活动、命令、输出和时间线；完成后会以带“已完成”和更新时间的最后进度面板冻结，然后发送原格式的最终总结。`!help` 也复用 Discord 的完整命令顺序，`!codex <请求>` 与 `!claude <请求>` 可以为当前一轮显式选择引擎。
+Wiscord 只负责传输，不定义另一套回复内容：它复用 Discord Bridge 的实时进度 formatter 和最终总结 formatter。同一条 `streaming` 消息会持续显示计划、子代理、活动、命令、输出和时间线；命令开始、命令结束和最新输出预览均显示 Bridge 主机本地时区的 `[HH:mm:ss]` 时间戳。完成后会以带“已完成”和更新时间的最后进度面板冻结，然后发送原格式的最终总结。`!help` 也复用 Discord 的完整命令顺序，`!codex <请求>` 与 `!claude <请求>` 可以为当前一轮显式选择引擎。
 
 使用下面命令验证集成：
 

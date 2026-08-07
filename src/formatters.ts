@@ -18,7 +18,7 @@ import type {
 
 import { formatAutopilotBoardChanges, normalizeAutopilotParallelism, summarizeAutopilotBoard, stampAutopilotLine } from './autopilot.js';
 import { filterDiagnosticStderr } from './codexDiagnostics.js';
-import { formatClockTimestamp, formatDurationMs, sanitizeInlineCode, shortId, tailLines, truncate } from './utils.js';
+import { formatClockTimestamp, formatDurationMs, formatSecondClockTimestamp, sanitizeInlineCode, shortId, tailLines, truncate } from './utils.js';
 import type { WebAccessUrl } from './webAccess.js';
 
 function describeAutopilotProjectState(
@@ -628,11 +628,17 @@ export function formatProgressMessage(
   appendTimelineLines(lines, activeRun.timeline, 8);
 
   if (activeRun.currentCommand) {
-    lines.push(`当前命令：\`${truncate(sanitizeInlineCode(activeRun.currentCommand), 180)}\``);
+    const startedAt = activeRun.currentCommandStartedAt
+      ? `${formatSecondClockTimestamp(activeRun.currentCommandStartedAt)} `
+      : '';
+    lines.push(`当前命令：${startedAt}\`${truncate(sanitizeInlineCode(activeRun.currentCommand), 180)}\``);
   }
 
   if (activeRun.lastCommandOutput) {
-    lines.push('最新输出预览：');
+    const completedAt = activeRun.lastCommandCompletedAt
+      ? formatSecondClockTimestamp(activeRun.lastCommandCompletedAt)
+      : '';
+    lines.push(`最新输出预览：${completedAt}`);
     lines.push('```');
     lines.push(truncate(tailLines(activeRun.lastCommandOutput, 6), 500));
     lines.push('```');

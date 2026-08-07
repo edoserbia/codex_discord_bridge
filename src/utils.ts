@@ -28,6 +28,14 @@ export function formatClockTimestamp(value: string | number | Date): string {
   return `[${hours}:${minutes}]`;
 }
 
+export function formatSecondClockTimestamp(value: string | number | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `[${hours}:${minutes}:${seconds}]`;
+}
+
 export function splitIntoDiscordChunks(value: string, maxLength = 1900): string[] {
   const normalized = value.replace(/\r\n/g, '\n');
 
