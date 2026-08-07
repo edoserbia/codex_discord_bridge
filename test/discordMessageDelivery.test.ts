@@ -107,6 +107,37 @@ test('bridge chunks long file-send final replies before sending them to Discord'
   }
 });
 
+test('bridge chunks help replies before sending them to Discord', { concurrency: false }, async () => {
+  const rootDir = await makeTempDir('codex-bridge-e2e-discord-help-');
+  const { bridge, channels } = await createBridgeTestRig({ rootDir, codexCommand: fakeCodexCommand });
+  const rootChannel = new FakeChannel('channel-discord-help', 'guild-1');
+  channels.set(rootChannel.id, rootChannel);
+
+  const originalSend = rootChannel.send.bind(rootChannel);
+  const helpChunks: string[] = [];
+  rootChannel.send = async (payload: any): Promise<any> => {
+    const content = typeof payload === 'string' ? payload : payload?.content ?? '';
+    if (typeof content === 'string' && content.trim().length > 0) {
+      helpChunks.push(content);
+    }
+    if (typeof content === 'string' && content.length > 2_000) {
+      throw new Error('Invalid Form Body\ncontent[BASE_TYPE_MAX_LENGTH]: Must be 2000 or fewer in length.');
+    }
+    return originalSend(payload);
+  };
+
+  try {
+    await dispatch(bridge, createUserMessage(rootChannel, '!help'));
+    assert.ok(helpChunks.length >= 2);
+    assert.ok(helpChunks.every((chunk) => chunk.length <= 2_000));
+    assert.match(helpChunks[0]!, /!effort status/);
+  } finally {
+    rootChannel.send = originalSend;
+    await (bridge as any).stop?.();
+    await cleanupDir(rootDir);
+  }
+});
+
 for (const failure of [
   {
     label: 'EPIPE',

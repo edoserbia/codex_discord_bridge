@@ -1787,7 +1787,7 @@ export class DiscordCodexBridge {
 
     switch (command.kind) {
       case 'help':
-        await message.reply(formatHelp(this.config.commandPrefix));
+        await this.replyWithChunks(message, formatHelp(this.config.commandPrefix));
         return;
       case 'projects':
         await message.reply(formatProjects(this.store.listBindings(message.guildId ?? undefined)));
