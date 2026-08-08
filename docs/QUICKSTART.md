@@ -192,10 +192,10 @@ sudo ./scripts/install-service.sh --mode daemon
 Codex 推理强度使用独立的 `!effort` 命令，不会受当前绑定的默认引擎影响：
 
 - `!effort status` 查看全局及当前项目的生效推理强度
-- `!effort set <minimal|low|medium|high|xhigh>` 写入 Codex 全局 `config.toml`
+- `!effort set <minimal|low|medium|high|xhigh|max|ultra>` 写入 Codex 全局 `config.toml`
 - `!effort clear` 清除 Codex 全局 `config.toml` 设置
 - `!effort project status` 查看当前项目的推理强度覆盖
-- `!effort project set <minimal|low|medium|high|xhigh>` 设置当前项目覆盖
+- `!effort project set <minimal|low|medium|high|xhigh|max|ultra>` 设置当前项目覆盖
 - `!effort project clear` 清除当前项目覆盖，恢复跟随全局
 
 推理强度优先级依次为项目覆盖、Codex `config.toml`、`DEFAULT_CODEX_REASONING_EFFORT` 环境变量、Codex 默认值。切换不会 reset 当前会话，正在运行的本轮继续使用旧配置，下一轮请求才使用新配置；Claude 不受此设置影响。

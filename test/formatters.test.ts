@@ -21,8 +21,8 @@ test('help text documents workspace inbox mirroring and file-send workflows', ()
   assert.match(text, /当前绑定引擎/);
   assert.match(text, /Claude.*实时/);
   assert.match(text, /!effort status/);
-  assert.match(text, /!effort set <minimal\|low\|medium\|high\|xhigh>/);
-  assert.match(text, /!effort project set <minimal\|low\|medium\|high\|xhigh>/);
+  assert.match(text, /!effort set <minimal\|low\|medium\|high\|xhigh\|max\|ultra>/);
+  assert.match(text, /!effort project set <minimal\|low\|medium\|high\|xhigh\|max\|ultra>/);
   assert.match(text, /!effort project clear/);
 });
 

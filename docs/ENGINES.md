@@ -50,14 +50,14 @@ If `--engine` is omitted, the binding defaults to Codex.
 
 ## Codex Reasoning Effort
 
-Codex accepts five reasoning effort values: `minimal`, `low`, `medium`, `high`, and `xhigh`. Discord administrators can manage the global value or a project override:
+Codex accepts seven reasoning effort values: `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, and `ultra`. Discord administrators can manage the global value or a project override:
 
 ```text
 !effort status
-!effort set <minimal|low|medium|high|xhigh>
+!effort set <minimal|low|medium|high|xhigh|max|ultra>
 !effort clear
 !effort project status
-!effort project set <minimal|low|medium|high|xhigh>
+!effort project set <minimal|low|medium|high|xhigh|max|ultra>
 !effort project clear
 ```
 

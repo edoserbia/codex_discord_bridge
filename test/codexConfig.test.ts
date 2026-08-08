@@ -16,6 +16,8 @@ import {
 test('read root reasoning effort from double and single quoted TOML strings only', () => {
   assert.equal(readRootReasoningEffortFromToml('model_reasoning_effort = "high"\n'), 'high');
   assert.equal(readRootReasoningEffortFromToml("model_reasoning_effort = 'xhigh' # keep\n"), 'xhigh');
+  assert.equal(readRootReasoningEffortFromToml('model_reasoning_effort = "max"\n'), 'max');
+  assert.equal(readRootReasoningEffortFromToml("model_reasoning_effort = 'ultra' # keep\n"), 'ultra');
   assert.equal(
     readRootReasoningEffortFromToml('[profiles.default]\nmodel_reasoning_effort = "low"\n'),
     undefined,

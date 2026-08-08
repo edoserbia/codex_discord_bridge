@@ -212,7 +212,7 @@ bridgectl session resume <Resume ID>
 !effort clear
 ```
 
-允许值是 `minimal`、`low`、`medium`、`high`、`xhigh`。生效顺序为项目覆盖 > `model_reasoning_effort` > `DEFAULT_CODEX_REASONING_EFFORT` > Codex 默认。全局键只位于 `CODEX_CONFIG_PATH`（未设置时为 `~/.codex/config.toml`）的根级；项目覆盖由 `data/state.json` 管理。命令不会中断活动任务，下一轮才使用新值；Claude 引擎不受影响。
+允许值是 `minimal`、`low`、`medium`、`high`、`xhigh`、`max`、`ultra`。生效顺序为项目覆盖 > `model_reasoning_effort` > `DEFAULT_CODEX_REASONING_EFFORT` > Codex 默认。全局键只位于 `CODEX_CONFIG_PATH`（未设置时为 `~/.codex/config.toml`）的根级；项目覆盖由 `data/state.json` 管理。命令不会中断活动任务，下一轮才使用新值；Claude 引擎不受影响。
 
 ## 非 Git 目录绑定
 

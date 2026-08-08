@@ -155,6 +155,8 @@ function parseReasoningEffort(value: string | undefined): ReasoningEffort | unde
     || normalized === 'medium'
     || normalized === 'high'
     || normalized === 'xhigh'
+    || normalized === 'max'
+    || normalized === 'ultra'
   ) {
     return normalized;
   }

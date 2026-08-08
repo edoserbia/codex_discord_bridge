@@ -456,6 +456,8 @@ test('loadConfig validates and normalizes DEFAULT_CODEX_REASONING_EFFORT', { con
       ['medium', 'medium'],
       ['HIGH', 'high'],
       [' xhigh ', 'xhigh'],
+      ['MAX', 'max'],
+      [' ultra ', 'ultra'],
     ] as const;
 
     for (const [configured, expected] of cases) {

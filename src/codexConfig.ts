@@ -6,7 +6,7 @@ import type { ReasoningEffort } from './types.js';
 
 export const DEFAULT_CODEX_CONFIG_PATH = path.join(os.homedir(), '.codex', 'config.toml');
 
-const REASONING_EFFORTS: ReadonlySet<string> = new Set(['minimal', 'low', 'medium', 'high', 'xhigh']);
+const REASONING_EFFORTS: ReadonlySet<string> = new Set(['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
 
 export function resolveCodexConfigPath(rawPath = process.env.CODEX_CONFIG_PATH): string {
   const candidate = rawPath?.trim();

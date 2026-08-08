@@ -401,8 +401,8 @@ Bridge 会中断当前步骤，在当前引擎会话里先处理新增引导，�
 | `!model codex ...` | 显式查看或修改 Codex 全局/项目模型 |
 | `!model claude ...` | 显式查看或修改 Claude 全局/项目模型 |
 | `!claude-model ...` | Claude 模型命令的兼容别名 |
-| `!effort status/set <minimal\|low\|medium\|high\|xhigh>/clear` | 查看、设置或清除 Codex 全局推理强度 |
-| `!effort project status/set <minimal\|low\|medium\|high\|xhigh>/clear` | 查看、设置或清除当前项目的 Codex 推理强度覆盖 |
+| `!effort status/set <minimal\|low\|medium\|high\|xhigh\|max\|ultra>/clear` | 查看、设置或清除 Codex 全局推理强度 |
+| `!effort project status/set <minimal\|low\|medium\|high\|xhigh\|max\|ultra>/clear` | 查看、设置或清除当前项目的 Codex 推理强度覆盖 |
 | `!approve <请求ID>` | 批准 Claude CLI 申请的工具权限 |
 | `!deny <请求ID>` | 拒绝 Claude CLI 申请的工具权限 |
 | `!status` | 查看当前会话状态、Resume ID 和本机续聊命令 |
@@ -541,7 +541,7 @@ sudo ./scripts/uninstall-service.sh --mode daemon
 | `DEFAULT_CODEX_SANDBOX` | 默认 sandbox 模式，默认 `danger-full-access` |
 | `DEFAULT_CODEX_APPROVAL` | 默认 approval 策略 |
 | `DEFAULT_CODEX_SEARCH` | 默认是否开启搜索 |
-| `DEFAULT_CODEX_REASONING_EFFORT` | Codex 推理强度环境变量回退，可选 `minimal`、`low`、`medium`、`high`、`xhigh`；优先级低于项目覆盖和 `config.toml` |
+| `DEFAULT_CODEX_REASONING_EFFORT` | Codex 推理强度环境变量回退，可选 `minimal`、`low`、`medium`、`high`、`xhigh`、`max`、`ultra`；优先级低于项目覆盖和 `config.toml` |
 | `DEFAULT_CODEX_SKIP_GIT_REPO_CHECK` | 默认是否跳过 Git 仓库检查，默认 `true` |
 | `CODEX_COMMAND` | Codex CLI 命令，默认 `codex` |
 | `CODEX_APP_SERVER_TURN_TIMEOUT_MS` | app-server 已提交轮次后无任何事件的卡死保护，默认 `600000`；设为 `0` 可禁用 |

@@ -279,8 +279,8 @@ test('parse bare and explicit global reasoning effort status commands', () => {
 });
 
 test('parse and normalize every supported global reasoning effort value', () => {
-  const inputs = ['MINIMAL', 'Low', 'mEdIuM', 'HIGH', 'XHigh'];
-  const expected = ['minimal', 'low', 'medium', 'high', 'xhigh'];
+  const inputs = ['MINIMAL', 'Low', 'mEdIuM', 'HIGH', 'XHigh', 'MAX', 'Ultra'];
+  const expected = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
 
   for (const [index, input] of inputs.entries()) {
     assert.deepEqual(parseCommand(`!effort set ${input}`, '!'), {
@@ -314,11 +314,11 @@ test('parse implicit and explicit project reasoning effort status commands', () 
 });
 
 test('parse and normalize project reasoning effort set command', () => {
-  assert.deepEqual(parseCommand('!effort project set XHIGH', '!'), {
+  assert.deepEqual(parseCommand('!effort project set ULTRA', '!'), {
     kind: 'effort',
     scope: 'project',
     action: 'set',
-    effort: 'xhigh',
+    effort: 'ultra',
   });
 });
 
@@ -349,7 +349,7 @@ test('reject invalid reasoning effort values and command shapes', () => {
   for (const command of invalidCommands) {
     assert.throws(
       () => parseCommand(command, '!'),
-      /minimal.*low.*medium.*high.*xhigh/,
+      /minimal.*low.*medium.*high.*xhigh.*max.*ultra/,
       command,
     );
   }

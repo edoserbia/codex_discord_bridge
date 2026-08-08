@@ -122,12 +122,12 @@ function parseSendFileIndex(value: string): number {
   return parsed;
 }
 
-const REASONING_EFFORT_USAGE = '用法：!effort [status|set <minimal|low|medium|high|xhigh>|clear] | !effort project <status|set <minimal|low|medium|high|xhigh>|clear>';
+const REASONING_EFFORT_USAGE = '用法：!effort [status|set <minimal|low|medium|high|xhigh|max|ultra>|clear] | !effort project <status|set <minimal|low|medium|high|xhigh|max|ultra>|clear>';
 
 function parseReasoningEffort(value: string): ReasoningEffort {
   const normalized = value.toLowerCase();
 
-  if (normalized === 'minimal' || normalized === 'low' || normalized === 'medium' || normalized === 'high' || normalized === 'xhigh') {
+  if (normalized === 'minimal' || normalized === 'low' || normalized === 'medium' || normalized === 'high' || normalized === 'xhigh' || normalized === 'max' || normalized === 'ultra') {
     return normalized;
   }
 

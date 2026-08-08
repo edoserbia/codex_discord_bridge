@@ -10,7 +10,7 @@ export type CodexDriverMode = 'legacy-exec' | 'app-server';
 
 export type ExecutionDriverMode = CodexDriverMode | 'claude-cli';
 
-export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
 
 export interface BindingCodexOptions {
   model?: string | undefined;

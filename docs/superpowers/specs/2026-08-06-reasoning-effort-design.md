@@ -12,10 +12,10 @@ The Bridge exposes one command family:
 
 ```text
 !effort status
-!effort set <minimal|low|medium|high|xhigh>
+!effort set <minimal|low|medium|high|xhigh|max|ultra>
 !effort clear
 !effort project status
-!effort project set <minimal|low|medium|high|xhigh>
+!effort project set <minimal|low|medium|high|xhigh|max|ultra>
 !effort project clear
 ```
 
@@ -52,7 +52,7 @@ Bridge resolves effective effort immediately before each Codex turn. A command n
 - Legacy exec driver: include `-c model_reasoning_effort=\"<value>\"` in both new and resumed executions.
 - Claude CLI driver: do not read or pass this setting.
 
-Bridge accepts `xhigh` without model-specific filtering. If the selected Codex model rejects an effort value, Bridge surfaces the native Codex error instead of silently downgrading it.
+Bridge accepts `xhigh`, `max`, and `ultra` without model-specific filtering. If the selected Codex model rejects an effort value, Bridge surfaces the native Codex error instead of silently downgrading it.
 
 ## Status And Help
 
