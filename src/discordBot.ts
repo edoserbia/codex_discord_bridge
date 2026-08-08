@@ -597,6 +597,7 @@ export class DiscordCodexBridge {
 
     const existingBinding = this.store.getBinding(request.channelId);
     const codexOptions = cloneCodexOptions(this.config.defaultCodex);
+    delete codexOptions.reasoningEffort;
     let modelScope: ChannelBinding['modelScope'];
 
     if (options.model) {

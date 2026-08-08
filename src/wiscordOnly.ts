@@ -13,11 +13,14 @@ async function main(): Promise<void> {
   await store.load();
   const bridge = new WiscordCodexBridge(config, store, createCodexExecutionDriver(config));
   await bridge.start();
+  // The transport intentionally unrefs heartbeat/retry timers, so keep the daemon alive between Gateway events.
+  const keepAlive = setInterval(() => undefined, 60_000);
 
   let stopping = false;
   const stop = () => {
     if (stopping) return;
     stopping = true;
+    clearInterval(keepAlive);
     void bridge.stop().finally(() => process.exit(0));
   };
   process.once('SIGINT', stop);

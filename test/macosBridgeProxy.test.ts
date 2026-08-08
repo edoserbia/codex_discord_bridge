@@ -320,12 +320,13 @@ validate_required_env() { :; }
 maybe_export_proxy() { :; }
 maybe_configure_node_tls() { :; }
 sanitize_codex_desktop_env() { :; }
-node() { echo "node:$*"; return 42; }
+  node() { echo "wiscord=\${WISCORD_ENABLED:-unset}"; echo "node:$*"; return 42; }
 sleep() { echo "sleep:$1"; exit 0; }
 run_service_run`,
     {},
   );
 
+  assert.match(output, /^wiscord=false$/m);
   assert.match(output, /^node:dist\/index\.js$/m);
   assert.match(output, /10 秒后自动重连\/重启/);
   assert.match(output, /^sleep:10$/m);

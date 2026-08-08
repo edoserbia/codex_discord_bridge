@@ -113,7 +113,7 @@ interface WiscordActiveRun {
   binding: ChannelBinding;
   job?: RunningCodexJob | undefined;
   runtime: ChannelRuntime;
-  refreshProgress: () => Promise<void>;
+  refreshProgress: (immediate?: boolean) => Promise<void>;
   cancellationReason?: 'autopilot' | 'guide' | 'cancel' | undefined;
 }
 
@@ -159,6 +159,7 @@ export class WiscordCodexBridge {
   private readonly pendingClaudePermissions = new Map<string, PendingWiscordClaudePermission>();
   private readonly scheduledEventIds = new Set<string>();
   private readonly activeAutopilotRuns = new Set<string>();
+  private readonly autopilotCompletions = new Set<Promise<void>>();
   private autopilotTimer: NodeJS.Timeout | undefined;
   private autopilotTickInFlight = false;
 
@@ -197,18 +198,17 @@ export class WiscordCodexBridge {
     await this.gatewayQueue;
     await Promise.all([...this.eventTasks]);
     await Promise.all([...this.queueWorkers.values()]);
+    await Promise.all([...this.autopilotCompletions]);
   }
 
   private async ensureBinding(): Promise<void> {
     const now = new Date().toISOString();
     const existing = this.store.getBinding(this.wiscord.channelId);
+    const codex = cloneCodexOptions(this.config.defaultCodex);
+    delete codex.reasoningEffort;
     const binding: ChannelBinding = {
       channelId: this.wiscord.channelId,
-      codex: {
-        ...this.config.defaultCodex,
-        addDirs: [...this.config.defaultCodex.addDirs],
-        extraConfig: [...this.config.defaultCodex.extraConfig],
-      },
+      codex,
       createdAt: existing?.createdAt ?? now,
       guildId: this.wiscord.guildId,
       projectName: this.wiscord.projectName,
@@ -558,9 +558,11 @@ export class WiscordCodexBridge {
     const resolvedWorkspace = await resolveExistingDirectory(targetWorkspace);
     const existing = this.store.getBinding(message.conversationId);
     const now = new Date().toISOString();
+    const codex = cloneCodexOptions(this.config.defaultCodex);
+    delete codex.reasoningEffort;
     const binding: ChannelBinding = {
       channelId: message.conversationId,
-      codex: cloneCodexOptions(this.config.defaultCodex),
+      codex,
       createdAt: existing?.createdAt ?? now,
       engine,
       guildId: message.guildId,
@@ -697,7 +699,7 @@ export class WiscordCodexBridge {
     activeRun.latestActivity = '收到中途引导，继续当前任务';
     activeRun.updatedAt = new Date().toISOString();
     activeRun.timeline = [...activeRun.timeline, `🧭 收到新的引导：${prompt}`].slice(-20);
-    await active.refreshProgress();
+    await active.refreshProgress(true);
     if (active.job?.steer) {
       await active.job.steer(prompt);
       await this.sendText(message.conversationId, '已将你的新消息作为引导项插入当前工作，当前引擎会在本轮继续处理中途引导。');
@@ -707,7 +709,7 @@ export class WiscordCodexBridge {
     active.cancellationReason = 'guide';
     activeRun.status = 'cancelled';
     activeRun.latestActivity = '正在中断当前步骤，优先处理中途引导';
-    await active.refreshProgress();
+    await active.refreshProgress(true);
     const guidedMessage: WiscordMessage = {
       ...message,
       content: `当前任务：${activeRun.task.rootPrompt}\n\n中途引导：${prompt}`,
@@ -748,7 +750,7 @@ export class WiscordCodexBridge {
       activeRun.latestActivity = `${reason}，已中止当前任务`;
       activeRun.updatedAt = new Date().toISOString();
       activeRun.timeline = [...activeRun.timeline, `🛑 ${reason}`].slice(-20);
-      await active.refreshProgress();
+      await active.refreshProgress(true);
     }
     active.job?.cancel();
   }
@@ -1047,7 +1049,7 @@ export class WiscordCodexBridge {
     activeRun.latestActivity = reason;
     activeRun.updatedAt = new Date().toISOString();
     activeRun.timeline = [...activeRun.timeline, `⏹️ ${reason}`].slice(-20);
-    await active.refreshProgress();
+    await active.refreshProgress(true);
     active.job?.cancel();
   }
 
@@ -1164,9 +1166,14 @@ export class WiscordCodexBridge {
       guildId: binding.guildId,
       id: `autopilot:${randomUUID()}`,
     };
-    void this.enqueueRun(message, binding, { origin: 'autopilot', prompt: message.content })
-      .then(() => this.completeAutopilotRun(binding, true))
-      .catch(() => this.completeAutopilotRun(binding, false));
+    const completion = this.enqueueRun(message, binding, { origin: 'autopilot', prompt: message.content })
+      .then(
+        () => this.completeAutopilotRun(binding, true),
+        () => this.completeAutopilotRun(binding, false),
+      )
+      .catch((error) => console.error('[wiscord] failed to complete Autopilot run', error));
+    this.autopilotCompletions.add(completion);
+    void completion.finally(() => this.autopilotCompletions.delete(completion));
   }
 
   private async completeAutopilotRun(binding: ChannelBinding, success: boolean): Promise<void> {
@@ -1251,9 +1258,33 @@ export class WiscordCodexBridge {
       method: 'POST',
     });
     let progressChain = Promise.resolve();
-    const updateProgress = (content: string) => {
-      progressChain = progressChain.then(() => this.editMessage(reply.messageId, content));
-      return progressChain;
+    let progressTimer: ReturnType<typeof setTimeout> | undefined;
+    let pendingProgress: string | undefined;
+    let progressResolvers: Array<() => void> = [];
+    const flushProgress = () => {
+      progressTimer = undefined;
+      const content = pendingProgress;
+      pendingProgress = undefined;
+      const resolvers = progressResolvers;
+      progressResolvers = [];
+      if (content === undefined) {
+        resolvers.forEach((resolve) => resolve());
+        return;
+      }
+      progressChain = progressChain
+        .then(() => this.editMessage(reply.messageId, content))
+        .catch(() => undefined)
+        .finally(() => resolvers.forEach((resolve) => resolve()));
+    };
+    const updateProgress = (content: string, immediate = false): Promise<void> => {
+      pendingProgress = content;
+      if (immediate) {
+        if (progressTimer) clearTimeout(progressTimer);
+        flushProgress();
+        return progressChain;
+      }
+      if (!progressTimer) progressTimer = setTimeout(flushProgress, 300);
+      return Promise.resolve();
     };
     const runtime = createWiscordRuntime(
       runMessage,
@@ -1264,12 +1295,12 @@ export class WiscordCodexBridge {
     const downloaded = await this.downloadAttachments(runMessage, runBinding);
     runtime.activeRun!.task.attachments = downloaded.attachments;
     const activeRun = runtime.activeRun!;
-    const refreshProgress = () => updateProgress(formatProgressMessage(
+    const refreshProgress = (immediate = false) => updateProgress(formatProgressMessage(
       runBinding,
       runtime,
       this.config.commandPrefix,
       this.config.codexDriverMode ?? 'app-server',
-    ));
+    ), immediate);
     const touch = (activity?: string) => {
       activeRun.updatedAt = new Date().toISOString();
       if (activity) activeRun.latestActivity = activity;
@@ -1277,8 +1308,9 @@ export class WiscordCodexBridge {
     const pushTimeline = (entry: string) => {
       activeRun.timeline = [...activeRun.timeline, entry].slice(-20);
     };
+    let agentMessageTimelineShown = false;
 
-    await refreshProgress();
+    await refreshProgress(true);
     const activeControl: WiscordActiveRun = { binding: runBinding, refreshProgress, runtime };
     this.activeRuns.set(message.conversationId, activeControl);
     const hooks: CodexRunHooks = {
@@ -1313,8 +1345,11 @@ export class WiscordCodexBridge {
       },
       onAgentMessage: async (content) => {
         touch('正在生成回答');
-        activeRun.agentMessages = [...activeRun.agentMessages, content].slice(-6);
-        pushTimeline('🔄 正在生成回答');
+        activeRun.agentMessages = [content];
+        if (!agentMessageTimelineShown) {
+          agentMessageTimelineShown = true;
+          pushTimeline('🔄 正在生成回答');
+        }
         await refreshProgress();
       },
       onCommandStarted: async (command) => {
@@ -1392,7 +1427,11 @@ export class WiscordCodexBridge {
           ? '🛑 当前任务已取消'
           : result.success ? '✅ 本轮已完成' : '❌ 本轮失败',
     );
-    await refreshProgress();
+    await refreshProgress(true);
+    if (progressTimer) {
+      clearTimeout(progressTimer);
+      flushProgress();
+    }
     await progressChain;
     await this.store.updateSession(message.conversationId, {
       codexThreadId: result.codexThreadId ?? session.codexThreadId,
@@ -1619,6 +1658,7 @@ class WiscordHttpError extends Error {
 
 class WiscordCheckpointStore {
   private state: WiscordCheckpoint = { lastAckedSequence: 0, pending: [], processedEventIds: [] };
+  private writeChain: Promise<void> = Promise.resolve();
 
   constructor(private readonly filePath: string) {}
 
@@ -1664,10 +1704,16 @@ class WiscordCheckpointStore {
   }
 
   private async save(): Promise<void> {
-    await fs.mkdir(path.dirname(this.filePath), { recursive: true });
-    const temporary = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
-    await fs.writeFile(temporary, `${JSON.stringify(this.state, null, 2)}\n`, 'utf8');
-    await fs.rename(temporary, this.filePath);
+    const snapshot = `${JSON.stringify(this.state, null, 2)}\n`;
+    const temporary = `${this.filePath}.${process.pid}.${randomUUID()}.tmp`;
+    const write = async () => {
+      await fs.mkdir(path.dirname(this.filePath), { recursive: true });
+      await fs.writeFile(temporary, snapshot, 'utf8');
+      await fs.rename(temporary, this.filePath);
+    };
+    const pending = this.writeChain.then(write, write);
+    this.writeChain = pending.catch(() => undefined);
+    await pending;
   }
 }
 

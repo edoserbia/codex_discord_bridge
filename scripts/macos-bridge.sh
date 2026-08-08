@@ -1644,6 +1644,10 @@ run_service_run() {
   print_header '前台运行服务'
   cd "${ROOT_DIR}"
 
+  # Wiscord runs in a dedicated launchd service so its Gateway connection cannot
+  # compete with the Discord bridge process that shares this configuration.
+  export WISCORD_ENABLED=false
+
   local child_pid=''
   local exit_code=0
   trap 'if [[ -n "${child_pid:-}" ]]; then kill "${child_pid}" >/dev/null 2>&1 || true; fi; rm -f "${PID_FILE}" >/dev/null 2>&1 || true; exit 0' TERM INT
